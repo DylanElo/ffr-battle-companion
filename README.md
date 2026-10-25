@@ -2,12 +2,12 @@
 
 Boss weaknesses, gear planning and Resonance kits for FINAL FANTASY RESONANCE: **https://dylanelo.github.io/ffr-battle-companion/**
 
-Works without a save for looking things up. Load your save to plan with what you actually own. The save is read in your browser tab and never uploaded or changed.
+Works without a save for looking things up. Load your save to plan with what you actually own. The save is read in your browser tab and never uploaded. It's only changed if you ask for your plans to be equipped, and then as a new downloaded file.
 
 ## What it does
 
 - **Fight**: pick an enemy to see what it's weak to, resists and attacks with. **Best party** searches every party of four you can field, with owned Resonances, shared equipment and learned abilities, and predicts one round of damage with the game's own formula. Choose damage, break or damage + support, require a healer or protection, lock characters in, then compare three options and use one as your gear plans. Below that: your Resonances with unlocked skills it's weak to, its skills and its status resistances.
-- **Characters**: an equip screen per character with real stat totals (base, level, sync and gear). **Build for a fight** searches one character's Resonance, gear, attack, abilities and passives together for the most damage or stagger against a chosen enemy. **Optimize stats** is the instant version: it picks the Resonance and gear for the stats you gear for, suggested from the character's own kit and role, and never takes gear another character is wearing unless you allow it. Keep plans per character and export them.
+- **Characters**: an equip screen per character with real stat totals (base, level, sync and gear). **Build for a fight** searches one character's Resonance, gear, attack, abilities and passives together for the most damage or stagger against a chosen enemy. **Optimize stats** is the instant version: it picks the Resonance and gear for the stats you gear for, suggested from the character's own kit and role, and never takes gear another character is wearing unless you allow it. Keep plans per character and export them. **Equip plans in my save** writes the plans' gear, Resonances and abilities into a copy of your save (with a backup download) for you to drop into your save folder; it's the only feature that writes a save.
 - **Resonances**: every kit with its finisher and what unlocks at each awakening and sync level, plus your own progress. **Filter by effect** finds Resonances by what their skills and passives do (ATK/MAG/DEF/SPR/Speed down or up, statuses, heals, revive, cure, dispel, cover, provoke and more), who they hit (one enemy, all enemies, self, allies), physical or magic, and element, optionally limited to what a character has unlocked. Each match shows the skill and where it unlocks.
 - **How this works** (footer): what the recommendations do and don't account for, impact tiers and source tables.
 
