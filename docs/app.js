@@ -8,7 +8,7 @@ const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
 const VIEWS = [['bosses', 'Bosses'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
 
 let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'bosses';
-const ui = { enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, goal: 'physical', reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, goal: 'physical', reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
@@ -18,6 +18,12 @@ const el = (e, extra = '') => `<span class="el ${h(C.clean(e))}">${h(C.clean(e))
 const statsText = item => Object.entries(item?.stats || {}).map(([k, v]) => `${C.statLabels[k] || k} ${v > 0 ? '+' : ''}${v}`).join(', ') || 'no stats';
 const pretty = s => C.clean(s).replace('Sowrd', 'Sword').replace(/([a-z])([A-Z])/g, '$1 $2');
 const opt = (value, text, selected) => `<option value="${h(value)}" ${selected ? 'selected' : ''}>${h(text)}</option>`;
+// Portraits are the game's own face icons (img/), named unit<id>, summon<id> and mons<FaceIconId>.
+let faces = {};
+const img = (file, size = '') => file ? `<img class="face ${size}" src="img/${file}.webp" alt="" width="128" height="128" decoding="async">` : '';
+const enemyFace = (id, size) => img(faces[id], size);
+const charFace = (id, size) => index.characters?.has(Number(id)) ? img(`unit${id}`, size) : '';
+const visionFace = (id, size) => index.visions?.has(Number(id)) ? img(`summon${id}`, size) : '';
 
 function toast(text) {
   const t = $('#toast'); t.textContent = text; t.hidden = false;
@@ -53,13 +59,18 @@ export async function readSave(file) {
         id: num(p + 'UnitId'), joinStatus: by.get(p + 'JoinStatus') ?? null, usable: by.get(p + 'IsUsable') ?? null,
         experience: num(p + 'Experience'), hp: num(p + 'HitPoint'), mp: num(p + 'MagicPoint'),
         equipment: { weaponId: num(p + 'EquipWeaponId'), armorId: num(p + 'EquipArmorId'), accessoryIds: list(p + 'EquipAccessoryIdList'), visionId: num(p + 'equipVisionId') },
+        baseParameters: list(p + 'baseParameterList'), equippedSkillIds: list(p + 'equipSkillList'), activeSkillIds: list(p + 'activeSkillIdList'),
+        rawFields: Object.fromEntries(fields.filter(f => f.path.startsWith(p)).map(f => [f.path.slice(p.length), f.value])),
       };
     }),
     resonances: records('visionList', 'ID').map(i => {
       const p = `visionList[${i}].`;
       return { id: num(p + 'ID'), awakeningPoints: num(p + 'awakeningPoint'),
-        sync: records(p + 'synchroPoints', 'Key').map(j => ({ characterId: num(`${p}synchroPoints[${j}].Key`), points: num(`${p}synchroPoints[${j}].Value`) })) };
+        sync: records(p + 'synchroPoints', 'Key').map(j => ({ characterId: num(`${p}synchroPoints[${j}].Key`), points: num(`${p}synchroPoints[${j}].Value`) })),
+        rawFields: Object.fromEntries(fields.filter(f => f.path.startsWith(p)).map(f => [f.path.slice(p.length), f.value])) };
     }),
+    player: Object.fromEntries(fields.filter(f => f.path.startsWith('Player.')).map(f => [f.path.slice(7), f.value])),
+    artifactOverrides: records('artifactList', 'Key').map(i => ({ id: num(`artifactList[${i}].Key`), active: by.get(`artifactList[${i}].Value.IsActive`) ?? null })),
   };
 }
 
@@ -109,7 +120,7 @@ function bosses() {
     <section class="window" aria-label="Choose an enemy">
       <input type="search" id="enemy-q" data-key="enemy-q" placeholder="Search enemies" value="${h(ui.enemyQ)}" aria-label="Search enemies">
       <label class="check"><input type="checkbox" id="boss-only" ${ui.bossOnly ? 'checked' : ''}> Bosses only</label>
-      <ul class="pick" role="listbox" aria-label="Enemies">${list.map(e => `<li role="option" tabindex="0" data-enemy="${e.id}" data-key="e${e.id}" aria-selected="${e.id === ui.enemyId}">${h(e.name)}<small>Lv ${e.level}</small></li>`).join('') || '<li class="dim">No enemies match.</li>'}</ul>
+      <ul class="pick" role="listbox" aria-label="Enemies">${list.map(e => `<li role="option" tabindex="0" data-enemy="${e.id}" data-key="e${e.id}" aria-selected="${e.id === ui.enemyId}">${enemyFace(e.id, 'sm')}<span>${h(e.name)}</span><small>Lv ${e.level}</small></li>`).join('') || '<li class="dim">No enemies match.</li>'}</ul>
     </section>
     <section class="window">${enemy ? enemyDetail(enemy) : '<p class="dim">Pick an enemy.</p>'}</section>
   </div>`;
@@ -126,28 +137,29 @@ function enemyDetail(enemy) {
     const rows = C.encounterOptions(catalog, snapshot, enemy, ui.perspective);
     picks = `<div class="row-head"><h3>Your Resonances for this fight</h3>${perspectivePicker('perspective')}</div>
       <p class="sub small">Ranked by how many skills you’ve unlocked that hit a weakness.</p>
-      <ul class="rows">${rows.map(r => `<li>
+      <ul class="rows">${rows.map(r => `<li class="match">${visionFace(r.vision.id, 'md')}
         <div class="row-head"><h4>${h(r.vision.name)}</h4><span class="dim small">${h(r.vision.roles.join(', '))}</span></div>
         ${r.matches.length ? `<p class="good">${r.matches.length} weakness hit${r.matches.length === 1 ? '' : 's'}: ${h(r.matches.map(s => s.name).join(', '))}</p>` : '<p class="dim">No unlocked skill hits a weakness.</p>'}
         ${r.risky.length ? `<p class="bad small">Some skills are resisted: ${h([...new Set(r.risky.map(s => C.clean(s.element)))].join(', '))}</p>` : ''}
-        <button type="button" data-plan="${r.vision.id}">Plan gear with ${h(r.vision.name)}</button>
+        <div><button type="button" data-plan="${r.vision.id}">Plan gear with ${h(r.vision.name)}</button></div>
       </li>`).join('') || '<li class="dim">This save has no Resonances yet.</li>'}</ul>`;
   } else {
     const hitters = catalog.visions.filter(v => v.skillIds.some(id => {
       const s = index.skills.get(id); return s && weak.includes(C.clean(s.element)) && Number(s.mag) > 0 && s.relation === 'Enemies';
     }));
     picks = `<h3>Resonances with skills it’s weak to</h3>
-      ${weak.length ? `<p>${hitters.map(v => h(v.name)).join(', ') || '<span class="dim">None.</span>'}</p>` : '<p class="dim">No weakness to plan around.</p>'}
+      ${weak.length ? (hitters.length ? `<ul class="gallery inline">${hitters.map(v => `<li data-kit="${v.id}" tabindex="0">${visionFace(v.id)}${h(v.name)}</li>`).join('')}</ul>` : '<p class="dim">None.</p>') : '<p class="dim">No weakness to plan around.</p>'}
       ${loadPrompt('Load your save to see which of yours have those skills unlocked, and plan gear around one.')}`;
   }
   const stats = Object.entries(enemy.stats || {}).map(([k, v]) => `<span>${h(k === 'MaxBreakPoint' ? 'Break' : C.statLabels[k] || k)}<b>${v.toLocaleString()}</b></span>`).join('');
-  return `<h2>${h(enemy.name)}</h2>
+  return `<div class="hero">${enemyFace(enemy.id, 'lg')}<div>
+    <h2>${h(enemy.name)}</h2>
     <p class="sub">Level ${enemy.level}${enemy.isBoss ? ', boss' : ''}</p>
     <div class="weak-line">
       <span>Weak to</span><div class="els">${weak.map(e => el(e)).join('') || '<span class="dim">Nothing</span>'}</div>
       <span>Resists</span><div class="els">${resist.map(([e, r]) => el(e, ` <span class="dim">${h(r)}</span>`)).join('') || '<span class="dim">Nothing</span>'}</div>
       <span>Attacks with</span><div class="els">${threats.map(e => el(e)).join('') || '<span class="dim">No elemental attacks</span>'}</div>
-    </div>
+    </div></div></div>
     ${picks}
     <h3>Details</h3>
     <div class="statline">${stats}</div>
@@ -163,10 +175,10 @@ function gear() {
   if (!hasSave()) return `<section class="window"><h2>Gear</h2>${loadPrompt('Load your save to compare the equipment you own and find the best loadout for each character.')}</section>`;
   const people = recruited(), saved = snapshot.characters.find(c => c.id === ui.charId), native = index.characters.get(ui.charId);
   const side = `<section class="window" aria-label="Character and goal">
-    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${h(name('characters', c.id))}<small>${snapshot.party.includes(c.id) ? 'In party' : ''}${plans[c.id] ? ' · planned' : ''}</small></li>`).join('')}</ul>
+    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}</span><small>${snapshot.party.includes(c.id) ? 'In party' : ''}${plans[c.id] ? ' · planned' : ''}</small></li>`).join('')}</ul>
     <label class="check">Best for <select id="goal">${Object.entries(C.goals).map(([id, g]) => opt(id, g.label, id === ui.goal)).join('')}</select></label>
     <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take other characters’ gear</label>
-    ${Object.keys(plans).length ? `<h3>Plans</h3><ul class="rows plans">${Object.keys(plans).map(id => `<li><span>${h(name('characters', id))}</span><button type="button" class="ghost" data-release="${id}">Remove</button></li>`).join('')}</ul>
+    ${Object.keys(plans).length ? `<h3>Plans</h3><ul class="rows plans">${Object.keys(plans).map(id => `<li>${charFace(id, 'sm')}<span>${h(name('characters', id))}</span>${visionFace(plans[id].visionId, 'sm')}<button type="button" class="ghost" data-release="${id}">Remove</button></li>`).join('')}</ul>
       <button type="button" id="export">Export plans</button>` : ''}
   </section>`;
   if (!saved || !native || !draft) return `<div class="split">${side}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
@@ -198,8 +210,11 @@ function gear() {
 
   return `<div class="split">${side}
   <section class="window">
-    <h2>${h(native.name)}</h2>
-    <p class="sub">${h(pretty(native.weaponType))}, ${h(native.armorTypes.map(pretty).join(' or ').toLowerCase())}</p>
+    <div class="hero">${charFace(native.id, 'lg')}<div>
+      <h2>${h(native.name)}</h2>
+      <p class="sub">${h(pretty(native.weaponType))}, ${h(native.armorTypes.map(pretty).join(' or ').toLowerCase())}</p>
+      ${v ? `<p class="small">${visionFace(v.id, 'sm')} With ${h(v.name)}</p>` : ''}
+    </div></div>
     <div class="toolbar">
       <button type="button" class="primary" id="best">Find the best ${h(C.goals[ui.goal].label.toLowerCase())} loadout</button>
       <button type="button" id="saved-gear">Back to saved gear</button>
@@ -230,28 +245,33 @@ function resonances() {
   const q = ui.kitQ.trim().toLowerCase(), mine = hasSave() && ui.ownedOnly;
   const text = v => `${v.name} ${v.roles.join(' ')} ${v.skillIds.map(id => { const s = index.skills.get(id); return `${s?.name} ${s?.desc} ${s?.element}`; }).join(' ')} ${v.passiveIds.map(id => name('passives', id)).join(' ')}`.toLowerCase();
   const list = catalog.visions.filter(v => (!mine || owned(v.id)) && (!q || text(v).includes(q))).sort((a, b) => a.name.localeCompare(b.name));
-  return `<section class="window">
-    <h2>Resonances</h2>
-    <div class="toolbar">
-      <input type="search" id="kit-q" data-key="kit-q" placeholder="Search names, roles, skills or effects" value="${h(ui.kitQ)}" aria-label="Search Resonances" style="max-width:360px">
-      ${hasSave() ? `<label class="check"><input type="checkbox" id="owned-only" ${ui.ownedOnly ? 'checked' : ''}> Only mine</label>${perspectivePicker('kit-perspective')}` : ''}
-    </div>
-    <ul class="rows">${list.map(kit).join('') || `<li class="dim">Nothing matches.${mine ? ' Turn off “Only mine” to search all of them.' : ''}</li>`}</ul>
-  </section>`;
+  if (!list.some(v => v.id === ui.kitId)) ui.kitId = list[0]?.id ?? 0;
+  const tierOf = id => catalog.legacyTiers.find(t => t.id === id)?.impact;
+  return `<div class="split">
+    <section class="window" aria-label="Choose a Resonance">
+      <input type="search" id="kit-q" data-key="kit-q" placeholder="Search names, roles, skills or effects" value="${h(ui.kitQ)}" aria-label="Search Resonances">
+      ${hasSave() ? `<label class="check"><input type="checkbox" id="owned-only" ${ui.ownedOnly ? 'checked' : ''}> Only mine</label>` : ''}
+      <ul class="gallery" role="listbox" aria-label="Resonances">${list.map(v => `<li role="option" tabindex="0" data-kit="${v.id}" data-key="k${v.id}" aria-selected="${v.id === ui.kitId}" class="${hasSave() && !owned(v.id) ? 'notmine' : ''}">
+        ${tierOf(v.id) ? `<span class="tier ${h(tierOf(v.id))}">${h(tierOf(v.id))}</span>` : ''}${visionFace(v.id)}${h(v.name)}</li>`).join('')
+        || `<li class="dim">Nothing matches.${mine ? ' Turn off “Only mine” to see all.' : ''}</li>`}</ul>
+    </section>
+    <section class="window">${index.visions.get(ui.kitId) ? kit(index.visions.get(ui.kitId)) : '<p class="dim">Pick a Resonance.</p>'}</section>
+  </div>`;
 }
 
 function kit(v) {
   const o = owned(v.id), m = C.mastery(v, o, ui.perspective), tier = catalog.legacyTiers.find(t => t.id === v.id);
   const next = o && m.rows.filter(r => !r.reached && r.kind === 'Sync').sort((a, b) => a.required - b.required)[0];
-  const stages = kind => `<details><summary>${kind} unlocks</summary><ul class="skills">${m.rows.filter(r => r.kind === kind).map(r => `<li class="${r.reached ? 'got' : ''}">
+  const stages = kind => `<details ${kind === 'Sync' && o ? 'open' : ''}><summary>${kind} unlocks</summary><ul class="skills">${m.rows.filter(r => r.kind === kind).map(r => `<li class="${r.reached ? 'got' : ''}">
     <b>${h(grantName(r))}</b> <span class="meta">at ${r.required} points${o ? (r.reached ? ', unlocked' : '') : ''}</span>${grantDesc(r) ? `<p>${h(grantDesc(r))}</p>` : ''}</li>`).join('')}</ul></details>`;
-  return `<li>
-    <div class="row-head"><h4>${tier ? `<span class="tier ${h(tier.impact)}" title="Impact tier">${h(tier.impact)}</span> ` : ''}${h(v.name)}</h4>
-      <span class="dim small">${h(v.roles.join(', '))}, ${C.clean(v.attackType) === 'Magic' ? 'magic' : 'physical'} damage</span></div>
-    ${o ? `<p class="small"><span class="owned">Yours.</span> Awakening ${m.awake}, ${h(name('characters', ui.perspective))}’s sync ${m.sync}.${next ? ` Next unlock at ${next.required} sync: ${h(grantName(next))}.` : ''}</p>` : ''}
-    <details><summary>Finisher: ${h(name('skills', v.finishBlow))}</summary><ul class="skills">${skillItem(index.skills.get(v.finishBlow))}</ul></details>
-    ${stages('Awakening')}${stages('Sync')}
-  </li>`;
+  return `<div class="hero">${visionFace(v.id, 'lg')}<div>
+      <h2>${h(v.name)} ${tier ? `<span class="tier ${h(tier.impact)}" title="Impact tier">${h(tier.impact)}</span>` : ''}</h2>
+      <p class="sub">${h(v.roles.join(', '))}, ${C.clean(v.attackType) === 'Magic' ? 'magic' : 'physical'} damage</p>
+      ${o ? `<p class="small"><span class="owned">Yours.</span> Awakening ${m.awake}, ${h(name('characters', ui.perspective))}’s sync ${m.sync}.${next ? ` Next unlock at ${next.required} sync: ${h(grantName(next))}.` : ''}</p>` : hasSave() ? '<p class="dim small">Not in your save yet.</p>' : ''}
+      ${o ? perspectivePicker('kit-perspective') : ''}
+    </div></div>
+    <h3>Finisher</h3><ul class="skills">${skillItem(index.skills.get(v.finishBlow))}</ul>
+    ${stages('Awakening')}${stages('Sync')}`;
 }
 
 // ---------- about ----------
@@ -285,7 +305,8 @@ const RENDER = { bosses, gear, resonances, about };
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
   $('#save').innerHTML = hasSave()
-    ? `<b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
+    ? `<span class="party" title="Your party">${snapshot.party.filter(id => id > 0).map(id => charFace(id, 'sm')).join('')}</span>
+       <b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
        <label class="load"><input type="file" accept=".sav" data-pick><span>Load another</span></label>`
     : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label><span class="dim">to plan with what you own</span>`;
   $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
@@ -305,9 +326,14 @@ function exportPlans() {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('button, [data-enemy], [data-char]'); if (!t || !catalog) return;
+  const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
   if (t.dataset.view) { view = t.dataset.view; render(); return; }
   if (t.dataset.enemy) { ui.enemyId = +t.dataset.enemy; render(); return; }
+  if (t.dataset.kit) {
+    ui.kitId = +t.dataset.kit;
+    if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
+    render(); return;
+  }
   if (t.dataset.char) { ui.charId = +t.dataset.char; setDraft(); render(); return; }
   if (t.dataset.plan) {
     const v = index.visions.get(+t.dataset.plan);
@@ -322,7 +348,7 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
-  const row = e.target.closest?.('[data-enemy], [data-char]');
+  const row = e.target.closest?.('[data-enemy], [data-char], [data-kit]');
   if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); row.click(); }
 });
 
@@ -350,6 +376,7 @@ const ready = (async () => {
     const r = await fetch('data/catalog.json');
     if (!r.ok) throw new Error(`Couldn’t load game data (${r.status}). Reload to try again.`);
     catalog = await r.json();
+    faces = await fetch('data/faces.json').then(x => x.ok ? x.json() : {}, () => ({}));
     for (const k of ['characters', 'visions', 'equipment', 'skills', 'passives', 'enemies']) index[k] = new Map(catalog[k].map(x => [x.id, x]));
     render();
   } catch (e) { error(e.message); $('#app').innerHTML = ''; throw e; }
