@@ -1,5 +1,5 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=23';
+import {createOptimizerController} from './optimizer-controller.js?v=24';
 import {comparison} from './optimizer-ui.js?v=22';
 
 const C = globalThis.Companion;
@@ -10,7 +10,7 @@ const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
 const VIEWS = [['next', 'Next fight'], ['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 'Resonances']];
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, pickVision: true,
   reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null,
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
@@ -217,7 +217,7 @@ function fightDetails(enemy) {
       <ul class="rows">${rows.map(r => `<li class="match">${visionFace(r.vision.id, 'md')}
         <div class="row-head"><h4>${h(r.vision.name)}</h4><span class="dim small">${h(r.vision.roles.join(', '))}</span></div>
         <p class="good small">${h(r.matches.map(s => s.name).join(', '))}</p>
-        <div><button type="button" class="ghost" data-plan="${r.vision.id}">Gear ${h(name('characters', ui.perspective))} with ${h(r.vision.name)}</button></div>
+        <div><button type="button" class="ghost" data-plan="${r.vision.id}">Build ${h(name('characters', ui.perspective))} around ${h(r.vision.name)}</button></div>
       </li>`).join('') || `<li class="dim">${weak.length ? 'None of your unlocked skills hit its weakness yet.' : 'It has no elemental weakness.'}</li>`}</ul>`;
   } else {
     const hitters = catalog.visions.filter(v => v.skillIds.some(id => {
@@ -231,7 +231,6 @@ function fightDetails(enemy) {
 
 // ---------- gear ----------
 
-const PRIORITY_LABELS = { PhysicalAttack: 'Attack', MagicalAttack: 'Magic', PhysicalDefense: 'Defence', MagicalDefense: 'Magic defence', HitPoint: 'HP', Agility: 'Speed', Divine: 'Divine', MagicPoint: 'MP' };
 // Everything the character can use with the planned Resonance: their own abilities, level and sync
 // unlocks, and the Resonance's grants (same source the party optimizer uses).
 function usableSkills(visionId) {
@@ -239,29 +238,6 @@ function usableSkills(visionId) {
     const l = globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId);
     return [...new Set([...l.freeActiveIds, ...l.learnedActiveIds])].map(id => index.skills.get(id)).filter(Boolean);
   } catch { return []; }
-}
-// "Find the best loadout": choose the Resonance first (unless the player chose one), then gear for
-// the priorities. If the priorities are the suggestion, re-suggest them for the new Resonance's kit.
-function findBest() {
-  if (ui.pickVision) {
-    const own = new Set(usableSkills(-1).map(s => s.id)), healer = (index.characters.get(ui.charId)?.roles || []).map(C.clean).includes('Healer');
-    const keys = gearPriorities().keys;
-    const taken = takenVisions();
-    // Ties keep the current Resonance instead of an arbitrary swap.
-    const ranked = snapshot.resonances.filter(r => !taken.has(r.id))
-      .map(r => ({ id: r.id, ...C.resonanceFit(usableSkills(r.id).filter(s => !own.has(s.id)), keys, healer) }))
-      .sort((a, b) => b.fit - a.fit || (b.id === Number(draft.visionId)) - (a.id === Number(draft.visionId)));
-    const best = ranked[0];
-    // Fit only measures attack power, so offer the runners-up (with their roles) for a player's call.
-    ui.visionAlts = ranked.slice(1, 4).filter(r => r.fit > 0);
-    if (best) {
-      draft.visionId = best.id;
-      ui.visionWhy = best.fit > 0 ? `${name('visions', best.id)} adds the most ${keys.filter(k => k.endsWith('Attack')).map(k => PRIORITY_LABELS[k]).join(' and ')} power you’ve unlocked for ${name('characters', ui.charId)} (${best.attacks} attack${best.attacks === 1 ? '' : 's'}).`
-        : `None of your free Resonances add unlocked skills for these stats yet, so ${name('visions', best.id)} stays.`;
-    }
-  }
-  const goal = C.priorityGoal(catalog, gearPriorities().keys);
-  draft = { ...C.recommend(catalog, snapshot, ui.charId, goal, plans, ui.reserve), visionId: draft.visionId };
 }
 
 // Same rule as validPlan: one Resonance per character, counting others' plans and (if reserving) their saved gear.
@@ -278,7 +254,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=24', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=25', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -290,20 +266,20 @@ function deepSearch() {
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
     options: { goals, difficulty: 'save', mpPercent: 100, broken: false, critical: false, minHealers: 0, minProtectors: 0,
-      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000, visionSlices: true } });
+      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000, visionSlices: true,
+      visionIds: ui.pickVision || !(Number(draft.visionId) > 0) ? null : [Number(draft.visionId)] } });
   render();
 }
 function applyDeep(i) {
   const r = ui.deep.results[i]; ui.deep.pick = i;
   draft = { ...r.equipment, accessoryIds: [...r.equipment.accessoryIds], visionId: r.visionId,
     equippedSkillIds: r.evaluation.equippedSkillIds || [], recommendedActionId: r.evaluation.skillId };
-  ui.visionWhy = ''; ui.visionAlts = [];
 }
 
 function gearPriorities() {
   const kitVision = index.visions.get(Number(draft?.visionId));
   const profile = C.kitProfile(usableSkills(kitVision?.id ?? -1), index.characters.get(ui.charId));
-  return { kitVision, profile, keys: ui.prio[ui.charId] ?? profile.keys };
+  return { kitVision, profile, keys: profile.keys };
 }
 
 // The stats shown on the character card, in the game's order.
@@ -328,10 +304,7 @@ function characters() {
   if (!saved || !native || !draft) return `<div class="chars">${roster}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
 
   // What to gear for: suggested from the character's usable skills and role, until the player picks.
-  const { kitVision, profile, keys } = gearPriorities(), goal = C.priorityGoal(catalog, keys);
-  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const why = profile.physicalShare === null ? `No damage skills unlocked${kitVision ? ` with ${kitVision.name}` : ''}, so this follows base stats.`
-    : `${plural(profile.damageSkills, 'damage skill')}${profile.healSkills ? ` and ${plural(profile.healSkills, 'heal')}` : ''}${kitVision ? ` with ${kitVision.name}` : ''}, ${Math.round(profile.physicalShare * 100)}% physical.${profile.roles.length ? ` ${profile.roles.join(', ')}.` : ''}`;
+  const { keys } = gearPriorities(), goal = C.priorityGoal(catalog, keys);
 
   const before = totals(saved.equipment), after = totals(draft);
   const statRows = CARD_STATS.map(([k, label]) => {
@@ -345,20 +318,7 @@ function characters() {
       <p class="sub">${after.level ? `Level ${after.level} · ` : ''}${h(pretty(native.weaponType))}</p>
     </div></div>
     <dl class="card-stats">${statRows}</dl>
-    <div class="gear-for">
-      <span class="dim small">Gear for</span>
-      ${ui.prioOpen
-        ? `<div class="chips" role="group" aria-label="Stats to prioritise">${C.priorityStats.map(k => `<button type="button" class="chip" data-prio="${k}" aria-pressed="${keys.includes(k)}"
-            ${k === 'Divine' ? 'title="Spirit raises Divine. What Divine does in battle hasn’t been confirmed yet."' : ''}>${PRIORITY_LABELS[k]}</button>`).join('')}</div>
-          <p class="dim small">${ui.prio[ui.charId] ? `<button type="button" class="ghost" data-prio-reset>Back to the suggestion</button>` : `Suggested from ${h(why)}`}</p>
-          <button type="button" class="ghost" data-prio-open>Done</button>`
-        : `<button type="button" class="goal" data-prio-open title="Change">${keys.map(k => `<span>${PRIORITY_LABELS[k]}</span>`).join('') || '<span>Pick stats</span>'}</button>`}
-    </div>
-    <div class="toolbar">
-      <button type="button" class="primary" id="best" ${keys.length ? '' : 'disabled'}>Optimize stats</button>
-      <button type="button" id="saved-gear">Reset</button>
-    </div>
-    ${deepPanel()}
+    ${deepPanel(native)}
   </section>`;
 
   const available = C.stock(snapshot, ui.charId, plans, ui.reserve);
@@ -379,10 +339,7 @@ function characters() {
     ${deepResult()}
     <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}
       <div><label for="vision" class="dim small">Resonance</label>
-        <select id="vision" data-key="vision" class="${Number(draft.visionId) !== Number(saved.equipment.visionId) ? 'changed' : ''}">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select>
-        <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''}> Optimize picks it</label></div></div>
-    ${ui.visionWhy ? `<div class="vision-why"><p class="small">${h(ui.visionWhy)}</p>
-      ${ui.visionAlts.length ? `<div class="chips alts">${ui.visionAlts.map(a => `<button type="button" class="chip" data-use-vision="${a.id}">${visionFace(a.id, 'sm')}${h(name('visions', a.id))} <span class="dim">${h(index.visions.get(a.id).roles.join(', '))}</span></button>`).join('')}</div>` : ''}</div>` : ''}
+        <select id="vision" data-key="vision" class="${Number(draft.visionId) !== Number(saved.equipment.visionId) ? 'changed' : ''}">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select></div></div>
     <div class="slots">${slotRows}</div>
     ${warning ? `<p class="note">${h(warning)}</p>` : ''}
     <div class="toolbar">
@@ -394,19 +351,22 @@ function characters() {
   return `<div class="chars">${roster}${card}${equip}</div>`;
 }
 
-function deepPanel() {
-  const d = ui.deep || {}, busy = !!d.busy;
+// The one build tool: Resonance (or the one you locked), gear, attack, abilities and passives, searched together.
+function deepPanel(native) {
+  const d = ui.deep || {}, busy = !!d.busy, locked = !ui.pickVision && Number(draft.visionId) > 0;
   const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.enemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return `<div class="deep">
-    <h4>Build for a fight</h4>
-    <p class="dim small">Searches Resonance, gear, attack, abilities and passives together, using the game’s damage and stagger formulas.</p>
+    <h4>Build ${h(native.name)}</h4>
+    <p class="dim small">Picks Resonance, gear, attack, abilities and passives together with the game’s damage and stagger formulas, and compares the result with what’s equipped now.</p>
     <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
       `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
     <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
     <label class="against"><span class="dim small">Against</span>
       <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.enemyId)).join('')}</select></label>
+    <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''} ${busy ? 'disabled' : ''}> Let it pick the Resonance</label>
+    ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}. Pick another in the Resonance box, or tick the box above.</p>` : ''}
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
-      : `<button type="button" class="primary" id="deep">Search</button><span class="dim small">About 15 seconds</span>`}</div>
+      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button><span class="dim small">About 15 seconds</span>`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
   </div>`;
 }
@@ -723,7 +683,6 @@ document.addEventListener('click', e => {
   if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
   if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.enemyId) go(() => { ui.enemyId = +t.dataset.enemy; }, t); return; }
   if (t.dataset.tab) { const [key, value] = t.dataset.tab.split(':'); ui[key] = value; render(); return; }
-  if ('prioOpen' in t.dataset) { ui.prioOpen = !ui.prioOpen; render(); return; }
   if (t.id === 'how') { $('#about-body').innerHTML = about(); $('#about').showModal(); return; }
   if (t.dataset.kit) {
     go(() => {
@@ -731,7 +690,7 @@ document.addEventListener('click', e => {
       if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
     }, t); return;
   }
-  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; ui.visionWhy = ''; setDraft(); }, t); return; }
+  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
   if (t.id === 'deep') { deepSearch(); return; }
   if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
   if (t.dataset.deepPick) { applyDeep(+t.dataset.deepPick); render(); return; }
@@ -739,29 +698,17 @@ document.addEventListener('click', e => {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.visionWhy = ''; view = 'characters'; scrollTo({ top: 0 });
+      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.deepGeneral = false; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
-  if (t.dataset.prio) {
-    const keys = gearPriorities().keys, k = t.dataset.prio;
-    ui.prio[ui.charId] = keys.includes(k) ? keys.filter(x => x !== k) : [...keys, k];
-    render(); return;
-  }
-  if ('prioReset' in t.dataset) { delete ui.prio[ui.charId]; render(); return; }
   if (t.dataset.rf) {
     const cut = t.dataset.rf.indexOf(':'), key = t.dataset.rf.slice(0, cut), value = t.dataset.rf.slice(cut + 1); // values like "down:ATK" contain ':'
     ui.rf[key] = ui.rf[key].includes(value) ? ui.rf[key].filter(x => x !== value) : [...ui.rf[key], value];
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.dataset.useVision) {
-    draft.visionId = +t.dataset.useVision; ui.pickVision = false; ui.visionWhy = '';
-    try { findBest(); } catch (err) { error(err.message); }
-    render(); return;
-  }
-  if (t.id === 'best') { ui.deep = null; try { findBest(); render(); } catch (err) { error(err.message); } return; }
-  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); ui.visionWhy = ''; ui.deep = null; render(); return; }
+  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); ui.deep = null; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();
@@ -788,7 +735,7 @@ document.addEventListener('change', e => {
   else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
   else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
   else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.enemyId = +t.value; }
-  else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.visionWhy = ''; ui.deep = null; }
+  else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;
   else if (t.dataset.slot) { ui.deep = null; const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }
   else return;

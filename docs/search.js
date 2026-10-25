@@ -98,7 +98,8 @@
     // Try every Resonance with the saved gear first, then search the strongest first, each with an equal share of the
     // remaining time, so a time budget can't end the search before the best (or the saved) Resonance is tried.
     const seed=visionId=>evaluateOne(state,callbacks,saved.id,visionId,{...base,visionId})?.score ?? -Infinity;
-    const seeds=new Map([-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)].map(id=>[id,seed(id)]));
+    const pool=options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)];
+    const seeds=new Map(pool.map(id=>[id,seed(id)]));
     const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || seeds.get(b)-seeds.get(a));
     const all=[];
     for (const [n,visionId] of visions.entries()) {

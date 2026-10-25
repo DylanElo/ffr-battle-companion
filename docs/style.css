@@ -260,10 +260,6 @@ dialog form { text-align: right; margin-top: 12px; }
 .card-stats dd { margin: 0; font-weight: 700; }
 .card-stats em { font-style: normal; font-size: 13px; margin-left: 6px; }
 .card-stats .focus dt { color: var(--gold); }
-.gear-for { display: grid; gap: 6px; }
-.goal { display: flex; flex-wrap: wrap; gap: 6px; border: 0; background: none; padding: 0; text-align: left; }
-.goal span { border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); border-radius: 99px; padding: 3px 12px; font-weight: 700; font-size: 14px; }
-.goal:hover span { background: rgba(255, 215, 94, .24); }
 .card .toolbar .primary { flex: 1; }
 /* with filters open, the whole left panel scrolls so the gallery stays reachable below them */
 .split > .window:first-child:has(.filters[open]) { overflow-y: auto; }
@@ -295,8 +291,6 @@ dialog form { text-align: right; margin-top: 12px; }
 .vision-slot > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
 .vision-slot select { width: 100%; }
 .face.empty { display: inline-block; border: 2px dashed var(--edge); transform: rotate(45deg) scale(.7); }
-.vision-why { padding: 8px 0 4px; }
-.vision-why p { margin: 0 0 6px; color: var(--dim); }
 .equip .slots { margin-top: 12px; }
 .equip .slots select { width: 100%; }
 
@@ -394,9 +388,6 @@ dialog form { text-align: right; margin-top: 12px; }
 }
 
 /* alternative Resonances offered after Optimize */
-.chips.alts { align-items: center; }
-.chips.alts .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 4px; }
-.chips.alts .face { width: 28px; height: 28px; }
 
 /* Next fight: the three steps, and the roster's Party tag under the name. */
 .steps { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 14px; padding-left: 20px; color: var(--dim); font-size: 14px; }
