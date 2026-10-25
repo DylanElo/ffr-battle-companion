@@ -1,12 +1,12 @@
-import * as S from './save.js?v=20';
-import {createOptimizerController} from './optimizer-controller.js?v=20';
+import * as S from './save.js?v=21';
+import {createOptimizerController} from './optimizer-controller.js?v=21';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 'Resonances']];
+const VIEWS = [['next', 'Next fight'], ['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 'Resonances']];
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
@@ -94,6 +94,7 @@ export function loadSnapshot(parsed) {
   try { plans = JSON.parse(localStorage.getItem('ffr-companion-plans:' + snapshot.source.sha256)) || {}; } catch { plans = {}; }
   const people = recruited(), first = snapshot.party.find(id => people.some(c => c.id === id)) ?? people[0]?.id ?? 0;
   ui.charId = ui.perspective = first; ui.ownedOnly = true;
+  ui.enemyId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'next';
   setDraft();
   render();
   toast(`Loaded ${snapshot.source.fileName}`);
@@ -130,6 +131,35 @@ const loadPrompt = text => `<div class="empty"><p class="dim">${text}</p><label 
 
 const tabs = (key, items) => `<div class="tabs" role="tablist">${items.map(([id, label]) =>
   `<button type="button" role="tab" data-tab="${key}:${id}" aria-selected="${ui[key] === id}">${label}</button>`).join('')}</div>`;
+
+// ---------- next fight: the home page once a save is loaded ----------
+
+// The first boss at or above the party's average level, so the page opens on the fight ahead, not the first one.
+function partyLevel() {
+  const levels = snapshot.party.filter(id => id > 0).map(id => { try { return globalThis.CompanionStats.characterStats(catalog, snapshot, id, snapshot.characters.find(c => c.id === id)?.equipment).level; } catch { return NaN; } }).filter(Number.isFinite);
+  return levels.length ? Math.round(levels.reduce((a, b) => a + b, 0) / levels.length) : 1;
+}
+function suggestedBoss() {
+  const level = partyLevel(), bosses = catalog.enemies.filter(e => e.isBoss).sort((a, b) => a.level - b.level);
+  return bosses.find(e => e.level >= level) ?? bosses.at(-1);
+}
+
+function next() {
+  if (!hasSave()) return `<section class="window"><h2>Your next fight</h2>${loadPrompt('Load your save to get a party built for your next fight and equip it in one click.')}</section>`;
+  optimizerController.setEnemy(ui.enemyId);
+  const general = optimizerController.against() === 'general', enemy = index.enemies.get(ui.enemyId), suggested = suggestedBoss();
+  const bosses = catalog.enemies.filter(e => e.isBoss).sort((a, b) => a.level - b.level);
+  return `<div class="stack next">
+    <section class="window">
+      <h2>Your next fight</h2>
+      <p class="dim small">Your party is level ${partyLevel()}. Pick the fight, build a party for it, then equip it straight into your save.</p>
+      <ol class="steps"><li>Pick the fight</li><li>Find the best party</li><li>Equip in my save</li></ol>
+      <label class="against">Fight <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', suggested' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
+    </section>
+    ${!general && enemy ? `<section class="window">${bossCard(enemy)}</section>` : ''}
+    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true })}</section>
+  </div>`;
+}
 
 // ---------- fight: who to bring against an enemy ----------
 
@@ -287,8 +317,8 @@ function characters() {
   if (!hasSave()) return `<section class="window"><h2>Characters</h2>${loadPrompt('Load your save to see your characters and find the best gear and Resonance for each.')}</section>`;
   const people = recruited(), saved = snapshot.characters.find(c => c.id === ui.charId), native = index.characters.get(ui.charId);
   const roster = `<section class="window roster" aria-label="Characters">
-    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}</span>
-      ${plans[c.id] ? '<i class="plan-dot" title="Has a gear plan"></i>' : ''}<small>${snapshot.party.includes(c.id) ? 'Party' : ''}</small></li>`).join('')}</ul>
+    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}${snapshot.party.includes(c.id) ? '<small>Party</small>' : ''}</span>
+      ${plans[c.id] ? '<i class="plan-dot" title="Has a gear plan"></i>' : ''}</li>`).join('')}</ul>
     ${Object.keys(plans).length ? '<p class="dim small"><i class="plan-dot"></i> has a gear plan</p>' : ''}
     <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take others’ gear</label>
     ${Object.keys(plans).length ? `${saveFile ? '<button type="button" class="primary" id="apply-plans">Equip plans in my save</button>' : ''}
@@ -553,8 +583,8 @@ const optimizerController=createOptimizerController({getCatalog:()=>catalog,getS
     equippedSkillIds:member.evaluation.equippedSkillIds || [],recommendedActionId:member.evaluation.skillId}]));
   for(const member of members){const invalid=C.validPlan(catalog,snapshot,member.characterId,next[member.characterId],next,false);if(invalid)throw new Error(invalid);}
   plans=next;ui.reserve=false;ui.charId=members[0].characterId;storePlans();setDraft();toast('Party planned. Their gear is on the Characters page; your save is unchanged.');
-}});
-const RENDER = { fight, characters, resonances };
+},canEquip:()=>!!saveFile,equipPlans:()=>applyPlans()});
+const RENDER = { next, fight, characters, resonances };
 
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
@@ -565,7 +595,8 @@ function render() {
        <b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
        <label class="load"><input type="file" accept=".sav" data-pick><span>Load another</span></label>`
     : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}`;
-  $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
+  if (view === 'next' && !hasSave()) view = 'fight';
+  $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.filter(([id]) => id !== 'next' || hasSave()).map(([id, label]) =>
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
   for (const d of document.querySelectorAll('details[data-keep]')) if (keepOpen.has(d.dataset.keep)) d.open = true;
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
@@ -664,6 +695,7 @@ async function applyPlans() {
       <p>Two files were downloaded: <b>${h(saveFile.name)}</b> with your plans equipped, and <b>${h(base)} (backup).sav</b>, your save as it was.</p>
       <ol><li>Close the game.</li><li>Open your save folder: <code>${h(SAVE_DIR)}</code>, then the numbered folder inside.</li>
       <li>Replace <b>${h(saveFile.name)}</b> with the downloaded one.</li><li>Start the game and load that save.</li></ol>
+      ${(swapIn => swapIn.length ? `<p>Then put <b>${swapIn.map(id => h(name('characters', id))).join(', ')}</b> in your party in the game.</p>` : '')(Object.keys(plans).map(Number).filter(id => !snapshot.party.includes(id)))}
       ${removed.length ? `<p>Taken off characters without a plan, because a plan uses them:</p><ul>${removed.map(r => `<li>${h(r)}</li>`).join('')}</ul>` : ''}
       ${manual.length ? `<p>Equip these Mastery skills in the game yourself (this tool can’t set them):</p><ul>${manual.map(r => `<li>${h(r)}</li>`).join('')}</ul>` : ''}
       <p class="dim">Something wrong? Put the backup back under the name ${h(saveFile.name)}.</p>`;
@@ -752,6 +784,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'perspective' || t.id === 'kit-perspective' || t.id === 'rf-perspective') ui.perspective = +t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
   else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
+  else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
   else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.enemyId = +t.value; }
   else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.visionWhy = ''; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;

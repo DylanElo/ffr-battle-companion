@@ -51,7 +51,7 @@ function memberCard(member, indexes) {
   </article>`;
 }
 
-function partyView(party, index, indexes) {
+function partyView(party, index, indexes, canEquip) {
   const members = list(party.members ?? party.party), evaluated = party.evaluation || party;
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   return `<div class="party-head">
@@ -61,12 +61,13 @@ function partyView(party, index, indexes) {
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}
     <div class="members">${members.map(m => memberCard(m, indexes)).join('')}</div>
     ${bullets(evaluated.warnings)}
-    <div class="toolbar"><button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>
+    <div class="toolbar">${canEquip ? `<button type="button" class="primary" data-equip-party-index="${index}">Equip in my save</button>
+      <button type="button" data-apply-party-index="${index}">Plan only</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}
       <button type="button" class="ghost" data-export-party="${index}">Export</button>
-      <span class="dim small">Fills in their gear on the Characters page.</span></div>`;
+      <span class="dim small">${canEquip ? 'Downloads your save with this party equipped, plus a backup.' : 'Fills in their gear on the Characters page.'}</span></div>`;
 }
 
-export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '' }) {
+export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false }) {
   const indexes = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills'].map(kind => [kind, new Map(list(catalog[kind]).map(item => [Number(item.id), item]))]));
   const people = list(snapshot?.characters).filter(joined).filter(c => indexes.characters.has(Number(c.id)));
   const fixed = list(state.fixedCharacterIds).map(Number);
@@ -74,7 +75,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   const off = busy ? 'disabled' : '';
   const toggle = (id, on, label) => `<label class="chip-check"><input type="checkbox" id="${id}" ${on ? 'checked' : ''} ${off}><span>${label}</span></label>`;
   const settings = `<div class="party-controls">
-      <label class="against"><span class="dim small">Against</span><select id="optimizer-against" ${off}>${[['enemy', 'This enemy'], ['general', 'Any fight']].map(([id, label]) => option(id, label, (state.against || 'enemy') === id)).join('')}</select></label>
+      ${fixedAgainst ? '' : `<label class="against"><span class="dim small">Against</span><select id="optimizer-against" ${off}>${[['enemy', 'This enemy'], ['general', 'Any fight']].map(([id, label]) => option(id, label, (state.against || 'enemy') === id)).join('')}</select></label>`}
       <span class="dim small">Build for</span><div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) => `<label class="chip-check"><input type="checkbox" data-party-goal="${id}" ${list(state.goals).includes(id) ? 'checked' : ''} ${off}><span>${label}</span></label>`).join('')}</div>
       <span class="dim small">Must have</span>${toggle('optimizer-healer', state.minHealers, 'Healer')}${toggle('optimizer-protector', state.minProtectors, 'Protection')}
       <details class="more" data-keep="party-more"><summary>More</summary><div>
@@ -90,7 +91,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   let body;
   if (busy) body = `<p class="dim" role="status">${h(state.progress || 'Searching your characters, Resonances, gear and abilities…')}</p>`;
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
-    ${partyView(results[pick], pick, indexes)}`;
+    ${partyView(results[pick], pick, indexes, canEquip)}`;
   else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or fewer locked characters.</p>${bullets(result.warnings)}`;
   else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches every party of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;

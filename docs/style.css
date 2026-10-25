@@ -397,3 +397,8 @@ dialog form { text-align: right; margin-top: 12px; }
 .chips.alts { align-items: center; }
 .chips.alts .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 4px; }
 .chips.alts .face { width: 28px; height: 28px; }
+
+/* Next fight: the three steps, and the roster's Party tag under the name. */
+.steps { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 14px; padding-left: 20px; color: var(--dim); font-size: 14px; }
+.next .against select { margin-left: 8px; max-width: 100%; }
+.pick li > span > small { display: block; }

@@ -1,16 +1,17 @@
-import {renderOptimizer} from './optimizer-ui.js?v=20';
+import {renderOptimizer} from './optimizer-ui.js?v=21';
 
-export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty}){
+export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipPlans}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
-  function render(){
+  function render(view={}){
     const snapshot=getSnapshot(),hash=snapshot.source?.sha256 || '';
     if(hash!==sourceHash){cancel();sourceHash=hash;result=null;error='';state.fixedCharacterIds=[];}
-    return renderOptimizer({catalog:getCatalog(),snapshot,state,result,busy,error,faces:getFaces()});
+    return renderOptimizer({catalog:getCatalog(),snapshot,state,result,busy,error,faces:getFaces(),canEquip:canEquip(),...view});
   }
   // Opened from a boss page: search that encounter, and show it even if it isn't a boss.
   function setEnemy(id){if(Number(id)===state.enemyId)return;cancel();state.enemyId=Number(id);state.enemyQ='';state.bossOnly=!!getCatalog().enemies.find(e=>e.id===Number(id))?.isBoss;result=null;error='';}
+  function setAgainst(value){if(value===state.against)return;cancel();state.against=value;result=null;error='';}
   function start(){
     const catalog=getCatalog(),snapshot=getSnapshot();
     const selected=document.getElementById('optimizer-enemy');
@@ -46,6 +47,9 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     else if(button.hasAttribute('data-apply-party-index')){
       const party=result?.results?.[Number(button.dataset.applyPartyIndex)];
       if(party){try{stageParty(party.members);error='';}catch(e){error=e.message;}rerender();}
+    }else if(button.hasAttribute('data-equip-party-index')){
+      const party=result?.results?.[Number(button.dataset.equipPartyIndex)];
+      if(party){try{stageParty(party.members);error='';equipPlans();}catch(e){error=e.message;}rerender();}
     }else if(button.hasAttribute('data-export-party'))exportParty(Number(button.dataset.exportParty));
   });
   document.addEventListener('input',event=>{
@@ -71,5 +75,5 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
       result=null;rerender();
     }
   });
-  return {render,cancel,setEnemy};
+  return {render,cancel,setEnemy,setAgainst,against:()=>state.against};
 }
