@@ -1,5 +1,5 @@
-import * as S from './save.js?v=16';
-import {createOptimizerController} from './optimizer-controller.js?v=16';
+import * as S from './save.js?v=18';
+import {createOptimizerController} from './optimizer-controller.js?v=19';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -10,7 +10,7 @@ const VIEWS = [['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoal: 'damage', deep: null,
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deep: null,
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
@@ -245,20 +245,20 @@ let deepWorker = null, deepRun = 0;
 function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; }
 function deepSearch() {
   cancelDeep();
-  const id = deepRun, charId = ui.charId, enemyId = ui.enemyId, goal = ui.deepGoal;
+  const id = deepRun, charId = ui.charId, enemyId = ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=16', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=18', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
     else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { ui.deep = { results: e.data.result.results, pick: 0, enemyId, goal }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
+    else { ui.deep = { results: e.data.result.results, pick: 0, enemyId, goals }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
     render();
   };
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
-    options: { objective: goal, difficulty: 'save', mpPercent: 100, broken: false, critical: false, minHealers: 0, minProtectors: 0,
+    options: { goals, difficulty: 'save', mpPercent: 100, broken: false, critical: false, minHealers: 0, minProtectors: 0,
       perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000 } });
   render();
 }
@@ -369,8 +369,9 @@ function deepPanel() {
   return `<div class="deep">
     <h4>Build for a fight</h4>
     <p class="dim small">Searches Resonance, gear, attack, abilities and passives together, using the game’s damage and stagger formulas.</p>
-    <div class="chips" role="radiogroup" aria-label="Build for">${[['damage', 'Damage'], ['break', 'Stagger']].map(([id, label]) =>
-      `<label class="chip-check"><input type="radio" name="deep-goal" value="${id}" ${ui.deepGoal === id ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
+    <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
+      `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
+    <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
     <label class="against"><span class="dim small">Against</span>
       <select id="deep-enemy" ${busy ? 'disabled' : ''}>${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, e.id === ui.enemyId)).join('')}</select></label>
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
@@ -385,14 +386,15 @@ function deepResult() {
   if (!d?.results) return '';
   if (!d.results.length) return `<div class="deep-result"><p>No legal attack was found for this character against ${h(name('enemies', d.enemyId))}.</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
-  const stagger = d.goal === 'break', abilities = (ev.equippedSkillIds || []).map(id => index.skills.get(id)?.name || index.passives.get(id)?.name).filter(Boolean);
+  const goals = d.goals || ['damage'], abilities = (ev.equippedSkillIds || []).map(id => index.skills.get(id)?.name || index.passives.get(id)?.name).filter(Boolean);
   const passives = (ev.passiveIds || []).map(id => index.passives.get(id)?.name).filter(Boolean);
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   return `<div class="deep-result" aria-busy="false">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Best'}</button>`).join('')}</div>` : ''}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(name('enemies', d.enemyId))}</span>
-      <span class="deep-num"><b>${n(stagger ? ev.breakDamage : ev.damage)}</b> ${stagger ? 'stagger' : 'damage'}</span>
-      <span class="dim small">${stagger ? `${n(ev.damage)} damage` : `${n(ev.breakDamage)} stagger`}</span></div>
+      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span>
+      <span class="dim small">${n(ev.breakDamage)} stagger per turn${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
+    <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over a five-round fight; staggered rounds deal ×1.5.</p>
     <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, assuming the party staggers the enemy at your rate ×4. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${abilities.length ? `<p class="small"><span class="dim">Abilities to equip:</span> ${abilities.map(h).join(', ')}</p>` : ''}
@@ -748,7 +750,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'rf-unlocked') ui.rfUnlocked = t.checked;
   else if (t.id === 'perspective' || t.id === 'kit-perspective' || t.id === 'rf-perspective') ui.perspective = +t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
-  else if (t.name === 'deep-goal') ui.deepGoal = t.value;
+  else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
   else if (t.id === 'deep-enemy') ui.enemyId = +t.value;
   else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.visionWhy = ''; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;

@@ -56,7 +56,7 @@ function partyView(party, index, indexes) {
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   return `<div class="party-head">
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
-      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage per round, averaged over ${num(evaluated.rounds || 5)} rounds with Limit Bursts${finite(evaluated.breakDamage) ? `, break ${num(evaluated.breakDamage)}` : ''}</span></div>
+      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
     </div>
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}
     <div class="members">${members.map(m => memberCard(m, indexes)).join('')}</div>
@@ -74,8 +74,8 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   const off = busy ? 'disabled' : '';
   const toggle = (id, on, label) => `<label class="chip-check"><input type="checkbox" id="${id}" ${on ? 'checked' : ''} ${off}><span>${label}</span></label>`;
   const settings = `<div class="party-controls">
-      <select id="optimizer-objective" aria-label="Aim for" ${off}>${[['balanced', 'Damage + support'], ['damage', 'Most damage'], ['break', 'Fastest break']].map(([id, label]) => option(id, label, (state.objective || 'balanced') === id)).join('')}</select>
-      ${toggle('optimizer-healer', state.minHealers, 'Healer')}${toggle('optimizer-protector', state.minProtectors, 'Protection')}
+      <span class="dim small">Build for</span><div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) => `<label class="chip-check"><input type="checkbox" data-party-goal="${id}" ${list(state.goals).includes(id) ? 'checked' : ''} ${off}><span>${label}</span></label>`).join('')}</div>
+      <span class="dim small">Must have</span>${toggle('optimizer-healer', state.minHealers, 'Healer')}${toggle('optimizer-protector', state.minProtectors, 'Protection')}
       <details class="more" data-keep="party-more"><summary>More</summary><div>
         <label>Difficulty <select id="optimizer-difficulty" ${off}>${[['save', 'From save'], ['Easy', 'Easy'], ['Normal', 'Normal'], ['Expert', 'Expert']].map(([id, label]) => option(id, label, (state.difficulty || 'save') === id)).join('')}</select></label>
         <label>MP available <input type="number" id="optimizer-mp" min="0" max="100" step="1" value="${h(state.mpPercent ?? 100)}" ${off}>%</label>

@@ -92,8 +92,8 @@ test('a support turn replaces the caster attack and its stagger in the final act
   assert.equal(party.actionOverrides[1001].skillId,230110);
   assert.equal(party.actionOverrides[1001].damage,0);
   assert.equal(party.actionOverrides[1001].breakDamage,0);
-  assert.equal(party.breakDamage,party.actionOverrides[1003].breakDamage);
-  assert.equal(party.damage,party.actionOverrides[1003].damage);
+  assert.equal(party.roundBreakDamage,party.actionOverrides[1003].breakDamage);
+  assert.equal(party.roundDamage,party.actionOverrides[1003].damage);
 });
 
 test('weakness-only stagger passives see the final attack element',()=>{

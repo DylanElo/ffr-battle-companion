@@ -1,7 +1,7 @@
-import {renderOptimizer} from './optimizer-ui.js?v=16';
+import {renderOptimizer} from './optimizer-ui.js?v=19';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty}){
-  const state={enemyQ:'',bossOnly:true,enemyId:0,objective:'balanced',minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
+  const state={enemyQ:'',bossOnly:true,enemyId:0,goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
   function render(){
@@ -18,7 +18,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     cancel();const id=run,hash=snapshot.source?.sha256;
     busy=true;error='';result=null;state.partyIndex=0;state.progress='Preparing progression, passive packages and legal equipment…';
     const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:13000};
-    worker=new Worker(new URL('./optimizer-worker.js?v=16',import.meta.url));
+    worker=new Worker(new URL('./optimizer-worker.js?v=18',import.meta.url));
     worker.onmessage=event=>{
       if(event.data.id!==run || getSnapshot().source?.sha256!==hash)return;
       if(event.data.type==='progress')state.progress=event.data.message;
@@ -53,12 +53,17 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
   });
   document.addEventListener('change',event=>{
     const input=event.target;
-    const fields={'optimizer-enemy':'enemyId','optimizer-boss-only':'bossOnly','optimizer-objective':'objective',
+    const fields={'optimizer-enemy':'enemyId','optimizer-boss-only':'bossOnly',
       'optimizer-healer':'minHealers','optimizer-protector':'minProtectors','optimizer-difficulty':'difficulty',
       'optimizer-broken':'broken','optimizer-critical':'critical','optimizer-mp':'mpPercent'};
     if(fields[input.id]){
       const key=fields[input.id];state[key]=input.type==='checkbox'?(key.startsWith('min')?Number(input.checked):input.checked):
         ['enemyId','mpPercent'].includes(key)?Number(input.value):input.value;
+      result=null;error='';rerender();
+    }else if(input.dataset.partyGoal){
+      const goal=input.dataset.partyGoal;
+      state.goals=input.checked?[...new Set([...state.goals,goal])]:state.goals.filter(g=>g!==goal);
+      if(!state.goals.length)state.goals=[goal];
       result=null;error='';rerender();
     }else if(input.dataset.optimizerLock){
       const id=Number(input.dataset.optimizerLock);

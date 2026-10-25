@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=16', 'damage.js', 'stats.js', 'battle.js?v=16', 'search.js?v=16');
+importScripts('core.js', 'passives.js?v=18', 'damage.js', 'stats.js', 'battle.js?v=18', 'search.js?v=18');
 let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
@@ -15,12 +15,7 @@ self.onmessage = async event => {
       // `available` is the item stock left after other characters' reservations; `taken` Resonances are in use elsewhere.
       const taken=new Set(event.data.taken || []);
       self.postMessage({id,type:'progress',message:'Trying your Resonances, gear and ability combinations…'});
-      // Stagger ignores Attack/Magic, so many builds tie; break ties by damage so gear isn't dropped for nothing.
-      const evaluate=args=>{
-        const r=model.evaluate(args);
-        if(r && r.valid!==false && options.objective==='break')r.score+=Number(r.damage||0)*1e-6;
-        return r;
-      };
+      const evaluate=args=>model.evaluate(args);
       const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options},
         options,new Map(event.data.available));
       const seen=new Set(),results=[];
