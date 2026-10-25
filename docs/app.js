@@ -348,6 +348,17 @@ function render() {
   $('.pick [aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
 }
 
+// Page-level changes animate with View Transitions (where supported). When a list item was
+// clicked, its portrait is the one that flies into the hero slot; otherwise pages just crossfade.
+function go(update, from) {
+  const run = () => { update(); render(); };
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return run();
+  const hero = $('.hero .face'), face = from?.querySelector('.face');
+  if (hero) hero.style.viewTransitionName = 'none';
+  if (face) face.style.viewTransitionName = 'hero-face';
+  document.startViewTransition(run);
+}
+
 function exportPlans() {
   const content = { created: new Date().toISOString(), save: snapshot.source.fileName, note: 'Gear plans from Resonance Battle Companion. Not a game save.',
     plans: Object.entries(plans).map(([id, p]) => ({ character: name('characters', id), weapon: name('equipment', p.weaponId), armor: name('equipment', p.armorId),
@@ -364,19 +375,22 @@ document.addEventListener('click', e => {
     return;
   }
   const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
-  if (t.dataset.view) { view = t.dataset.view; render(); return; }
-  if (t.dataset.enemy) { ui.enemyId = +t.dataset.enemy; render(); return; }
-  if (t.dataset.optimize) { optimizerController.setEnemy(+t.dataset.optimize); view = 'optimizer'; render(); scrollTo({ top: 0 }); return; }
+  if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
+  if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.enemyId) go(() => { ui.enemyId = +t.dataset.enemy; }, t); return; }
+  if (t.dataset.optimize) { go(() => { optimizerController.setEnemy(+t.dataset.optimize); view = 'optimizer'; scrollTo({ top: 0 }); }); return; }
   if (t.dataset.kit) {
-    ui.kitId = +t.dataset.kit;
-    if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
-    render(); return;
+    go(() => {
+      ui.kitId = +t.dataset.kit;
+      if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
+    }, t); return;
   }
-  if (t.dataset.char) { ui.charId = +t.dataset.char; setDraft(); render(); return; }
+  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { ui.charId = +t.dataset.char; setDraft(); }, t); return; }
   if (t.dataset.plan) {
     const v = index.visions.get(+t.dataset.plan);
-    ui.charId = ui.perspective; ui.goal = C.clean(v.attackType) === 'Magic' ? 'magic' : 'physical';
-    setDraft(); draft.visionId = v.id; view = 'gear'; render(); scrollTo({ top: 0 }); return;
+    go(() => {
+      ui.charId = ui.perspective; ui.goal = C.clean(v.attackType) === 'Magic' ? 'magic' : 'physical';
+      setDraft(); draft.visionId = v.id; view = 'gear'; scrollTo({ top: 0 });
+    }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
   if (t.id === 'best') { try { draft = { ...C.recommend(catalog, snapshot, ui.charId, ui.goal, plans, ui.reserve), visionId: draft.visionId }; render(); } catch (err) { error(err.message); } return; }
@@ -416,6 +430,8 @@ const ready = (async () => {
     catalog = await r.json();
     faces = await fetch('data/faces.json').then(x => x.ok ? x.json() : {}, () => ({}));
     for (const k of ['characters', 'visions', 'equipment', 'skills', 'passives', 'enemies']) index[k] = new Map(catalog[k].map(x => [x.id, x]));
+    document.body.classList.add('entering');
     render();
+    setTimeout(() => document.body.classList.remove('entering'), 900);
   } catch (e) { error(e.message); $('#app').innerHTML = ''; throw e; }
 })();
