@@ -1,0 +1,1041 @@
+{
+ "schemaVersion": 1,
+ "meta": {
+  "source": "Current installed game extraction, 2026-10-25 JST",
+  "stateLockCaveat": "usableData is native lock configuration; ambiguous lock direction is conservatively excluded unless its condition is explicitly validated.",
+  "selectorCaveat": "Configured hierarchy exclusions are native; action counts are corroborated by native descriptions. Duration/sequence execution must be modeled by caller."
+ },
+ "provenance": [
+  {
+   "table": "Skill/Other/DT_SkillGeneralData",
+   "sha256": "7866325687340462e0bc270a078b41371a2b0e74c5c6aa5c18c1799db163b99a",
+   "currentGameExtract": true,
+   "matchesHistoricalSnapshot": true,
+   "rows": 1
+  },
+  {
+   "table": "Skill/Other/DT_SkillDamageCalcData",
+   "sha256": "3ea9766fdb5df339ba1267e5fa0ced6189e7b8483e3c4034d8a4b64ec2ae2133",
+   "currentGameExtract": true,
+   "matchesHistoricalSnapshot": true,
+   "rows": 18
+  },
+  {
+   "table": "Skill/Other/DT_SkillRecoveryCalcData",
+   "sha256": "902ea0d1d1fa99323f1676151e47f0dac78b2afa07a491338e4917fde68081bb",
+   "currentGameExtract": true,
+   "matchesHistoricalSnapshot": true,
+   "rows": 5
+  },
+  {
+   "table": "Skill/Other/DT_SkillAttributeDetailData",
+   "sha256": "f1e3b5b98a41d60af984e30bb8e421f647fc1cbf930ce9beb298025409a244fd",
+   "currentGameExtract": true,
+   "matchesHistoricalSnapshot": true,
+   "rows": 16
+  },
+  {
+   "table": "Skill/Other/DT_SkillTargetData",
+   "sha256": "3c923fe41fc7cbc28e74f09cac81ecede21bc8f24ad59199e395c2678628cb1d",
+   "currentGameExtract": true,
+   "matchesHistoricalSnapshot": true,
+   "rows": 10
+  }
+ ],
+ "general": {
+  "effectMaxLifeTime": 10,
+  "normalAttackSkills": [
+   400210,
+   400220,
+   400270,
+   400280,
+   400300,
+   400310,
+   400350,
+   400490,
+   400500,
+   400530,
+   446840,
+   446850,
+   446860,
+   446870
+  ],
+  "costOverrideData": [
+   {
+    "SkillId": 400490,
+    "costType": "HPRatio",
+    "Cost": 5
+   }
+  ],
+  "additionalCostData": [
+   {
+    "SkillId": 406110,
+    "costType": "GoodLuck",
+    "Cost": 4
+   },
+   {
+    "SkillId": 406120,
+    "costType": "GoodLuck",
+    "Cost": 3
+   },
+   {
+    "SkillId": 406130,
+    "costType": "GoodLuck",
+    "Cost": 5
+   },
+   {
+    "SkillId": 406050,
+    "costType": "GoodLuck",
+    "Cost": 5
+   },
+   {
+    "SkillId": 408070,
+    "costType": "HPRatio",
+    "Cost": 10
+   },
+   {
+    "SkillId": 406070,
+    "costType": "GoodLuck",
+    "Cost": 3
+   }
+  ],
+  "costCheckData": [
+   {
+    "SkillId": 406110,
+    "costType": "GoodLuck",
+    "Cost": 4
+   },
+   {
+    "SkillId": 406130,
+    "costType": "GoodLuck",
+    "Cost": 5
+   },
+   {
+    "SkillId": 404140,
+    "costType": "OverClock",
+    "Cost": 0
+   },
+   {
+    "SkillId": 406050,
+    "costType": "GoodLuck",
+    "Cost": 8
+   },
+   {
+    "SkillId": 406070,
+    "costType": "GoodLuck",
+    "Cost": 3
+   },
+   {
+    "SkillId": 406140,
+    "costType": "GoodLuck",
+    "Cost": 9
+   }
+  ],
+  "usableData": [
+   {
+    "lockType": "EventFlag",
+    "lockSkills": [
+     404080,
+     404090
+    ],
+    "FlagID": 213,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": false
+   },
+   {
+    "lockType": "FoundSkillInHierarchy",
+    "lockSkills": [
+     400680,
+     400760
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [
+     400710,
+     400760
+    ],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "ExPhase",
+    "lockSkills": [
+     400680,
+     400760,
+     401140,
+     406130
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "DemonForm",
+    "lockSkills": [
+     408090
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "NormalForm",
+    "lockSkills": [
+     408150
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "DivineRadiance",
+    "lockSkills": [
+     401300,
+     402300,
+     403300,
+     404300,
+     405300,
+     406300,
+     407300,
+     408300
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": false
+   },
+   {
+    "lockType": "HasEscaped",
+    "lockSkills": [
+     400020
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "FoundSkillInHierarchy",
+    "lockSkills": [
+     400650,
+     400680,
+     406120,
+     400760,
+     400210,
+     400330,
+     406130,
+     400020,
+     100210,
+     404090
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [
+     400650
+    ],
+    "isCheckLockOnAllSkillUseDbg": true
+   },
+   {
+    "lockType": "AwakeningPower",
+    "lockSkills": [
+     401130
+    ],
+    "FlagID": -1,
+    "hierarchySkills": [],
+    "isCheckLockOnAllSkillUseDbg": true
+   }
+  ],
+  "meikyoIds": [
+   402040,
+   402130,
+   402080,
+   402150,
+   402160,
+   402210,
+   402030,
+   402050,
+   402060
+  ],
+  "overclockTargetSkills": [
+   404080,
+   404110,
+   404060,
+   404070
+  ],
+  "untriggerableSkills": [
+   400760,
+   400210,
+   406120,
+   400020,
+   404090,
+   100210,
+   400680,
+   400780,
+   400800,
+   400650,
+   400710,
+   400730,
+   400360,
+   407090
+  ],
+  "whiteMagicSkills": [
+   210010,
+   210020,
+   210030,
+   215000,
+   215010,
+   215020,
+   220410,
+   220480,
+   220490,
+   220500,
+   240010,
+   240020,
+   240030,
+   24500,
+   245010,
+   245020
+  ],
+  "equipperActionVisionSkills": [
+   414610
+  ],
+  "predictedActionEffects": [
+   "eSkillEffectType::BreakDamageVariation",
+   "eSkillEffectType::DmgMulGoodLuckNum",
+   "eSkillEffectType::CostVariation",
+   "eSkillEffectType::ImpossibleLimitBurst"
+  ],
+  "predictedProceedEffects": [
+   "eSkillTiming::SkillBegin",
+   "eSkillTiming::SkillEnd",
+   "eSkillTiming::DamageCalcEnd"
+  ],
+  "nonFlashSkillIds": [
+   502400,
+   502410,
+   503960,
+   504000,
+   501450,
+   503990,
+   501090,
+   580140,
+   580150,
+   580160,
+   501780,
+   504010
+  ],
+  "voicePlaybackRestrictedSkillIds": [
+   401300,
+   402300,
+   403300,
+   404300,
+   405300,
+   406300,
+   407300,
+   408300
+  ],
+  "nonCoverTargetSkillIds": [
+   505230,
+   503750,
+   570610,
+   504010
+  ],
+  "nonRepeatSkillsIds": [
+   400680,
+   400210,
+   400220,
+   406130,
+   406150,
+   400020,
+   404090,
+   24,
+   400760,
+   406120,
+   406160
+  ],
+  "equalizeGameSpeedSkillTypes": [
+   "eSkillAttributeType::LimitBurst",
+   "eSkillAttributeType::FinishBlow",
+   "eSkillAttributeType::Summon"
+  ],
+  "hierarchicalSkills": [
+   400650,
+   400710,
+   400730,
+   400360,
+   400790,
+   400660,
+   400700,
+   445210,
+   406140
+  ],
+  "sequentialSelectedSkills": [
+   400710,
+   400730,
+   400360,
+   400660,
+   400700,
+   406140
+  ],
+  "sealRankMultiplier": [
+   6,
+   5,
+   4,
+   3,
+   2,
+   1
+  ],
+  "pauseEffectLifetimes": [
+   "eSkillTiming::SkillBegin",
+   "eSkillTiming::SkillEnd"
+  ],
+  "quadraMagicNum": 4,
+  "cureSkillIds": [
+   210010,
+   210020,
+   210030,
+   220480,
+   220490,
+   220500
+  ],
+  "goodLuckEffectId": 1195,
+  "wActionSkillId": 400710,
+  "wArmsSkillId": 400650,
+  "mimicSkillId": 400330,
+  "quadraMagicSkillId": 400360,
+  "twinCounterSkillId": 400790,
+  "vaanCmdId": 124,
+  "beastSkillsOfClive": [
+   448000,
+   448010,
+   440310
+  ],
+  "mechaboAttackSkills": [
+   404060,
+   404070,
+   404080,
+   404110,
+   404120
+  ],
+  "allowDuplicateEffectTypes": [
+   "eSkillEffectType::DamageMultiplier",
+   "eSkillEffectType::BreakDamageVariation",
+   "eSkillEffectType::ParameterContinuousVariation",
+   "eSkillEffectType::CritMul",
+   "eSkillEffectType::DmgMulElement",
+   "eSkillEffectType::CriticalRateVariation",
+   "eSkillEffectType::Deffence",
+   "eSkillEffectType::DmgMulWeakness",
+   "eSkillEffectType::DamageIncOnSkillAttribute",
+   "eSkillEffectType::JointRaid"
+  ],
+  "allowDuplicateTimingTypes": [
+   "eSkillTiming::None"
+  ],
+  "allowDuplicateEffects": [
+   54206,
+   90000,
+   15111,
+   12932,
+   12934,
+   12935,
+   12936,
+   12937
+  ],
+  "waitTimeOffsetEffect": 54203
+ },
+ "damageCalc": {
+  "Physic": {
+   "calcType": "Physic",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "Magic": {
+   "calcType": "Magic",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "Fixed": {
+   "calcType": "Fixed",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "InvokerCurrentHP": {
+   "calcType": "InvokerCurrentHP",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "TargetMaxHPRatio": {
+   "calcType": "TargetMaxHPRatio",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "TargetCurHPRatio": {
+   "calcType": "TargetCurHPRatio",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "ThrowMoney": {
+   "calcType": "ThrowMoney",
+   "doCalcSkillDamage": false,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": false,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "EscapeNum": {
+   "calcType": "EscapeNum",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "WinNum": {
+   "calcType": "WinNum",
+   "doCalcSkillDamage": true,
+   "doCalcElement": false,
+   "doCalcHitNum": true,
+   "doCalcCritical": false,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "LowerHP": {
+   "calcType": "LowerHP",
+   "doCalcSkillDamage": false,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "HigherHP": {
+   "calcType": "HigherHP",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "DeffenceIgnore": {
+   "calcType": "DeffenceIgnore",
+   "doCalcSkillDamage": true,
+   "doCalcElement": false,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "DefeatUnitNum": {
+   "calcType": "DefeatUnitNum",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "SameLevel": {
+   "calcType": "SameLevel",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "GoodLuck": {
+   "calcType": "GoodLuck",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "MPAbsorb": {
+   "calcType": "MPAbsorb",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "Level3Flare": {
+   "calcType": "Level3Flare",
+   "doCalcSkillDamage": true,
+   "doCalcElement": true,
+   "doCalcHitNum": true,
+   "doCalcCritical": true,
+   "doCalcBreak": true,
+   "doCalcRandom": true,
+   "doCalcDeffence": true,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "ForceHP": {
+   "calcType": "ForceHP",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": false,
+   "doMinDamageGuarantee": false
+  }
+ },
+ "recoveryCalc": {
+  "NewRow": {
+   "calcType": "Physic",
+   "doCalcSkillDamage": true,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": true,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "NewRow_0": {
+   "calcType": "Magic",
+   "doCalcSkillDamage": true,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": true,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": true,
+   "doMinDamageGuarantee": true
+  },
+  "NewRow_1": {
+   "calcType": "Fixed",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": true,
+   "doCalcAdditionalTurn": false,
+   "doMinDamageGuarantee": true
+  },
+  "NewRow_2": {
+   "calcType": "InvokerCurrentHP",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": false,
+   "doMinDamageGuarantee": true
+  },
+  "NewRow_3": {
+   "calcType": "TargetMaxHPRatio",
+   "doCalcSkillDamage": false,
+   "doCalcElement": false,
+   "doCalcHitNum": false,
+   "doCalcCritical": false,
+   "doCalcBreak": false,
+   "doCalcRandom": false,
+   "doCalcDeffence": false,
+   "doCalcSkillEffect": false,
+   "doCalcAdditionalTurn": false,
+   "doMinDamageGuarantee": true
+  }
+ },
+ "attributeDetail": {
+  "たたかう": {
+   "skillAttrType": "Fight",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "追撃": {
+   "skillAttrType": "ChaseAttack",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": false,
+   "isParallelExecutable": true
+  },
+  "アビリティ": {
+   "skillAttrType": "Ability",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "魔法": {
+   "skillAttrType": "Magic",
+   "costType": "MP",
+   "unusableListInStatusCondition": [
+    "eUnitStatusCondition::Silence",
+    "eUnitStatusCondition::Confusion",
+    "eUnitStatusCondition::Berserk",
+    "eUnitStatusCondition::Charme",
+    "eUnitStatusCondition::Sleep",
+    "eUnitStatusCondition::Paralyzation",
+    "eUnitStatusCondition::Stoned"
+   ],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "LB技": {
+   "skillAttrType": "LimitBurst",
+   "costType": "LB",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": true,
+   "isRepeatEffectApply": false,
+   "isParallelExecutable": true
+  },
+  "アイテム": {
+   "skillAttrType": "Item",
+   "costType": "Item",
+   "unusableListInStatusCondition": [
+    "eUnitStatusCondition::Confusion",
+    "eUnitStatusCondition::Berserk",
+    "eUnitStatusCondition::Charme",
+    "eUnitStatusCondition::Sleep",
+    "eUnitStatusCondition::Paralyzation",
+    "eUnitStatusCondition::Stoned"
+   ],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "召喚": {
+   "skillAttrType": "Summon",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": false,
+   "isParallelExecutable": false
+  },
+  "ちょうごう": {
+   "skillAttrType": "MixItem",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "なげる": {
+   "skillAttrType": "Throw",
+   "costType": "ThrowItem",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "ぜになげ": {
+   "skillAttrType": "ThrowMoney",
+   "costType": "ThrowMoney",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "れんぞくま": {
+   "skillAttrType": "Dualcast",
+   "costType": "MP",
+   "unusableListInStatusCondition": [
+    "eUnitStatusCondition::Silence",
+    "eUnitStatusCondition::Confusion",
+    "eUnitStatusCondition::Berserk",
+    "eUnitStatusCondition::Charme",
+    "eUnitStatusCondition::Sleep",
+    "eUnitStatusCondition::Paralyzation",
+    "eUnitStatusCondition::Stoned"
+   ],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "ものまね": {
+   "skillAttrType": "Mimic",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "まほうけん": {
+   "skillAttrType": "MagicSword",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "にげる": {
+   "skillAttrType": "Escape",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": false,
+   "isParallelExecutable": true
+  },
+  "メカボ": {
+   "skillAttrType": "Mechabo",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": false,
+   "isRepeatEffectApply": true,
+   "isParallelExecutable": true
+  },
+  "フィニッシュブロー": {
+   "skillAttrType": "FinishBlow",
+   "costType": "MP",
+   "unusableListInStatusCondition": [],
+   "isUnusableInCannotLimitBurst": true,
+   "isRepeatEffectApply": false,
+   "isParallelExecutable": true
+  }
+ },
+ "targets": {
+  "オートポーション対象": {
+   "ID": 1000,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Self",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "リレイズ対象": {
+   "ID": 1001,
+   "targetRelation": "Friendlies",
+   "isAlive": false,
+   "skillTargetCondition": "Self",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "死の宣告対象": {
+   "ID": 1002,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Self",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "混乱対象": {
+   "ID": 1003,
+   "targetRelation": "All",
+   "isAlive": true,
+   "skillTargetCondition": "Random",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "チャーム対象": {
+   "ID": 1004,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Random",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "バーサク対象": {
+   "ID": 1005,
+   "targetRelation": "Enemies",
+   "isAlive": true,
+   "skillTargetCondition": "Random",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "ジャンプ対象": {
+   "ID": 1006,
+   "targetRelation": "Enemies",
+   "isAlive": true,
+   "skillTargetCondition": "LastSelected",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "あらわれる対象": {
+   "ID": 1007,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Self",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "オートエスナ対象": {
+   "ID": 1008,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Self",
+   "skillTargetConditionParamList": [
+    -1,
+    -1,
+    -1
+   ]
+  },
+  "そなえる対象": {
+   "ID": 1009,
+   "targetRelation": "Friendlies",
+   "isAlive": true,
+   "skillTargetCondition": "Prepare",
+   "skillTargetConditionParamList": [
+    50,
+    -1,
+    -1
+   ]
+  }
+ },
+ "selectors": {
+  "armsAkimbo": {
+   "skillId": 400650,
+   "actionCount": 2,
+   "forbiddenSkillIds": [
+    100210,
+    400020,
+    400210,
+    400330,
+    400650,
+    400680,
+    400760,
+    404090,
+    406120,
+    406130
+   ],
+   "evidence": "Native wArmsSkillId plus FoundSkillInHierarchy usableData; count2 from native localized description."
+  },
+  "dualcast": {
+   "skillId": 400730,
+   "actionCount": 2,
+   "requiredAttribute": "Magic",
+   "evidence": "Native hierarchicalSkills and sequentialSelectedSkills include400730; localized description restricts to black/white magic, encoded as Magic in native skill attributes."
+  },
+  "doubleAction": {
+   "skillId": 400710,
+   "actionCount": 2,
+   "forbiddenAttribute": "Magic",
+   "evidence": "Native wActionSkillId; localized description excludes black/white magic."
+  }
+ }
+}

@@ -1,11 +1,12 @@
 import * as S from './save.js';
+import {createOptimizerController} from './optimizer-controller.js';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['bosses', 'Bosses'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
+const VIEWS = [['bosses', 'Bosses'], ['optimizer', 'Party'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
 
 let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'bosses';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, goal: 'physical', reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
@@ -77,14 +78,22 @@ export async function readSave(file) {
 async function loadSave(file) {
   error();
   await ready;
-  try { snapshot = await readSave(file); }
+  let parsed;
+  try { parsed = await readSave(file); }
   catch (e) { return error(e.message); }
+  loadSnapshot(parsed);
+}
+
+// Shared with the read-only desktop importer; the public site still reads uploaded files in the browser.
+export function loadSnapshot(parsed) {
+  if(parsed.schemaVersion!==1 || !parsed.source?.sha256 || !Array.isArray(parsed.characters) || !Array.isArray(parsed.inventory) || !Array.isArray(parsed.resonances))throw new Error('Unsupported inventory snapshot.');
+  optimizerController.cancel();snapshot=parsed;
   try { plans = JSON.parse(localStorage.getItem('ffr-companion-plans:' + snapshot.source.sha256)) || {}; } catch { plans = {}; }
   const people = recruited(), first = snapshot.party.find(id => people.some(c => c.id === id)) ?? people[0]?.id ?? 0;
   ui.charId = ui.perspective = first; ui.ownedOnly = true;
   setDraft();
   render();
-  toast(`Loaded ${file.name}`);
+  toast(`Loaded ${snapshot.source.fileName}`);
 }
 
 function storePlans() {
@@ -160,6 +169,8 @@ function enemyDetail(enemy) {
       <span>Resists</span><div class="els">${resist.map(([e, r]) => el(e, ` <span class="dim">${h(r)}</span>`)).join('') || '<span class="dim">Nothing</span>'}</div>
       <span>Attacks with</span><div class="els">${threats.map(e => el(e)).join('') || '<span class="dim">No elemental attacks</span>'}</div>
     </div></div></div>
+    ${hasSave() ? `<div class="toolbar"><button type="button" class="primary" data-optimize="${enemy.id}">Find the best party for this fight</button>
+      <span class="dim small">Searches your characters, Resonances, gear and abilities.</span></div>` : ''}
     ${picks}
     <h3>Details</h3>
     <div class="statline">${stats}</div>
@@ -300,7 +311,13 @@ function about() {
 
 // ---------- frame ----------
 
-const RENDER = { bosses, gear, resonances, about };
+const optimizerController=createOptimizerController({getCatalog:()=>catalog,getSnapshot:()=>snapshot,getFaces:()=>faces,rerender:()=>render(),stageParty:members=>{
+  const next=Object.fromEntries(members.map(member=>[member.characterId,{...member.equipment,visionId:member.visionId,
+    equippedSkillIds:member.evaluation.equippedSkillIds || [],recommendedActionId:member.evaluation.skillId}]));
+  for(const member of members){const invalid=C.validPlan(catalog,snapshot,member.characterId,next[member.characterId],next,false);if(invalid)throw new Error(invalid);}
+  plans=next;ui.reserve=false;ui.charId=members[0].characterId;storePlans();setDraft();toast('Kept the party’s equipment and ability plans. Your save is unchanged.');
+}});
+const RENDER = { optimizer:()=>optimizerController.render(), bosses, gear, resonances, about };
 
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
@@ -329,6 +346,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
   if (t.dataset.view) { view = t.dataset.view; render(); return; }
   if (t.dataset.enemy) { ui.enemyId = +t.dataset.enemy; render(); return; }
+  if (t.dataset.optimize) { optimizerController.setEnemy(+t.dataset.optimize); view = 'optimizer'; render(); scrollTo({ top: 0 }); return; }
   if (t.dataset.kit) {
     ui.kitId = +t.dataset.kit;
     if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
