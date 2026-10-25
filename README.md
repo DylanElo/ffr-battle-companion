@@ -6,13 +6,12 @@ Works without a save for looking things up. Load your save to plan with what you
 
 ## What it does
 
-- **Party**: searches four-person parties, owned Resonances, shared equipment and learned ability loadouts for an encounter. It uses native-formula HP/stagger damage, recorded progression, supported passive synergies, skill costs and slots. Choose damage, break, or a balanced objective; optionally require healing/protection or lock characters in the party. Compare three candidates, inspect counted/excluded effects, stage their plans or export the result.
-- **Bosses**: what an enemy is weak to, resists and attacks with. With your save loaded, your Resonances are ranked by how many unlocked skills hit a weakness, and you can jump straight to planning gear around one.
-- **Gear**: the best loadout for a goal (physical damage, magic, durability, speed and more) from equipment you own. It won't take gear another character is wearing unless you allow it. Keep plans per character and export them.
+- **Fight**: pick an enemy to see what it's weak to, resists and attacks with. **Best party** searches every party of four you can field, with owned Resonances, shared equipment and learned abilities, and predicts one round of damage with the game's own formula. Choose damage, break or damage + support, require a healer or protection, lock characters in, then compare three options and use one as your gear plans. Below that: your Resonances with unlocked skills it's weak to, its skills and its status resistances.
+- **Characters**: an equip screen per character with real stat totals (base, level, sync and gear). **Optimize** picks the Resonance and gear for the stats you gear for, suggested from the character's own kit and role, and never takes gear another character is wearing unless you allow it. Keep plans per character and export them.
 - **Resonances**: every kit with its finisher and what unlocks at each awakening and sync level, plus your own progress.
-- **About the data**: what the recommendations do and don't account for, impact tiers and source tables.
+- **How this works** (footer): what the recommendations do and don't account for, impact tiers and source tables.
 
-The **Gear** view remains a quick flat-stat comparison. The **Party** page uses battle calculations and passive effects instead. It reports the strongest candidates found by a bounded search, not a proof of the global optimum. Damage is a native-formula prediction, not a live measurement.
+Optimize is a quick flat-stat comparison. Best party uses battle calculations and passive effects instead. It reports the strongest candidates found by a bounded search, not a proof of the global optimum. Damage is a native-formula prediction, not a live measurement.
 
 The default scenario gives each member one ordinary action, with no free setup turns or automatic finishers. A supported buff/debuff spends its caster’s action and only benefits allies acting later by Agility. Enemy entries are base rows; a specific encounter may override them. Nested multi-action commands, bespoke reactions, unknown active artifacts and unsupported calculations are explicitly excluded. Runtime Spirit expansion retains an evidence caveat; see [model notes](docs/model-notes.md).
 

@@ -8,12 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="optimizer.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='3' fill='%23233a96' stroke='%23e9ecf8' stroke-width='1.5'/%3E%3Cpath d='M8 4l3 4-3 4-3-4z' fill='%23ffd75e'/%3E%3C/svg%3E">
-<script src="core.js?v=5"></script>
-<script src="stats.js?v=5"></script>
-<script type="module" src="app.js?v=5"></script>
+<script src="core.js?v=6"></script>
+<script src="stats.js?v=6"></script>
+<script type="module" src="app.js?v=6"></script>
 </head>
 <body>
 <header class="top">
@@ -26,8 +25,12 @@
 <p id="error" class="error" role="alert" hidden></p>
 <main id="app"><p class="dim loading">Loading game data…</p></main>
 <div id="toast" class="toast window" role="status" aria-live="polite" hidden></div>
+<dialog id="about" class="window" aria-label="How this works">
+  <div id="about-body"></div>
+  <form method="dialog"><button class="primary">Close</button></form>
+</dialog>
 <footer class="foot">
-  <p>Unofficial fan tool. Not affiliated with or endorsed by Square Enix. Your save is read in this tab and never uploaded. <a href="https://github.com/DylanElo/ffr-battle-companion">Source on GitHub</a>.</p>
+  <p><button type="button" class="ghost" id="how">How this works</button> · Unofficial fan tool, not affiliated with Square Enix. Your save is read in this tab and never uploaded. <a href="https://github.com/DylanElo/ffr-battle-companion">Source on GitHub</a>.</p>
 </footer>
 </body>
 </html>

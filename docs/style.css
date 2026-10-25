@@ -192,6 +192,87 @@ summary:hover, details[open] > summary { color: var(--ink); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th { text-align: left; color: var(--dim); font-weight: 400; }
 td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+tr.dim td { color: var(--dim); }
+
+/* ---------- shared pieces of the three pages ---------- */
+.stack { display: grid; gap: 16px; min-width: 0; }
+.stack h3:first-child { margin-bottom: 12px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 0 0 12px; overflow-x: auto; scrollbar-width: none; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--dim); padding: 6px 12px; white-space: nowrap; }
+.tabs button:hover { color: var(--ink); background: none; }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--gold); font-weight: 700; }
+.planned { color: var(--gold); font-size: 13px; font-weight: 700; }
+.plan-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); flex: none; }
+.roster p { margin: 0; }
+.notes { font-size: 13px; padding-left: 18px; margin: 6px 0 10px; color: var(--dim); }
+dialog.window { max-width: 680px; max-height: 85vh; overflow: auto; color: var(--ink); }
+dialog::backdrop { background: rgba(3, 6, 25, .7); }
+dialog form { text-align: right; margin-top: 12px; }
+.foot button.ghost { font-size: 14px; padding: 0; }
+
+/* ---------- fight: best party panel ---------- */
+.party-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.party-controls > .primary, .party-controls > [data-cancel-party] { margin-left: auto; }
+.chip-check { position: relative; cursor: pointer; }
+.chip-check input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip-check span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--edge); border-radius: 99px; padding: 4px 12px; color: var(--dim); }
+.chip-check input:checked + span { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); font-weight: 700; }
+.chip-check input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 2px; }
+.chip-check .face { width: 24px; height: 24px; }
+.more { position: relative; margin: 0; }
+.more > div { position: absolute; z-index: 15; top: calc(100% + 8px); left: 0; width: min(360px, calc(100vw - 48px)); display: grid; gap: 8px;
+  background: linear-gradient(180deg, var(--win-top), var(--win-bottom)); border: 2px solid var(--frame); border-radius: 8px; padding: 14px; box-shadow: 0 18px 40px rgba(3, 6, 25, .6); }
+.more label:not(.check) { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--dim); }
+.more input[type=number] { width: 70px; }
+.locks { display: flex; flex-wrap: wrap; gap: 6px; }
+.party-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.party-head .face { margin-left: -14px; }
+.party-head .face:first-child { margin-left: 0; }
+.party-total { text-align: right; }
+.party-total strong { display: block; font-size: 30px; font-weight: 900; color: var(--gold); line-height: 1.1; }
+.party-total span { color: var(--dim); font-size: 14px; }
+.members { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1240px) { .members { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .members { grid-template-columns: minmax(0, 1fr); } }
+.member { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel); min-width: 0; }
+.member-who { display: flex; gap: 10px; align-items: center; }
+.member-who h4 { font-size: 17px; }
+.member-vision { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); font-size: 14px; }
+.member-vision .face { width: 24px; height: 24px; }
+.member-hit { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 10px 0 4px; }
+.member-hit small { color: var(--dim); }
+.member-hit b { font-size: 20px; }
+.member-gear { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
+.member h5 { font-size: 13px; margin: 10px 0 2px; }
+.tags { display: flex; gap: 6px; }
+.tags span { font-size: 12px; color: var(--good); border: 1px solid currentColor; border-radius: 99px; padding: 0 8px; }
+
+/* ---------- characters: roster · card · equipment, like the in-game equip screen ---------- */
+.chars { display: grid; grid-template-columns: 230px 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.chars > .roster, .chars > .card { position: sticky; top: 12px; }
+.roster { display: flex; flex-direction: column; gap: 10px; }
+.roster .ghost { align-self: flex-start; }
+.card-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+.card-head .face { width: 128px; height: 128px; image-rendering: pixelated; }
+.card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 18px; margin: 14px 0; }
+.card-stats div { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.card-stats dt { color: var(--dim); font-size: 14px; }
+.card-stats dd { margin: 0; font-weight: 700; }
+.card-stats em { font-style: normal; font-size: 13px; margin-left: 6px; }
+.card-stats .focus dt { color: var(--gold); }
+.gear-for { display: grid; gap: 6px; }
+.goal { display: flex; flex-wrap: wrap; gap: 6px; border: 0; background: none; padding: 0; text-align: left; }
+.goal span { border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); border-radius: 99px; padding: 3px 12px; font-weight: 700; font-size: 14px; }
+.goal:hover span { background: rgba(255, 215, 94, .24); }
+.card .toolbar .primary { flex: 1; }
+.vision-slot { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.vision-slot > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
+.vision-slot select { width: 100%; }
+.face.empty { display: inline-block; border: 2px dashed var(--edge); transform: rotate(45deg) scale(.7); }
+.vision-why { padding: 8px 0 4px; }
+.vision-why p { margin: 0 0 6px; color: var(--dim); }
+.equip .slots { margin-top: 12px; }
+.equip .slots select { width: 100%; }
 
 @media (max-width: 880px) {
   .top, main { padding-left: 16px; padding-right: 16px; }
@@ -208,6 +289,18 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
   .slots { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .slots label { margin-top: 8px; }
   .top .where > div { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; }
+  .chars { grid-template-columns: minmax(0, 1fr); }
+  .chars > .roster, .chars > .card { position: static; }
+  .roster .pick { display: flex; overflow-x: auto; max-height: none; }
+  .roster .pick li { flex-direction: column; padding: 6px 10px; text-align: center; gap: 2px; }
+  .roster .pick li[aria-selected=true]::before { display: none; }
+  .party-controls > .primary, .party-controls > [data-cancel-party] { margin-left: 0; width: 100%; }
+  .party-total { text-align: left; }
+}
+@media (min-width: 881px) and (max-width: 1180px) {
+  .chars { grid-template-columns: 200px minmax(0, 1fr); }
+  .chars > .equip { grid-column: 2; }
+  .chars > .card { position: static; }
 }
 
 /* ================= motion =================
@@ -241,12 +334,14 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
   .where::details-content { height: auto; overflow: visible; opacity: 1; transition: none; }
 
   /* first load: chrome first, then the windows, staggered */
-  body.entering .top, body.entering .commands, body.entering main > .window, body.entering .split > *, body.entering .optimizer-layout > * {
+  body.entering .top, body.entering .commands, body.entering main > .window, body.entering .split > .window, body.entering .stack > *, body.entering .chars > * {
     animation: rise .5s var(--ease-out) both;
   }
   body.entering .commands { animation-delay: .06s; }
-  body.entering .split > :first-child, body.entering .optimizer-layout > :first-child { animation-delay: .12s; }
-  body.entering .split > :nth-child(2), body.entering .optimizer-layout > :nth-child(2), body.entering main > .window { animation-delay: .2s; }
+  body.entering .split > :first-child, body.entering .chars > :first-child { animation-delay: .12s; }
+  body.entering .stack > :nth-child(1), body.entering .chars > :nth-child(2), body.entering main > .window { animation-delay: .18s; }
+  body.entering .stack > :nth-child(2), body.entering .chars > :nth-child(3) { animation-delay: .24s; }
+  body.entering .stack > :nth-child(3) { animation-delay: .3s; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 
   /* searching: a sweep along the top of the results */
@@ -262,7 +357,9 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
   @keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
   .top { view-transition-name: top; }
   .commands { view-transition-name: commands; }
-  .hero .face { view-transition-name: hero-face; }
+  .hero .face, .card-head .face { view-transition-name: hero-face; }
+  .more[open] > div { animation: window-open .22s var(--ease-out) both; transform-origin: 50% 0; }
+  .more::details-content { height: auto; overflow: visible; opacity: 1; transition: none; }
   ::view-transition-group(hero-face) { animation-duration: .38s; animation-timing-function: var(--ease-out); }
   ::view-transition-old(top), ::view-transition-new(top), ::view-transition-old(commands), ::view-transition-new(commands) { animation: none; }
 }
@@ -270,7 +367,7 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
   *, ::before, ::after { animation: none !important; transition: none !important; }
 }
 
-/* alternative Resonances offered after "Find the best loadout" */
+/* alternative Resonances offered after Optimize */
 .chips.alts { align-items: center; }
 .chips.alts .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 4px; }
 .chips.alts .face { width: 28px; height: 28px; }

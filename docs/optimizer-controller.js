@@ -1,7 +1,7 @@
 import {renderOptimizer} from './optimizer-ui.js';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty}){
-  const state={enemyQ:'',bossOnly:true,enemyId:0,objective:'balanced',minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:''};
+  const state={enemyQ:'',bossOnly:true,enemyId:0,objective:'balanced',minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
   function render(){
@@ -16,7 +16,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     const selected=document.getElementById('optimizer-enemy');
     if(selected)state.enemyId=Number(selected.value);
     cancel();const id=run,hash=snapshot.source?.sha256;
-    busy=true;error='';result=null;state.progress='Preparing progression, passive packages and legal equipment…';
+    busy=true;error='';result=null;state.partyIndex=0;state.progress='Preparing progression, passive packages and legal equipment…';
     const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:18000};
     worker=new Worker(new URL('./optimizer-worker.js',import.meta.url));
     worker.onmessage=event=>{
@@ -41,6 +41,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
   document.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
     if(button.hasAttribute('data-solve-party'))start();
+    else if(button.hasAttribute('data-party-tab')){state.partyIndex=Number(button.dataset.partyTab);rerender();}
     else if(button.hasAttribute('data-cancel-party')){cancel();rerender();}
     else if(button.hasAttribute('data-apply-party-index')){
       const party=result?.results?.[Number(button.dataset.applyPartyIndex)];

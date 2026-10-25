@@ -6,10 +6,11 @@ const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['bosses', 'Bosses'], ['optimizer', 'Party'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
+const VIEWS = [['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 'Resonances']];
 
-let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'bosses';
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, pickVision: true, visionWhy: '', visionAlts: [], reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
+let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects' };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
@@ -125,67 +126,74 @@ const whereHelp = `<details class="where"><summary>Where is my save?</summary><d
 </div></details>`;
 const loadPrompt = text => `<div class="empty"><p class="dim">${text}</p><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}</div>`;
 
-// ---------- bosses ----------
+const tabs = (key, items) => `<div class="tabs" role="tablist">${items.map(([id, label]) =>
+  `<button type="button" role="tab" data-tab="${key}:${id}" aria-selected="${ui[key] === id}">${label}</button>`).join('')}</div>`;
 
-function bosses() {
+// ---------- fight: who to bring against an enemy ----------
+
+function fight() {
   const q = ui.enemyQ.trim().toLowerCase();
   const list = catalog.enemies.filter(e => (!ui.bossOnly || e.isBoss) && `${e.name} ${e.id}`.toLowerCase().includes(q))
     .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   if (!list.some(e => e.id === ui.enemyId)) ui.enemyId = list[0]?.id ?? 0;
   const enemy = index.enemies.get(ui.enemyId);
+  if (enemy) optimizerController.setEnemy(enemy.id);
   return `<div class="split">
     <section class="window" aria-label="Choose an enemy">
       <input type="search" id="enemy-q" data-key="enemy-q" placeholder="Search enemies" value="${h(ui.enemyQ)}" aria-label="Search enemies">
       <label class="check"><input type="checkbox" id="boss-only" ${ui.bossOnly ? 'checked' : ''}> Bosses only</label>
       <ul class="pick" role="listbox" aria-label="Enemies">${list.map(e => `<li role="option" tabindex="0" data-enemy="${e.id}" data-key="e${e.id}" aria-selected="${e.id === ui.enemyId}">${enemyFace(e.id, 'sm')}<span>${h(e.name)}</span><small>Lv ${e.level}</small></li>`).join('') || '<li class="dim">No enemies match.</li>'}</ul>
     </section>
-    <section class="window">${enemy ? enemyDetail(enemy) : '<p class="dim">Pick an enemy.</p>'}</section>
+    ${enemy ? `<div class="stack">
+      <section class="window">${bossCard(enemy)}</section>
+      <section class="window"><h3>Best party</h3>${hasSave() ? optimizerController.render() : loadPrompt('Load your save to find the best party of four you can field against this enemy.')}</section>
+      <section class="window">${fightDetails(enemy)}</section>
+    </div>` : '<section class="window"><p class="dim">No enemy selected.</p></section>'}
   </div>`;
 }
 
-function enemyDetail(enemy) {
-  const res = Object.entries(enemy.resistances || {}).map(([e, r]) => [C.clean(e), C.clean(r)]);
-  const weak = res.filter(([, r]) => r === 'Weakness').map(([e]) => e);
+const enemyRes = enemy => Object.entries(enemy.resistances || {}).map(([e, r]) => [C.clean(e), C.clean(r)]);
+
+function bossCard(enemy) {
+  const res = enemyRes(enemy), weak = res.filter(([, r]) => r === 'Weakness').map(([e]) => e);
   const resist = res.filter(([, r]) => r !== 'None' && r !== 'Weakness');
-  const actions = enemy.skillIds.map(id => index.skills.get(id)).filter(Boolean);
-  const threats = [...new Set(actions.map(s => C.clean(s.element)).filter(e => ELEMENTS.includes(e)))];
-  let picks;
-  if (hasSave()) {
-    const rows = C.encounterOptions(catalog, snapshot, enemy, ui.perspective);
-    picks = `<div class="row-head"><h3>Your Resonances for this fight</h3>${perspectivePicker('perspective')}</div>
-      <p class="sub small">Ranked by how many skills you’ve unlocked that hit a weakness.</p>
-      <ul class="rows">${rows.map(r => `<li class="match">${visionFace(r.vision.id, 'md')}
-        <div class="row-head"><h4>${h(r.vision.name)}</h4><span class="dim small">${h(r.vision.roles.join(', '))}</span></div>
-        ${r.matches.length ? `<p class="good">${r.matches.length} weakness hit${r.matches.length === 1 ? '' : 's'}: ${h(r.matches.map(s => s.name).join(', '))}</p>` : '<p class="dim">No unlocked skill hits a weakness.</p>'}
-        ${r.risky.length ? `<p class="bad small">Some skills are resisted: ${h([...new Set(r.risky.map(s => C.clean(s.element)))].join(', '))}</p>` : ''}
-        <div><button type="button" data-plan="${r.vision.id}">Plan gear with ${h(r.vision.name)}</button></div>
-      </li>`).join('') || '<li class="dim">This save has no Resonances yet.</li>'}</ul>`;
-  } else {
-    const hitters = catalog.visions.filter(v => v.skillIds.some(id => {
-      const s = index.skills.get(id); return s && weak.includes(C.clean(s.element)) && Number(s.mag) > 0 && s.relation === 'Enemies';
-    }));
-    picks = `<h3>Resonances with skills it’s weak to</h3>
-      ${weak.length ? (hitters.length ? `<ul class="gallery inline">${hitters.map(v => `<li data-kit="${v.id}" tabindex="0">${visionFace(v.id)}${h(v.name)}</li>`).join('')}</ul>` : '<p class="dim">None.</p>') : '<p class="dim">No weakness to plan around.</p>'}
-      ${loadPrompt('Load your save to see which of yours have those skills unlocked, and plan gear around one.')}`;
-  }
-  const stats = Object.entries(enemy.stats || {}).map(([k, v]) => `<span>${h(k === 'MaxBreakPoint' ? 'Break' : C.statLabels[k] || k)}<b>${v.toLocaleString()}</b></span>`).join('');
+  const threats = [...new Set(enemy.skillIds.map(id => index.skills.get(id)).filter(Boolean).map(s => C.clean(s.element)).filter(e => ELEMENTS.includes(e)))];
+  const stats = Object.entries(enemy.stats || {}).filter(([k]) => ['MaxHitPoint', 'Attack', 'Intelligence', 'Defence', 'Mind', 'MaxBreakPoint'].includes(k))
+    .map(([k, v]) => `<span>${h(k === 'MaxBreakPoint' ? 'Break' : C.statLabels[k] || k)}<b>${v.toLocaleString()}</b></span>`).join('');
   return `<div class="hero">${enemyFace(enemy.id, 'lg')}<div>
     <h2>${h(enemy.name)}</h2>
     <p class="sub">Level ${enemy.level}${enemy.isBoss ? ', boss' : ''}</p>
     <div class="weak-line">
       <span>Weak to</span><div class="els">${weak.map(e => el(e)).join('') || '<span class="dim">Nothing</span>'}</div>
-      <span>Resists</span><div class="els">${resist.map(([e, r]) => el(e, ` <span class="dim">${h(r)}</span>`)).join('') || '<span class="dim">Nothing</span>'}</div>
-      <span>Attacks with</span><div class="els">${threats.map(e => el(e)).join('') || '<span class="dim">No elemental attacks</span>'}</div>
-    </div></div></div>
-    ${hasSave() ? `<div class="toolbar"><button type="button" class="primary" data-optimize="${enemy.id}">Find the best party for this fight</button>
-      <span class="dim small">Searches your characters, Resonances, gear and abilities.</span></div>` : ''}
-    ${picks}
-    <h3>Details</h3>
+      ${resist.length ? `<span>Resists</span><div class="els">${resist.map(([e, r]) => el(e, ` <span class="dim">${h(r)}</span>`)).join('')}</div>` : ''}
+      ${threats.length ? `<span>Attacks with</span><div class="els">${threats.map(e => el(e)).join('')}</div>` : ''}
+    </div>
     <div class="statline">${stats}</div>
-    <details><summary>Its skills (${actions.length})</summary><ul class="skills">${actions.map(s => skillItem(s)).join('')}</ul></details>
-    <details><summary>Status resistances</summary><div class="statline">${Object.entries(enemy.statusResistances || {}).map(([k, v]) => `<span>${h(k)}<b>${v}</b></span>`).join('')}</div>
-      <p class="dim small">Raw game values, not success chances.</p></details>
-    <p class="dim small">Base data for this enemy. A specific fight can scale its level and stats.</p>`;
+  </div></div>`;
+}
+
+function fightDetails(enemy) {
+  const weak = enemyRes(enemy).filter(([, r]) => r === 'Weakness').map(([e]) => e);
+  const actions = enemy.skillIds.map(id => index.skills.get(id)).filter(Boolean);
+  let body;
+  if (ui.fightTab === 'skills') body = `<ul class="skills">${actions.map(s => skillItem(s)).join('') || '<li class="dim">No known skills.</li>'}</ul>`;
+  else if (ui.fightTab === 'status') body = `<div class="statline">${Object.entries(enemy.statusResistances || {}).map(([k, v]) => `<span>${h(k)}<b>${v}</b></span>`).join('')}</div>`;
+  else if (hasSave()) {
+    const rows = C.encounterOptions(catalog, snapshot, enemy, ui.perspective).filter(r => r.matches.length);
+    body = `<div class="row-head"><p class="dim small">Your Resonances with unlocked skills it’s weak to.</p>${perspectivePicker('perspective')}</div>
+      <ul class="rows">${rows.map(r => `<li class="match">${visionFace(r.vision.id, 'md')}
+        <div class="row-head"><h4>${h(r.vision.name)}</h4><span class="dim small">${h(r.vision.roles.join(', '))}</span></div>
+        <p class="good small">${h(r.matches.map(s => s.name).join(', '))}</p>
+        <div><button type="button" class="ghost" data-plan="${r.vision.id}">Gear ${h(name('characters', ui.perspective))} with ${h(r.vision.name)}</button></div>
+      </li>`).join('') || `<li class="dim">${weak.length ? 'None of your unlocked skills hit its weakness yet.' : 'It has no elemental weakness.'}</li>`}</ul>`;
+  } else {
+    const hitters = catalog.visions.filter(v => v.skillIds.some(id => {
+      const s = index.skills.get(id); return s && weak.includes(C.clean(s.element)) && Number(s.mag) > 0 && s.relation === 'Enemies';
+    }));
+    body = hitters.length ? `<ul class="gallery inline">${hitters.map(v => `<li data-kit="${v.id}" tabindex="0">${visionFace(v.id)}${h(v.name)}</li>`).join('')}</ul>`
+      : `<p class="dim">${weak.length ? 'No Resonance has skills of that element.' : 'It has no elemental weakness.'}</p>`;
+  }
+  return `${tabs('fightTab', [['resonances', 'Resonances for this fight'], ['skills', `Its skills (${actions.length})`], ['status', 'Status resistances']])}${body}`;
 }
 
 // ---------- gear ----------
@@ -231,89 +239,106 @@ function gearPriorities() {
   return { kitVision, profile, keys: ui.prio[ui.charId] ?? profile.keys };
 }
 
-function gear() {
-  if (!hasSave()) return `<section class="window"><h2>Gear</h2>${loadPrompt('Load your save to compare the equipment you own and find the best loadout for each character.')}</section>`;
-  const people = recruited(), saved = snapshot.characters.find(c => c.id === ui.charId), native = index.characters.get(ui.charId);
-  const side = `<section class="window" aria-label="Character and goal">
-    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}</span><small>${snapshot.party.includes(c.id) ? 'In party' : ''}${plans[c.id] ? ' · planned' : ''}</small></li>`).join('')}</ul>
-    <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take other characters’ gear</label>
-    ${Object.keys(plans).length ? `<h3>Plans</h3><ul class="rows plans">${Object.keys(plans).map(id => `<li>${charFace(id, 'sm')}<span>${h(name('characters', id))}</span>${visionFace(plans[id].visionId, 'sm')}<button type="button" class="ghost" data-release="${id}">Remove</button></li>`).join('')}</ul>
-      <button type="button" id="export">Export plans</button>` : ''}
-  </section>`;
-  if (!saved || !native || !draft) return `<div class="split">${side}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
+// The stats shown on the character card, in the game's order.
+const CARD_STATS = [['PhysicalAttack', 'ATK'], ['MagicalAttack', 'MAG'], ['PhysicalDefense', 'DEF'], ['MagicalDefense', 'MDEF'], ['HitPoint', 'HP'], ['MagicPoint', 'MP'], ['Agility', 'SPD'], ['Divine', 'Divine']];
+// Real totals (base, level, sync and gear) when the stat model can run; equipment bonuses otherwise.
+function totals(equipment) {
+  try { const r = globalThis.CompanionStats.characterStats(catalog, snapshot, ui.charId, equipment); return { stats: r.stats, level: r.level }; }
+  catch { return { stats: C.stats(C.equipmentIds(equipment).map(id => index.equipment.get(id))), level: null }; }
+}
 
-  // What to gear for: suggested from the planned Resonance's unlocked skills and the character's role,
-  // until the player picks their own combination for this character.
+function characters() {
+  if (!hasSave()) return `<section class="window"><h2>Characters</h2>${loadPrompt('Load your save to see your characters and find the best gear and Resonance for each.')}</section>`;
+  const people = recruited(), saved = snapshot.characters.find(c => c.id === ui.charId), native = index.characters.get(ui.charId);
+  const roster = `<section class="window roster" aria-label="Characters">
+    <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}</span>
+      ${plans[c.id] ? '<i class="plan-dot" title="Has a gear plan"></i>' : ''}<small>${snapshot.party.includes(c.id) ? 'Party' : ''}</small></li>`).join('')}</ul>
+    ${Object.keys(plans).length ? '<p class="dim small"><i class="plan-dot"></i> has a gear plan</p>' : ''}
+    <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take others’ gear</label>
+    ${Object.keys(plans).length ? '<button type="button" class="ghost" id="export">Export plans</button>' : ''}
+  </section>`;
+  if (!saved || !native || !draft) return `<div class="chars">${roster}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
+
+  // What to gear for: suggested from the character's usable skills and role, until the player picks.
   const { kitVision, profile, keys } = gearPriorities(), goal = C.priorityGoal(catalog, keys);
-  const goalText = keys.map(k => PRIORITY_LABELS[k]).join(' + ');
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const why = profile.physicalShare === null
-    ? `${native.name} has no damage skills unlocked${kitVision ? ` with ${kitVision.name}` : ''}, so this follows their base stats`
-    : `${native.name}${kitVision ? ` with ${kitVision.name}` : ''} can use ${plural(profile.damageSkills, 'damage skill')}${profile.healSkills ? ` and ${plural(profile.healSkills, 'heal')}` : ''}, ${Math.round(profile.physicalShare * 100)}% physical by power`;
-  const roleText = profile.roles.length ? ` Role: ${profile.roles.join(', ')}.` : '';
+  const why = profile.physicalShare === null ? `No damage skills unlocked${kitVision ? ` with ${kitVision.name}` : ''}, so this follows base stats.`
+    : `${plural(profile.damageSkills, 'damage skill')}${profile.healSkills ? ` and ${plural(profile.healSkills, 'heal')}` : ''}${kitVision ? ` with ${kitVision.name}` : ''}, ${Math.round(profile.physicalShare * 100)}% physical.${profile.roles.length ? ` ${profile.roles.join(', ')}.` : ''}`;
+
+  const before = totals(saved.equipment), after = totals(draft);
+  const statRows = CARD_STATS.map(([k, label]) => {
+    const a = Number(after.stats[k]) || 0, d = a - (Number(before.stats[k]) || 0);
+    return `<div class="${keys.includes(k) ? 'focus' : ''}"><dt>${label}</dt><dd>${a.toLocaleString()}${d ? `<em class="${d > 0 ? 'good' : 'bad'}">${d > 0 ? '+' : ''}${d}</em>` : ''}</dd></div>`;
+  }).join('');
+
+  const card = `<section class="window card">
+    <div class="card-head">${charFace(native.id, 'lg')}<div>
+      <h2>${h(native.name)}</h2>
+      <p class="sub">${after.level ? `Level ${after.level} · ` : ''}${h(pretty(native.weaponType))}</p>
+    </div></div>
+    <dl class="card-stats">${statRows}</dl>
+    <div class="gear-for">
+      <span class="dim small">Gear for</span>
+      ${ui.prioOpen
+        ? `<div class="chips" role="group" aria-label="Stats to prioritise">${C.priorityStats.map(k => `<button type="button" class="chip" data-prio="${k}" aria-pressed="${keys.includes(k)}"
+            ${k === 'Divine' ? 'title="Spirit raises Divine. What Divine does in battle hasn’t been confirmed yet."' : ''}>${PRIORITY_LABELS[k]}</button>`).join('')}</div>
+          <p class="dim small">${ui.prio[ui.charId] ? `<button type="button" class="ghost" data-prio-reset>Back to the suggestion</button>` : `Suggested from ${h(why)}`}</p>
+          <button type="button" class="ghost" data-prio-open>Done</button>`
+        : `<button type="button" class="goal" data-prio-open title="Change">${keys.map(k => `<span>${PRIORITY_LABELS[k]}</span>`).join('') || '<span>Pick stats</span>'}</button>`}
+    </div>
+    <div class="toolbar">
+      <button type="button" class="primary" id="best" ${keys.length ? '' : 'disabled'}>Optimize</button>
+      <button type="button" id="saved-gear">Reset</button>
+    </div>
+  </section>`;
 
   const available = C.stock(snapshot, ui.charId, plans, ui.reserve);
-  const slots = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])];
   const savedIds = [saved.equipment.weaponId, saved.equipment.armorId, ...saved.equipment.accessoryIds];
-  const selects = slots.map(([slot, label, id, i = 0], n) => {
-    const list = C.candidates(catalog, native, available, slot, goal), cur = Number(id);
-    return `<label for="slot${n}">${label}</label><select id="slot${n}" data-slot="${slot}" data-index="${i}" data-key="slot${n}" class="${cur !== Number(savedIds[n]) ? 'changed' : ''}">
-      ${opt(-1, 'Empty', cur <= 0)}${cur > 0 && !list.some(x => x.id === cur) ? opt(cur, `${name('equipment', cur)} (equipped)`, true) : ''}
-      ${list.map(x => opt(x.id, `${x.name}: ${statsText(x)}${available.get(x.id) > 1 ? ` (${available.get(x.id)} free)` : ''}`, x.id === cur)).join('')}</select>`;
-  }).join('');
-  const before = C.stats(C.equipmentIds(saved.equipment).map(id => index.equipment.get(id)));
-  const after = C.stats(C.equipmentIds(draft).map(id => index.equipment.get(id)));
-  const stats = [...new Set([...Object.keys(before), ...Object.keys(after)])].map(k => {
-    const d = (after[k] || 0) - (before[k] || 0);
-    return `<span>${h(C.statLabels[k] || k)}<b>${after[k] || 0}</b>${d ? `<em class="${d > 0 ? 'good' : 'bad'}">${d > 0 ? '+' : ''}${d}</em>` : ''}</span>`;
-  }).join('');
+  const slotRows = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])]
+    .map(([slot, label, id, i = 0], n) => {
+      const list = C.candidates(catalog, native, available, slot, goal), cur = Number(id);
+      return `<label for="slot${n}">${label}</label><select id="slot${n}" data-slot="${slot}" data-index="${i}" data-key="slot${n}" class="${cur !== Number(savedIds[n]) ? 'changed' : ''}">
+        ${opt(-1, 'Empty', cur <= 0)}${cur > 0 && !list.some(x => x.id === cur) ? opt(cur, `${name('equipment', cur)} (equipped)`, true) : ''}
+        ${list.map(x => opt(x.id, `${x.name}: ${statsText(x)}${available.get(x.id) > 1 ? ` (${available.get(x.id)} free)` : ''}`, x.id === cur)).join('')}</select>`;
+    }).join('');
+  const v = index.visions.get(Number(draft.visionId));
   const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve);
-  const passiveIds = [...new Set(C.equipmentIds(draft).flatMap(id => index.equipment.get(id)?.passiveIds || []))];
-  const v = index.visions.get(Number(draft.visionId)), m = v && C.mastery(v, owned(v.id), ui.charId);
-  const unlocked = v ? C.accessibleSkills(v, owned(v.id), ui.charId, catalog) : [];
+  const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(plans[ui.charId]);
   const changed = JSON.stringify(draft) !== JSON.stringify(plans[ui.charId] || saved.equipment);
 
+  const equip = `<section class="window equip">
+    <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}
+      <div><label for="vision" class="dim small">Resonance</label>
+        <select id="vision" data-key="vision" class="${Number(draft.visionId) !== Number(saved.equipment.visionId) ? 'changed' : ''}">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select>
+        <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''}> Optimize picks it</label></div></div>
+    ${ui.visionWhy ? `<div class="vision-why"><p class="small">${h(ui.visionWhy)}</p>
+      ${ui.visionAlts.length ? `<div class="chips alts">${ui.visionAlts.map(a => `<button type="button" class="chip" data-use-vision="${a.id}">${visionFace(a.id, 'sm')}${h(name('visions', a.id))} <span class="dim">${h(index.visions.get(a.id).roles.join(', '))}</span></button>`).join('')}</div>` : ''}</div>` : ''}
+    <div class="slots">${slotRows}</div>
+    ${warning ? `<p class="note">${h(warning)}</p>` : ''}
+    <div class="toolbar">
+      ${isPlan ? `<span class="planned">Planned</span><button type="button" class="ghost" data-release="${ui.charId}">Remove plan</button>`
+        : `<button type="button" id="keep" ${warning || !changed ? 'disabled' : ''}>Keep as plan</button>`}
+    </div>
+    ${equipTabs(native, v, available)}
+  </section>`;
+  return `<div class="chars">${roster}${card}${equip}</div>`;
+}
+
+function equipTabs(native, v, available) {
+  const passiveIds = [...new Set(C.equipmentIds(draft).flatMap(id => index.equipment.get(id)?.passiveIds || []))];
+  const unlocked = v ? C.accessibleSkills(v, owned(v.id), ui.charId, catalog) : [];
   const term = ui.gearQ.trim().toLowerCase();
   const inv = snapshot.inventory.map(o => [o, index.equipment.get(o.id)]).filter(([o, e]) => e && o.quantity > 0
     && (!term || `${e.name} ${e.detailType} ${(e.passiveIds || []).map(id => name('passives', id)).join(' ')}`.toLowerCase().includes(term)));
-
-  return `<div class="split">${side}
-  <section class="window">
-    <div class="hero">${charFace(native.id, 'lg')}<div>
-      <h2>${h(native.name)}</h2>
-      <p class="sub">${h(pretty(native.weaponType))}, ${h(native.armorTypes.map(pretty).join(' or ').toLowerCase())}</p>
-      ${v ? `<p class="small">${visionFace(v.id, 'sm')} With ${h(v.name)}</p>` : ''}
-    </div></div>
-    <h3>Gear for</h3>
-    <div class="chips" role="group" aria-label="Stats to prioritise">${C.priorityStats.map(k => `<button type="button" class="chip" data-prio="${k}" aria-pressed="${keys.includes(k)}"
-      ${k === 'Divine' ? 'title="Spirit raises Divine. What Divine does in battle hasn’t been confirmed yet."' : ''}>${PRIORITY_LABELS[k]}</button>`).join('')}</div>
-    <p class="dim small">${ui.prio[ui.charId] ? `Your choice. <button type="button" class="ghost" data-prio-reset>Use the suggestion (${h(profile.keys.map(k => PRIORITY_LABELS[k]).join(' + '))})</button>`
-      : `Suggested: ${h(why)}.${h(roleText)} Damage and healing use ${h(native.name)}’s own Attack or Magic, whichever Resonance grants the skill.`}</p>
-    <div class="toolbar">
-      <button type="button" class="primary" id="best" ${keys.length ? '' : 'disabled'}>Find the best loadout for ${h(goalText || '…')}</button>
-      <button type="button" id="saved-gear">Back to saved gear</button>
-      <label class="check"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''}> Also choose the Resonance</label>
-    </div>
-    ${ui.visionWhy ? `<p class="small">${visionFace(draft.visionId, 'sm')} ${h(ui.visionWhy)}</p>
-      ${ui.visionAlts.length ? `<div class="chips alts"><span class="dim small">Or use</span>${ui.visionAlts.map(a => `<button type="button" class="chip" data-use-vision="${a.id}">${visionFace(a.id, 'sm')}${h(name('visions', a.id))} <span class="dim">${h(index.visions.get(a.id).roles.join(', '))}, ${a.attacks} attack${a.attacks === 1 ? '' : 's'}</span></button>`).join('')}</div>` : ''}` : ''}
-    <div class="slots">${selects}
-      <label for="vision">Resonance</label><select id="vision" data-key="vision">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select>
-    </div>
-    <div class="statline" aria-label="Equipment stats compared with your save">${stats || '<span>No stat bonuses</span>'}</div>
-    <p class="${warning ? 'note' : 'dim small'}">${warning ? h(warning) : 'Stats from equipment only, compared with what this character wears in your save.'}</p>
-    <div class="toolbar"><button type="button" id="keep" ${warning || !changed ? 'disabled' : ''}>Keep as plan</button>
-      <span class="dim small">Plans stay in this browser and reserve their items. Your save is never changed.</span></div>
-    <details ${passiveIds.length ? 'open' : ''}><summary>Equipment effects (${passiveIds.length})</summary>
-      <ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">None.</li>'}</ul>
-      <p class="dim small">These aren’t counted in “best loadout”. Read them before you swap.</p></details>
-    ${v ? `<details><summary>${h(v.name)}: ${unlocked.length} skills unlocked for ${h(native.name)}</summary>
-      <p class="dim small">Awakening ${m.awake}, sync ${m.sync}.</p><ul class="skills">${unlocked.map(s => skillItem(s, true)).join('')}</ul></details>` : ''}
-    <details><summary>All your equipment (${inv.length})</summary>
-      <input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
-      <table><thead><tr><th>Item</th><th>Owned</th><th>Free</th><th>Stats</th></tr></thead><tbody>
-      ${inv.map(([o, e]) => `<tr><td>${h(e.name)}${['weapon', 'armor', 'accessory'].some(s => C.eligible(e, native, s)) ? '' : ' <span class="dim small">(can’t equip)</span>'}</td><td>${o.quantity}</td><td>${available.get(e.id) || 0}</td><td>${h(statsText(e))}</td></tr>`).join('')}
-      </tbody></table></details>
-  </section></div>`;
+  let body;
+  if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
+  else if (ui.charTab === 'items') body = `<input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
+    <table><thead><tr><th>Item</th><th>Free</th><th>Stats</th></tr></thead><tbody>
+    ${inv.map(([o, e]) => `<tr class="${['weapon', 'armor', 'accessory'].some(s => C.eligible(e, native, s)) ? '' : 'dim'}"><td>${h(e.name)}</td><td>${available.get(e.id) || 0}/${o.quantity}</td><td>${h(statsText(e))}</td></tr>`).join('')}
+    </tbody></table>`;
+  else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
+    ${passiveIds.length ? '<p class="dim small">Effects aren’t scored by Optimize. Check them before swapping.</p>' : ''}`;
+  return `${tabs('charTab', [['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
 // ---------- resonances ----------
@@ -355,12 +380,14 @@ function kit(v) {
 
 function about() {
   const tiers = ['S', 'A', 'B', 'C'].map(t => [t, catalog.legacyTiers.filter(v => v.impact === t)]);
-  return `<section class="window">
-    <h2>About the data</h2>
+  return `<section>
+    <h2>How this works</h2>
     <p class="sub">Everything here comes from the game’s own data tables: ${catalog.visions.length} Resonances, ${catalog.equipment.length} pieces of equipment, ${catalog.characters.length} playable characters and ${catalog.enemies.length} enemies. English text comes from an earlier version of the game, so a few names may be outdated.</p>
     <h3>What the recommendations do and don’t cover</h3>
     <ul>
-      <li>“Best loadout” adds up flat stats from equipment for the goal you pick. Effects like “+20% Fire damage”, damage formulas and set bonuses aren’t scored, so they’re listed for you to judge.</li>
+      <li><b>Optimize</b> (Characters) adds up flat equipment stats for the stats you gear for, each scaled to its own range. Effects like “+20% Fire damage” aren’t scored, so they’re listed for you to judge. It picks the Resonance whose unlocked skills add the most power in those stats.</li>
+      <li>Damage and healing use the user’s own Attack (physical skills) or Magic (magic skills), whichever Resonance grants the skill. What Divine does in battle hasn’t been confirmed.</li>
+      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one round with one action each. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
       <li>Owned counts include equipped copies. With “Don’t take other characters’ gear” on, their current gear and any plans are reserved.</li>
       <li>A Resonance is reserved for one character at a time. Whether two characters can share one hasn’t been confirmed.</li>
       <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>
@@ -381,12 +408,14 @@ const optimizerController=createOptimizerController({getCatalog:()=>catalog,getS
   const next=Object.fromEntries(members.map(member=>[member.characterId,{...member.equipment,visionId:member.visionId,
     equippedSkillIds:member.evaluation.equippedSkillIds || [],recommendedActionId:member.evaluation.skillId}]));
   for(const member of members){const invalid=C.validPlan(catalog,snapshot,member.characterId,next[member.characterId],next,false);if(invalid)throw new Error(invalid);}
-  plans=next;ui.reserve=false;ui.charId=members[0].characterId;storePlans();setDraft();toast('Kept the party’s equipment and ability plans. Your save is unchanged.');
+  plans=next;ui.reserve=false;ui.charId=members[0].characterId;storePlans();setDraft();toast('Party planned. Their gear is on the Characters page; your save is unchanged.');
 }});
-const RENDER = { optimizer:()=>optimizerController.render(), bosses, gear, resonances, about };
+const RENDER = { fight, characters, resonances };
 
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
+  // Panels marked data-keep stay open across re-renders (e.g. the party search's "More" settings).
+  const keepOpen = new Set([...document.querySelectorAll('details[data-keep][open]')].map(d => d.dataset.keep));
   $('#save').innerHTML = hasSave()
     ? `<span class="party" title="Your party">${snapshot.party.filter(id => id > 0).map(id => charFace(id, 'sm')).join('')}</span>
        <b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
@@ -394,6 +423,7 @@ function render() {
     : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}`;
   $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
+  for (const d of document.querySelectorAll('details[data-keep]')) if (keepOpen.has(d.dataset.keep)) d.open = true;
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
   if (target) { target.focus({ preventScroll: true }); if (sel != null && target.type === 'search') target.setSelectionRange(sel, sel); }
   $('.pick [aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
@@ -404,10 +434,12 @@ function render() {
 function go(update, from) {
   const run = () => { update(); render(); };
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return run();
-  const hero = $('.hero .face'), face = from?.querySelector('.face');
+  const hero = $('.hero .face, .card-head .face'), face = from?.querySelector('.face');
   if (hero) hero.style.viewTransitionName = 'none';
   if (face) face.style.viewTransitionName = 'hero-face';
-  document.startViewTransition(run);
+  // A skipped or interrupted transition (rapid clicks, hidden tab) still runs the update; just don't report it.
+  const t = document.startViewTransition(run);
+  for (const p of [t.ready, t.finished, t.updateCallbackDone]) p.catch(() => {});
 }
 
 function exportPlans() {
@@ -427,7 +459,9 @@ document.addEventListener('click', e => {
   const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
   if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
   if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.enemyId) go(() => { ui.enemyId = +t.dataset.enemy; }, t); return; }
-  if (t.dataset.optimize) { go(() => { optimizerController.setEnemy(+t.dataset.optimize); view = 'optimizer'; scrollTo({ top: 0 }); }); return; }
+  if (t.dataset.tab) { const [key, value] = t.dataset.tab.split(':'); ui[key] = value; render(); return; }
+  if ('prioOpen' in t.dataset) { ui.prioOpen = !ui.prioOpen; render(); return; }
+  if (t.id === 'how') { $('#about-body').innerHTML = about(); $('#about').showModal(); return; }
   if (t.dataset.kit) {
     go(() => {
       ui.kitId = +t.dataset.kit;
@@ -439,7 +473,7 @@ document.addEventListener('click', e => {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.visionWhy = ''; view = 'gear'; scrollTo({ top: 0 });
+      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.visionWhy = ''; view = 'characters'; scrollTo({ top: 0 });
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
