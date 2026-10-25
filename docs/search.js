@@ -200,6 +200,34 @@
     }
     visit(0,[]);return out;
   }
+  // Later beam members only see candidates whose gear survived earlier picks,
+  // so they can end with empty slots while matching gear sits unused. Fill those from leftovers.
+  function fillEmpty(catalog,members,stock,state,callbacks) {
+    const gear=new Map(catalog.equipment.map(e=>[e.id,e]));
+    const used=countsOf(members.flatMap(m=>C.equipmentIds(m.equipment)));
+    const worth=id=>Object.values(gear.get(id)?.stats || {}).reduce((a,b)=>a+Number(b||0),0);
+    const fillState={...state,options:{...state.options,maxEvaluations:Infinity,timeMs:0}};
+    const out=members.map(member=>{
+      const native=catalog.characters.find(c=>c.id===member.characterId);
+      const slots=[['weapon',e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',e=>e.armorId,(e,id)=>({...e,armorId:id})],
+        ...member.equipment.accessoryIds.map((_,i)=>['accessory',e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
+      let best=member;
+      for (const [slot,get,set] of slots) {
+        if (Number(get(best.equipment))>0) continue;
+        let pick=null;
+        for (const item of catalog.equipment) {
+          if ((stock.get(item.id)||0)-(used.get(item.id)||0)<1 || !C.eligible(item,native,slot)) continue;
+          const c=evaluateOne(fillState,callbacks,member.characterId,member.visionId,set(best.equipment,item.id));
+          if (c && c.score>=best.score && (!pick || c.score>pick.c.score || (c.score===pick.c.score && worth(item.id)>worth(pick.id))))pick={c,id:item.id};
+        }
+        // The cache keys accessories unordered, so keep this slot order rather than the cached one.
+        if (pick) {best={...pick.c,equipment:set(best.equipment,pick.id)};used.set(pick.id,(used.get(pick.id)||0)+1);}
+      }
+      return best;
+    });
+    state.evaluations=fillState.evaluations;
+    return out;
+  }
   function rankParties(catalog,snapshot,callbacks) {
     const options=defaults(callbacks.options || {}),state=stateFor(options);
     if (typeof callbacks.evaluate!=='function') throw new Error('A native-mechanics evaluator is required.');
@@ -271,10 +299,21 @@
         beam=next.slice(0,options.beamWidth);
         if(!beam.length)break;
       }
-      for(const result of beam)if(!validateParty(catalog,snapshot,result.members,options))results.push(result);
+      for(const result of beam)if(!validateParty(catalog,snapshot,result.members,options))results.push({...result,stock});
       results.sort((a,b)=>b.score-a.score);
-      if(results.length>options.maxResults)results.length=options.maxResults;
+      // Spare results: filling empty slots can make near-duplicates identical.
+      if(results.length>options.maxResults*5)results.length=options.maxResults*5;
     }
+    const seen=new Set(),unique=[];
+    for(const result of results) {
+      if(unique.length>=options.maxResults)break;
+      result.members=fillEmpty(catalog,result.members,result.stock,state,callbacks);
+      const key=result.members.map(m=>`${m.characterId}:${m.visionId}:${keyOf(m.equipment)}`).sort().join('|');
+      if(seen.has(key))continue;
+      seen.add(key);unique.push(Object.assign(result,partyScore(result.members)));
+    }
+    unique.sort((a,b)=>b.score-a.score);
+    results.length=0;results.push(...unique);
     return {approximate:state.truncated,considered,evaluations:state.evaluations,truncated:state.truncated,
       reasons:[...state.reasons],teamsConsidered:teamCount,totalTeams:teams.length,
       results:results.map(({members,score,evaluation})=>({members,score,evaluation})),baseline,elapsedMs:Date.now()-state.started};

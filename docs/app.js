@@ -246,7 +246,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.enemyId, goal = ui.deepGoal;
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=11', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;

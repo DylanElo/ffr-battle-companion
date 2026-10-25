@@ -87,3 +87,15 @@ test('invalid evaluator output is excluded, unknown IDs stay excluded and budget
     assert.equal([member.equipment.weaponId,member.equipment.armorId,...member.equipment.accessoryIds].includes(999),false);
   }
 });
+test('fills slots that later members would otherwise leave empty from leftover stock',()=>{
+  const {catalog,snapshot}=fixture();
+  const result=S.rankParties(catalog,snapshot,{options:{...options,candidatesPerVision:1},
+    evaluate:({equipment})=>({score:equipment.weaponId===10?100:0})});
+  for(const party of result.results) {
+    assert.equal(S.validateParty(catalog,snapshot,party.members,{partySize:4}),'');
+    for(const m of party.members) {
+      assert.equal(m.equipment.armorId,20);
+      assert.ok(m.equipment.accessoryIds.every(id=>id>0));
+    }
+  }
+});

@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js', 'damage.js', 'stats.js', 'battle.js', 'search.js');
+importScripts('core.js', 'passives.js', 'damage.js', 'stats.js', 'battle.js', 'search.js?v=11');
 let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
