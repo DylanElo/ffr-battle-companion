@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=15', 'damage.js', 'stats.js', 'battle.js?v=15', 'search.js?v=15');
+importScripts('core.js', 'passives.js?v=16', 'damage.js', 'stats.js', 'battle.js?v=16', 'search.js?v=16');
 let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
@@ -45,7 +45,7 @@ self.onmessage = async event => {
     result.scenario=model.scenario;
     result.modelEvidence=model.evidence;
     for(const party of result.results || []){
-      party.members=party.members.map(member=>({...member,evaluation:{...member.evaluation,...party.evaluation?.actionOverrides?.[member.characterId]}}));
+      party.members=party.members.map(member=>({...member,evaluation:{...member.evaluation,...party.evaluation?.actionOverrides?.[member.characterId],limitUses:party.evaluation?.limitUses?.[member.characterId] || []}}));
     }
     self.postMessage({id,type:'result',result});
   } catch(error) {

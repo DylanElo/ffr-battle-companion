@@ -119,6 +119,11 @@
       term.kind=p[1]===1?'physicalEvasionPercent':'magicEvasionPercent';term.value=Number(p[0]);return term;
     }
     if(type==='DamageLimitBreak')return {...term,kind:'damageCapRaised',value:true};
+    // Limit Burst / finisher / summon power: native vtable+0x5A8 adds trunc(level) * 100/p0 to the coefficient scale (base 1).
+    if(type==='MulBaseSkillByLevel'){
+      if(!(Number(p[0])>0) || !allDefault(1))return reject('Unrecognized level-scaled power layout.');
+      term.kind='coefficientPerLevel';term.value=100/Number(p[0]);return term;
+    }
     // Decimating Attacks: +p0% per target, when attacking all enemies. Tip-Top Shape: +p0% per buff on the user.
     if(type==='DmgMulTargetlNum' || type==='DmgMulBuffNum'){
       if(!allDefault(1))return reject('Unrecognized count-scaled damage layout.');
@@ -131,7 +136,7 @@
     let indexes=catalogCache.get(catalog);
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
-    const modifiers={statFlat:{},statPercent:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false};
+    const modifiers={statFlat:{},statPercent:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,coefficientPerLevel:0};
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     for(const id of passiveIds || []){

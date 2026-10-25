@@ -38,6 +38,7 @@ function memberCard(member, indexes) {
     </div></div>
     <div class="member-hit"><span>${h(skill?.name || 'No damaging action')}${evaluation.actionCount > 1 ? ' ×2' : ''}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP${[evaluation.multiActionId && indexes.skills.get(evaluation.multiActionId)?.name, evaluation.magicBoost && 'Magic Boost'].filter(Boolean).map(t => ` · ${h(t)}`).join('')}</small>` : ''}</span>
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
+    ${list(evaluation.limitUses).length ? `<p class="small member-lb">Limit Burst: ${list(evaluation.limitUses).map(u => `${h(indexes.skills.get(Number(u.skillId))?.name)} in round ${u.round}`).join(', ')}</p>` : ''}
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
     <p class="member-gear">${gear.map(h).join(' · ') || 'No equipment'}</p>
     <details><summary>Abilities and effects</summary>
@@ -55,7 +56,7 @@ function partyView(party, index, indexes) {
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   return `<div class="party-head">
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
-      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage in one round${finite(evaluated.breakDamage) ? `, break ${num(evaluated.breakDamage)}` : ''}</span></div>
+      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage per round, averaged over ${num(evaluated.rounds || 5)} rounds with Limit Bursts${finite(evaluated.breakDamage) ? `, break ${num(evaluated.breakDamage)}` : ''}</span></div>
     </div>
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}
     <div class="members">${members.map(m => memberCard(m, indexes)).join('')}</div>
@@ -90,6 +91,6 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
     ${partyView(results[pick], pick, indexes)}`;
   else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or fewer locked characters.</p>${bullets(result.warnings)}`;
-  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches every party of four you can field, with their Resonances, gear and abilities, and predicts one round of damage. Takes about 20 seconds.'}</p>`;
+  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches every party of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
 }

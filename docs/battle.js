@@ -12,6 +12,10 @@
   const DAMAGE_CAP=9999,RAISED_DAMAGE_CAP=99999;
   // Turn modifiers with special command handling. Magic Boost's own damage effect (12911) is native; its 1.5x MP cost is applied here.
   const ARMS_AKIMBO=400650,DUALCAST=400730,MAGIC_BOOST=400660,MAGIC_BOOST_EFFECT=12911;
+  // Limit Bursts: the 100-gauge one comes with the character; bigger ones once learned (saved activeSkillIdList).
+  // Native skill rows name their owner; Archwitch Fina's rows say Darkfina.
+  const LB_OWNER_ALIASES={Darkfina:1006},LB_PARAMETER=4,STAGGER_PARTY_SCALE=4;
+  const LB_CHARGE_IDS=[1000,1031],LB_EXTRA_IDS=[1280,1338];
   const isHealing=skill=>skill && skill.relation==='Friendlies' && clean(skill.parameterVariationType)==='Increase' && clean(skill.parameterType)==='HitPoint' && number(skill.mag)>0;
   function knapsack(entries,budget,slots){
     const states=new Map([['0:0',{cost:0,slots:0,score:0,ids:[]}]]);
@@ -40,7 +44,7 @@
     const difficultyTaken=number(difficulty?.DamageTakenRate,1);
     const scenario={enemyId:enemy.id,enemyName:enemy.name,difficulty:difficultyName,difficultyGiven,difficultyTaken,
       broken:!!options.broken,critical:!!options.critical,mpPercent:Math.max(0,Math.min(100,number(options.mpPercent,100))),
-      enemyCount:Math.max(1,number(options.enemyCount,1)),
+      enemyCount:Math.max(1,number(options.enemyCount,1)),rounds:Math.max(1,Math.round(number(options.rounds,5))),
       horizon:'One turn per member: one action, or two with Arms Akimbo/Dualcast (same attack twice). Legal support actions spend that member’s turn. Starts at full HP with no buffs; no free setup or finisher assumed.'};
     const evidence={formula:'Native executable damage helpers; see docs/damage-research.md.',stats:'Native XP/growth/seed/sync/equipment derivation; cross-save HP checks.',
       passives:'Native effect IDs, timing, conditions and additive damage bucket.',
@@ -76,7 +80,10 @@
       const protectSkills=unique([...support.buffs.filter(a=>['physicalReductionPercent','magicReductionPercent'].includes(a.kind)).map(a=>a.skillId),
         ...legalSkills.filter(s=>s.relation==='Friendlies' && (s.effects || []).some(id=>clean(indexes.effects.get(id)?.type)==='Cover')).map(s=>s.id)]).map(id=>indexes.skills.get(id));
       const legal=new Set(legalSkills.map(s=>s.id));
-      const result={saved,native,learn,free,skills,active,legal,borrowed,learned,support,healSkills,protectSkills,excludedActions};
+      const learnedSpecials=new Set(saved?.activeSkillIds || []);
+      const limits=(catalog.skills || []).filter(s=>clean(s.attr)==='LimitBurst' && (LB_OWNER_ALIASES[s.hasUnit] ?? catalog.characters.find(c=>c.name===s.hasUnit)?.id)===characterId &&
+        (number(s.cost)<=100 || learnedSpecials.has(s.id)) && s.relation==='Enemies' && ['Physic','Magic'].includes(clean(s.calcType)) && number(s.mag)>0);
+      const result={saved,native,learn,free,skills,active,legal,limits,borrowed,learned,support,healSkills,protectSkills,excludedActions};
       prepCache.set(key,result);return result;
     }
     function analysis(ids,skill,extra={}){
@@ -114,7 +121,8 @@
       const common={attack,defense,level:stats.level || context.level,targetLevel:number(enemy.level,1),skill,elementFactor:factor,
         outgoingFactor:Math.max(0,passiveAnalysis.damageFactor+number(context.additionalDamagePercent)/100)*incomingFactor,
         criticalBonus:number(passiveAnalysis.modifiers.critDamagePercent)/100,broken:scenario.broken,exPhase:false,
-        difficultyGiven:scenario.difficultyGiven,rules:catalog.battleRules,damageCap:passiveAnalysis.modifiers.damageCapRaised?RAISED_DAMAGE_CAP:DAMAGE_CAP,
+        difficultyGiven:scenario.difficultyGiven,rules:catalog.battleRules,
+        coefficientScale:1+number(passiveAnalysis.modifiers.coefficientPerLevel)*Math.trunc(number(stats.level || context.level,1)),damageCap:passiveAnalysis.modifiers.damageCapRaised?RAISED_DAMAGE_CAP:DAMAGE_CAP,
         successfulEscapes:number(snapshot.player?.escapeCount ?? snapshot.player?.escapeNum ?? snapshot.player?.successfulEscapes,NaN)};
       const ratios=(skill.ratios || []).slice(0,Math.max(1,number(skill.hits,1))).map(Number).filter(v=>v>0);
       const useRatios=ratios.length?ratios:[1];
@@ -146,7 +154,7 @@
     function gearPassives(equipment){return unique(C.equipmentIds(equipment).flatMap(id=>indexes.equipment.get(id)?.passiveIds || []));}
     function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}}){
       const stats0=S.characterStats(catalog,snapshot,prepared.saved.id,equipment,[]);
-      const reservedCost=turn.reservedIds.reduce((sum,id)=>sum+number(indexes.skills.get(id)?.equipCost),0);
+      const reservedCost=equipCostOf(turn.reservedIds);
       const totalBudget=number(stats0.skillBudget,prepared.learn.skillBudget)-reservedCost,totalSlots=number(stats0.maxSkillSlots,8)-turn.reservedIds.length;
       const effectiveElement=analysis(freeIds,skill).modifiers.element;
       const key=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${options.objective}:${turn.reservedIds.join(',')}`;
@@ -181,7 +189,7 @@
         if(budget<0 || slots<0)continue;
         const fixedValue=valueOf(fixedPassives),entries=[];
         for(const id of unique([...prepared.learned,...masters.map(m=>m.id)])){
-          if(fixedIds.includes(id) || fixedPassives.includes(id) || baseIds.includes(id))continue;
+          if(fixedIds.includes(id) || fixedPassives.includes(id) || baseIds.includes(id) || turn.reservedIds.includes(id))continue;
           const item=source(id);if(!item)continue;
           const value=Math.max(0,valueOf(unique([...fixedPassives,...expanded([id])]))-fixedValue);
           if(value>0)entries.push({id,cost:Math.max(0,number(item.equipCost)),value});
@@ -205,6 +213,54 @@
       if(!result)result={ids:[],passiveIds:[],masterIds:[],equippedIds:[],freeActiveIds:[...prepared.free],cost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeCost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeSlots:prepared.free.has(skill.id)?0:1};
       packageCache.set(key,result);return result;
     }
+    const equipCostOf=ids=>ids.reduce((sum,id)=>sum+number((indexes.skills.get(id) || indexes.passives.get(id))?.equipCost),0);
+    // LB gauge passives: fill-rate multiplier (IncreaseParameterVariation on LimitBurstPoint; strongest one counts),
+    // flat fill when this unit staggers (ParameterVariation at Break) and refund after a Limit Burst (Recuperate).
+    function limitTraits(passiveIds){
+      const traits={mult:1,fillOnStagger:0,recuperate:0};
+      for(const id of passiveIds)for(const bundle of indexes.passives.get(id)?.effectBundles || []){
+        const effect=indexes.effects.get(Number(bundle.effectId));
+        if(!effect || Number(effect.params?.[1])!==LB_PARAMETER)continue;
+        const value=number(effect.params[0]);
+        if(clean(effect.type)==='IncreaseParameterVariation')traits.mult=Math.max(traits.mult,value/100);
+        else if(clean(effect.type)==='ParameterVariation' && clean(effect.applyTiming)==='Break')traits.fillOnStagger+=value;
+        else if(clean(effect.type)==='ParameterVariation' && clean(bundle.passiveSkillAddTiming)==='ActivateLimitBurst')traits.recuperate+=value;
+      }
+      return traits;
+    }
+    function limitInfo(prepared,equipment,passiveIds){
+      const traits=limitTraits(passiveIds),max=prepared.limits.some(s=>number(s.cost)>100)?200:100;
+      const options=prepared.limits.map(skill=>{
+        const selfEffects=(skill.effectBundles || []).filter(b=>Number(b.effectId)>0 && clean(b.TargetType)==='Self').map(b=>Number(b.effectId));
+        const passiveAnalysis=analysis(passiveIds,skill,{activeEffectIds:selfEffects});
+        const final=S.characterStats(catalog,snapshot,prepared.saved.id,equipment,passiveAnalysis.terms);
+        const r=rollDamage({...final.stats,level:final.level},skill,passiveAnalysis,{level:final.level});
+        return r.supported?{skillId:skill.id,cost:number(skill.cost),damage:r.damage,breakDamage:number(r.breakDamage)}:null;
+      }).filter(Boolean);
+      return {...traits,max,options};
+    }
+    // Rounds in Agility order. A stagger gives everyone the native breakLBIncrease and its dealer Fill LB on Stagger,
+    // all scaled by each unit's fill rate; the enemy then recovers for one round. Damage taken is not simulated.
+    function simulateFight(members,breakScale=1){
+      const rounds=scenario.rounds,maxBreak=Math.max(1,number(enemy.stats?.MaxBreakPoint,100)),gain=number(catalog.battleRules.breakLBIncrease,25);
+      const value=o=>options.objective==='break'?o.breakDamage:o.damage;
+      const state=members.map(m=>({m,gauge:0,uses:[]})),order=state.slice().sort((a,b)=>number(b.m.agility)-number(a.m.agility));
+      let damage=0,breakDamage=0,gauge=0,recoverAt=0,staggers=0;
+      for(let round=1;round<=rounds;round++)for(const s of order){
+        const lb=s.m.limit,turn={damage:s.m.damage,breakDamage:s.m.breakDamage};
+        const burst=(lb?.options || []).filter(o=>o.cost<=s.gauge && value(o)>value(turn)).sort((a,b)=>value(b)-value(a))[0];
+        if(burst){s.gauge=Math.min(lb.max,s.gauge-burst.cost+lb.recuperate*lb.mult);s.uses.push({round,skillId:burst.skillId});}
+        const act=burst || turn;
+        damage+=act.damage;breakDamage+=act.breakDamage;
+        if(round<recoverAt)continue;
+        gauge+=act.breakDamage*breakScale;
+        if(gauge<maxBreak)continue;
+        gauge=0;recoverAt=round+2;staggers++;
+        for(const o of state)if(o.m.limit)o.gauge=Math.min(o.m.limit.max,o.gauge+gain*o.m.limit.mult);
+        if(lb)s.gauge=Math.min(lb.max,s.gauge+lb.fillOnStagger*lb.mult);
+      }
+      return {damage:damage/rounds,breakDamage:breakDamage/rounds,staggers,uses:Object.fromEntries(state.map(s=>[s.m.id,s.uses]))};
+    }
     // Ways to spend a turn on this attack: plain, Magic Boost (magic damage), Arms Akimbo or Dualcast (spells) for two actions.
     // ponytail: the second action repeats the first attack; mixed pairs (e.g. buff + attack) are not searched.
     function turnsFor(prepared,skill){
@@ -216,7 +272,7 @@
       for(const boost of boosts)for(const multi of multis){
         const reservedIds=[...(boost?[MAGIC_BOOST]:[]),...(multi?[multi]:[])].filter(id=>!prepared.free.has(id));
         const actions=multi?2:1,perAction=boost?Math.ceil(number(skill.cost)*1.5):number(skill.cost);
-        turns.push({reservedIds,reservedCost:reservedIds.reduce((sum,id)=>sum+number(indexes.skills.get(id)?.equipCost),0),actions,multi,boost,
+        turns.push({reservedIds,reservedCost:equipCostOf(reservedIds),actions,multi,boost,
           mp:actions*perAction+(multi?number(indexes.skills.get(multi)?.cost):0),context:boost?{activeEffectIds:[MAGIC_BOOST_EFFECT]}:{}});
       }
       return turns;
@@ -225,7 +281,7 @@
       const prepared=prep(characterId,visionId);
       if(!prepared.saved || !C.joined(prepared.saved))return {valid:false,score:-Infinity};
       const freeIds=unique([...prepared.borrowed,...gearPassives(equipment)]),results=[];
-      for(const skill of prepared.active)for(const turn of turnsFor(prepared,skill)){
+      const consider=(skill,turn)=>{
         const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn);
         const allPassives=unique([...freeIds,...packageInfo.passiveIds]);
         const passiveAnalysis=analysis(allPassives,skill,turn.context);
@@ -234,9 +290,9 @@
         const criticalAnalysis=analysis(allPassives,skill,{critical:true,...turn.context});
         const criticalStats=S.characterStats(catalog,snapshot,characterId,equipment,criticalAnalysis.terms).stats;
         const availableMp=Math.floor(number(stats.MaxMagicPoint ?? stats.MagicPoint)*scenario.mpPercent/100);
-        if(turn.mp>availableMp || packageInfo.cost+turn.reservedCost>calculated.skillBudget || packageInfo.equippedIds.length+packageInfo.activeSlots+turn.reservedIds.length>calculated.maxSkillSlots)continue;
+        if(turn.mp>availableMp || packageInfo.cost+turn.reservedCost>calculated.skillBudget || packageInfo.equippedIds.length+packageInfo.activeSlots+turn.reservedIds.length>calculated.maxSkillSlots)return;
         const single=rollDamage(stats,skill,passiveAnalysis,{level:calculated.level,criticalAnalysis,criticalStats});
-        if(!single.supported)continue;
+        if(!single.supported)return;
         const damage={...single,damage:single.damage*turn.actions,damageMin:single.damageMin*turn.actions,damageMax:single.damageMax*turn.actions,breakDamage:single.breakDamage*turn.actions};
         const cost=packageInfo.cost+turn.reservedCost,selected=[...packageInfo.equippedIds,...turn.reservedIds],packageFree=new Set(packageInfo.freeActiveIds),activeSelected=packageFree.has(skill.id)?[]:[skill.id];
         const supports=[];
@@ -257,7 +313,9 @@
         const legalSkills=new Set([...packageFree,...activeSelected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
         const survivability=number(stats.MaxHitPoint)*.02+number(stats.PhysicalDefense)+number(stats.MagicalDefense);
-        const score=options.objective==='break'?(damage.breakVerified?damage.breakDamage:0):damage.damage+(options.objective==='balanced'?survivability*.5:0);
+        const limit=prepared.limits.length?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
+        const fight=simulateFight([{id:characterId,agility:stats.Agility,damage:damage.damage,breakDamage:damage.breakDamage,limit}],STAGGER_PARTY_SCALE);
+        const score=options.objective==='break'?(damage.breakVerified?fight.breakDamage:0):fight.damage+(options.objective==='balanced'?survivability*.5:0);
         const warnings=[...(calculated.warnings || []),...(prepared.learn.warnings || [])];
         if(packageInfo.masterIds.length)warnings.push('Spirit bundles use native mastery grants and their descriptions; exact runtime expansion has not been traced.');
         if(prepared.excludedActions.length)warnings.push(`Actions excluded by native state/resource rules: ${prepared.excludedActions.join(' | ')}`);
@@ -265,11 +323,25 @@
         if(!damage.breakVerified && options.objective==='break')warnings.push('Stagger damage formula is not implemented; this objective is unavailable.');
         if(turn.multi)warnings.push(`${indexes.skills.get(turn.multi).name}: both actions use ${skill.name}; native limits on repeating it are not verified.`);
         if(turn.boost)warnings.push('Magic Boost: assumed MP cost rounds up; with Dualcast it boosts both spells (not verified).');
-        results.push({valid:true,score,...damage,skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
+        results.push({valid:true,score,...damage,turn,limit,fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
           passiveIds:packageInfo.passiveIds,equippedSkillIds:unique([...selected,...activeSelected]),alwaysPassiveIds:freeIds,stats,level:calculated.level,
           canHeal,canProtect,supportTags:supports.map(s=>s.role),supportSkillIds:supports.map(s=>s.skillId),supportActions,
           appliedSynergies:passiveAnalysis.applied.map(t=>({name:t.passiveName || t.type,reason:`${t.passiveName || t.type}: ${t.kind} ${t.value ?? t.element} ${t.parameter || ''}`})),
           passiveAnalysis,criticalAnalysis,criticalStats,coverage:passiveAnalysis.coverage,warnings,availableMp});
+      };
+      for(const skill of prepared.active)for(const turn of turnsFor(prepared,skill))consider(skill,turn);
+      // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
+      const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
+      if(prepared.limits.length && charges.length+extras.length){
+        const sets=[];
+        for(const charge of [null,...charges])for(let mask=0;mask<(1<<extras.length);mask++){
+          const ids=[...(charge?[charge]:[]),...extras.filter((_,i)=>mask&(1<<i))];
+          if(ids.length)sets.push(ids);
+        }
+        for(const base of results.slice().sort((a,b)=>b.score-a.score).slice(0,2))for(const ids of sets){
+          const reservedIds=[...base.turn.reservedIds,...ids];
+          consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
+        }
       }
       if(!results.length)return {valid:false,score:-Infinity,reason:'No supported, affordable, legally learned ordinary attack.'};
       return results.sort((a,b)=>b.score-a.score || b.damage-a.damage)[0];
@@ -312,9 +384,12 @@
           }
         }
       }
+      // Limit Bursts over the fight: real party stagger timing, added on top of the support-optimized round.
+      const fight=simulateFight(members.map(m=>({id:m.characterId,agility:m.evaluation.stats.Agility,damage:m.evaluation.damage,breakDamage:number(m.evaluation.breakDamage),limit:m.evaluation.limit})));
+      damage+=fight.damage-baseline;breakDamage+=fight.breakDamage-baselineBreak;
       const defenseScore=members.reduce((sum,m)=>sum+number(m.evaluation.stats.MaxHitPoint)*.01+(number(m.evaluation.stats.PhysicalDefense)+number(m.evaluation.stats.MagicalDefense))*.5,0);
       const score=options.objective==='break'?breakDamage:damage+(options.objective==='balanced'?defenseScore:0);
-      return {score,damage,breakDamage,supportUsed,supportDescription,actionOverrides,warnings:globalWarnings,
+      return {score,damage,breakDamage,limitUses:fight.uses,staggers:fight.staggers,rounds:scenario.rounds,supportUsed,supportDescription,actionOverrides,warnings:globalWarnings,
         baselineDamage:baseline,objective:options.objective,objectiveWeights:options.objective==='balanced'?'expected damage + 0.01 × HP + 0.5 × (DEF + MDEF) per member':'expected damage'};
     }
     return {evaluate,evaluateParty,scenario,evidence,globalWarnings,prep};

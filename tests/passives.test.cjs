@@ -165,3 +165,10 @@ test('Decimating Attacks scales with targets on area attacks only; Tip-Top Shape
   assert.equal(P.analyze(catalog,[1428],{skill:area,buffCount:0}).modifiers.damagePercent,0);
   assert.equal(P.analyze(catalog,[1428],{skill:area,buffCount:2}).modifiers.damagePercent,30);
 });
+
+test('Limit Burst power scales by level: native adds 100/p0 per level to the coefficient scale',()=>{
+  const catalog=require('../docs/data/catalog.json'),P=require('../docs/passives.js');
+  const skill=catalog.skills.find(s=>s.id===401040);
+  const r=P.analyze(catalog,[],{skill,activeEffectIds:[12966],broken:false});
+  assert.equal(r.modifiers.coefficientPerLevel,100/1500);
+});

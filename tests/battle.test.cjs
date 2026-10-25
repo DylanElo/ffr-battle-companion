@@ -130,3 +130,13 @@ test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within th
   assert.ok(Math.abs(result.damage-result.singleDamage*2)<1e-6);
   assert.ok(result.turnMp<=result.availableMp && result.skillCost<=result.skillBudget);
 });
+
+test('a Limit Burst that beats the normal turn is used once staggers fill the gauge',()=>{
+  const fragile={...enemy,stats:{...enemy.stats,MaxBreakPoint:1}};
+  const model=B.createModel(catalog,snapshot,fragile,{objective:'damage',mpPercent:0});
+  const result=model.evaluate(input);
+  if(!model.prep(input.characterId,input.visionId).limits.length)return;
+  assert.ok(result.limit.options.every(o=>o.damage>0));
+  assert.ok(result.limitUses.length>0);
+  assert.ok(result.fightDamage>result.damage);
+});
