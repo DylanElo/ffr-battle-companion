@@ -9,7 +9,7 @@ const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
 const VIEWS = [['bosses', 'Bosses'], ['optimizer', 'Party'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
 
 let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'bosses';
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, pickVision: true, visionWhy: '', visionAlts: [], reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
@@ -199,6 +199,32 @@ function usableSkills(visionId) {
     return [...new Set([...l.freeActiveIds, ...l.learnedActiveIds])].map(id => index.skills.get(id)).filter(Boolean);
   } catch { return []; }
 }
+// "Find the best loadout": choose the Resonance first (unless the player chose one), then gear for
+// the priorities. If the priorities are the suggestion, re-suggest them for the new Resonance's kit.
+function findBest() {
+  if (ui.pickVision) {
+    const own = new Set(usableSkills(-1).map(s => s.id)), healer = (index.characters.get(ui.charId)?.roles || []).map(C.clean).includes('Healer');
+    const keys = gearPriorities().keys;
+    // Same rule as validPlan: one Resonance per character, counting others' plans and (if reserving) their saved gear.
+    const taken = new Set(snapshot.characters.filter(c => c.id !== ui.charId && C.joined(c))
+      .map(c => (plans[c.id] || (ui.reserve ? c.equipment : null))?.visionId).filter(id => id > 0));
+    // Ties keep the current Resonance instead of an arbitrary swap.
+    const ranked = snapshot.resonances.filter(r => !taken.has(r.id))
+      .map(r => ({ id: r.id, ...C.resonanceFit(usableSkills(r.id).filter(s => !own.has(s.id)), keys, healer) }))
+      .sort((a, b) => b.fit - a.fit || (b.id === Number(draft.visionId)) - (a.id === Number(draft.visionId)));
+    const best = ranked[0];
+    // Fit only measures attack power, so offer the runners-up (with their roles) for a player's call.
+    ui.visionAlts = ranked.slice(1, 4).filter(r => r.fit > 0);
+    if (best) {
+      draft.visionId = best.id;
+      ui.visionWhy = best.fit > 0 ? `${name('visions', best.id)} adds the most ${keys.filter(k => k.endsWith('Attack')).map(k => PRIORITY_LABELS[k]).join(' and ')} power you’ve unlocked for ${name('characters', ui.charId)} (${best.attacks} attack${best.attacks === 1 ? '' : 's'}).`
+        : `None of your free Resonances add unlocked skills for these stats yet, so ${name('visions', best.id)} stays.`;
+    }
+  }
+  const goal = C.priorityGoal(catalog, gearPriorities().keys);
+  draft = { ...C.recommend(catalog, snapshot, ui.charId, goal, plans, ui.reserve), visionId: draft.visionId };
+}
+
 function gearPriorities() {
   const kitVision = index.visions.get(Number(draft?.visionId));
   const profile = C.kitProfile(usableSkills(kitVision?.id ?? -1), index.characters.get(ui.charId));
@@ -266,7 +292,10 @@ function gear() {
     <div class="toolbar">
       <button type="button" class="primary" id="best" ${keys.length ? '' : 'disabled'}>Find the best loadout for ${h(goalText || '…')}</button>
       <button type="button" id="saved-gear">Back to saved gear</button>
+      <label class="check"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''}> Also choose the Resonance</label>
     </div>
+    ${ui.visionWhy ? `<p class="small">${visionFace(draft.visionId, 'sm')} ${h(ui.visionWhy)}</p>
+      ${ui.visionAlts.length ? `<div class="chips alts"><span class="dim small">Or use</span>${ui.visionAlts.map(a => `<button type="button" class="chip" data-use-vision="${a.id}">${visionFace(a.id, 'sm')}${h(name('visions', a.id))} <span class="dim">${h(index.visions.get(a.id).roles.join(', '))}, ${a.attacks} attack${a.attacks === 1 ? '' : 's'}</span></button>`).join('')}</div>` : ''}` : ''}
     <div class="slots">${selects}
       <label for="vision">Resonance</label><select id="vision" data-key="vision">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select>
     </div>
@@ -405,12 +434,12 @@ document.addEventListener('click', e => {
       if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
     }, t); return;
   }
-  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { ui.charId = +t.dataset.char; setDraft(); }, t); return; }
+  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { ui.charId = +t.dataset.char; ui.pickVision = true; ui.visionWhy = ''; setDraft(); }, t); return; }
   if (t.dataset.plan) {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; view = 'gear'; scrollTo({ top: 0 });
+      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.visionWhy = ''; view = 'gear'; scrollTo({ top: 0 });
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
@@ -420,8 +449,13 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('prioReset' in t.dataset) { delete ui.prio[ui.charId]; render(); return; }
-  if (t.id === 'best') { try { draft = { ...C.recommend(catalog, snapshot, ui.charId, C.priorityGoal(catalog, gearPriorities().keys), plans, ui.reserve), visionId: draft.visionId }; render(); } catch (err) { error(err.message); } return; }
-  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); render(); return; }
+  if (t.dataset.useVision) {
+    draft.visionId = +t.dataset.useVision; ui.pickVision = false; ui.visionWhy = '';
+    try { findBest(); } catch (err) { error(err.message); }
+    render(); return;
+  }
+  if (t.id === 'best') { try { findBest(); render(); } catch (err) { error(err.message); } return; }
+  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); ui.visionWhy = ''; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
 });
@@ -443,7 +477,8 @@ document.addEventListener('change', e => {
   else if (t.id === 'owned-only') ui.ownedOnly = t.checked;
   else if (t.id === 'perspective' || t.id === 'kit-perspective') ui.perspective = +t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
-  else if (t.id === 'vision') draft.visionId = +t.value;
+  else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.visionWhy = ''; }
+  else if (t.id === 'pick-vision') ui.pickVision = t.checked;
   else if (t.dataset.slot) { const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }
   else return;
   render();

@@ -269,3 +269,8 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation: none !important; transition: none !important; }
 }
+
+/* alternative Resonances offered after "Find the best loadout" */
+.chips.alts { align-items: center; }
+.chips.alts .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 12px 2px 4px; }
+.chips.alts .face { width: 28px; height: 28px; }

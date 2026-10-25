@@ -106,3 +106,12 @@ test('kit profile follows the skills the character can use, plus their role',()=
   const none=core.kitProfile([],{roles:['Attacker'],stats:{Attack:18,Intelligence:40}});
   assert.deepEqual(none.keys,['MagicalAttack']);
 });
+
+test('resonance fit counts only skills in the stats being geared for',()=>{
+  const skill=(calcType,relation,dir,mag,hits=1)=>({calcType,relation,parameterType:'HitPoint',parameterVariationType:dir,mag,hits});
+  const slash=skill('Physic','Enemies','Decrease',100,3),fire=skill('Magic','Enemies','Decrease',250),cure=skill('Magic','Friendlies','Increase',200);
+  assert.deepEqual(core.resonanceFit([slash,fire,cure],['PhysicalAttack','PhysicalDefense'],false),{fit:300,attacks:1});
+  assert.deepEqual(core.resonanceFit([slash,fire,cure],['MagicalAttack'],false),{fit:250,attacks:1});
+  assert.deepEqual(core.resonanceFit([slash,fire,cure],['MagicalAttack'],true),{fit:450,attacks:1});
+  assert.equal(core.resonanceFit([slash],['HitPoint'],false).fit,0);
+});

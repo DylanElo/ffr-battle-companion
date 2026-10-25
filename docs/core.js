@@ -58,6 +58,21 @@
     if (healer) keys.push('MagicalDefense', 'HitPoint');
     return {keys:[...new Set(keys)], physicalShare: total ? power.Physic / total : null, damageSkills: counts.damage, healSkills: counts.heal, roles};
   }
+  // How much a Resonance's unlocked skills add in the attack stats being geared for.
+  // `skills` are only what the Resonance adds (the character's own abilities don't change).
+  function resonanceFit(skills, keys, healer) {
+    const wants = {Physic: keys.includes('PhysicalAttack'), Magic: keys.includes('MagicalAttack')};
+    let fit = 0, attacks = 0;
+    for (const s of skills || []) {
+      const calc = clean(s.calcType), mag = Number(s.mag) || 0, dir = clean(s.parameterVariationType);
+      if (!wants[calc] || mag <= 0 || clean(s.parameterType) !== 'HitPoint') continue;
+      const attack = s.relation === 'Enemies' && dir === 'Decrease', heal = healer && s.relation === 'Friendlies' && dir === 'Increase';
+      if (!attack && !heal) continue;
+      if (attack) attacks++;
+      fit += mag * Math.max(1, Number(s.hits) || 1);
+    }
+    return {fit, attacks};
+  }
   function eligible(item, character, slot) {
     if (!item || !character) return false;
     const sex = clean(item.sexLimit);
@@ -151,7 +166,7 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
+  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
