@@ -115,7 +115,22 @@ function skillItem(s, got = false) {
 const grantName = r => r.type === 'ActiveSkill' ? name('skills', r.id) : r.type === 'PassiveSkill' ? name('passives', r.id) : `${r.type} #${r.id}`;
 const grantDesc = r => (r.type === 'ActiveSkill' ? index.skills : index.passives).get(r.id)?.desc ?? '';
 const perspectivePicker = id => `<label class="check">Mastery for <select id="${id}">${recruited().map(c => opt(c.id, name('characters', c.id), c.id === ui.perspective)).join('')}</select></label>`;
-const loadPrompt = text => `<div class="empty"><p class="dim">${text}</p><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label></div>`;
+// Browsers can't open a folder by path, so show it with a Copy button. Chrome/Edge then remember it (see pickSave).
+const SAVE_DIR = '%LOCALAPPDATA%\\FFRS\\Steam';
+const whereHelp = `<details class="where"><summary>Where is my save?</summary><div>
+  <p>Click <b>Copy</b>, then in the file window paste into the address bar at the top and press Enter:</p>
+  <div class="path"><code>${SAVE_DIR}</code><button type="button" data-copy-path>Copy</button></div>
+  <p class="dim small">Open the numbered folder inside and pick a <b>GameSaveData</b> file. The most recently modified one is your latest save. After the first time, Chrome and Edge open this folder for you.</p>
+</div></details>`;
+const loadPrompt = text => `<div class="empty"><p class="dim">${text}</p><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}</div>`;
+
+async function pickSave() {
+  try {
+    // A fixed id makes the browser reopen the folder the save was last picked from.
+    const [handle] = await showOpenFilePicker({ id: 'ffr-saves', types: [{ description: 'Game save', accept: { 'application/octet-stream': ['.sav'] } }] });
+    loadSave(await handle.getFile());
+  } catch (e) { if (e.name !== 'AbortError') error(e.message); }
+}
 
 // ---------- bosses ----------
 
@@ -325,7 +340,7 @@ function render() {
     ? `<span class="party" title="Your party">${snapshot.party.filter(id => id > 0).map(id => charFace(id, 'sm')).join('')}</span>
        <b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
        <label class="load"><input type="file" accept=".sav" data-pick><span>Load another</span></label>`
-    : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label><span class="dim">to plan with what you own</span>`;
+    : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}`;
   $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
@@ -343,6 +358,11 @@ function exportPlans() {
 }
 
 document.addEventListener('click', e => {
+  if (e.target.closest('label.load') && window.showOpenFilePicker) { e.preventDefault(); pickSave(); return; }
+  if (e.target.closest('[data-copy-path]')) {
+    navigator.clipboard.writeText(SAVE_DIR).then(() => toast('Copied. Paste it into the file window’s address bar.'), () => toast(SAVE_DIR));
+    return;
+  }
   const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
   if (t.dataset.view) { view = t.dataset.view; render(); return; }
   if (t.dataset.enemy) { ui.enemyId = +t.dataset.enemy; render(); return; }

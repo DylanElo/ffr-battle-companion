@@ -162,6 +162,17 @@ summary { cursor: pointer; color: var(--teal); font-size: 15px; font-weight: 700
 .plans li > span { flex: 1; }
 
 .empty { padding: 20px 0 4px; }
+
+/* "Where is my save?" help next to every Load button */
+.where { position: relative; margin: 0; }
+.where summary { font-size: 14px; }
+.where > div { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(420px, calc(100vw - 32px));
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; padding: 14px 16px; box-shadow: 0 16px 40px -12px rgba(27, 35, 64, .35); }
+.where p { font-size: 14px; }
+.where .path { display: flex; align-items: center; gap: 8px; background: var(--panel-tint); border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 12px; margin: 8px 0 10px; }
+.where .path code { flex: 1; color: var(--ink); font-size: 15px; }
+.empty .where { margin-top: 10px; }
+.empty .where > div { position: static; margin-top: 8px; box-shadow: none; }
 .empty .load span { margin-top: 8px; }
 
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 18px; z-index: 10; max-width: calc(100vw - 32px); }
@@ -182,6 +193,7 @@ td, th { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-ali
   .hero { gap: 14px; }
   h2 { font-size: 24px; }
   .weak-line { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .top .where > div { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; }
   .slots { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .slots label { margin-top: 8px; }
 }
