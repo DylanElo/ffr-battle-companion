@@ -82,3 +82,27 @@ test('encounter helper warns about native Halved, Invalid and Absorb elemental r
   assert.deepEqual(result.matches.map(s=>s.id),[2]);
   assert.deepEqual(result.risky.map(s=>s.id),[1]);
 });
+
+test('priority goals balance stats by their own equipment range',()=>{
+  const catalog={equipment:[{id:1,stats:{PhysicalAttack:100}},{id:2,stats:{PhysicalDefense:50}},{id:3,stats:{PhysicalAttack:50,PhysicalDefense:25}}]};
+  const goal=core.priorityGoal(catalog,['PhysicalAttack','PhysicalDefense']);
+  // Each top piece scores 100; a half-strength hybrid ties with neither.
+  assert.equal(core.score(catalog.equipment[0],goal),100);
+  assert.equal(core.score(catalog.equipment[1],goal),100);
+  assert.equal(core.score(catalog.equipment[2],goal),100);
+  assert.equal(core.score({stats:{PhysicalAttack:40}},'physical'),40);
+});
+
+test('kit profile follows the skills the character can use, plus their role',()=>{
+  const skill=(id,calcType,relation,dir,mag)=>({id,calcType,relation,parameterType:'HitPoint',parameterVariationType:dir,mag,hits:1});
+  const slash=skill(1,'Physic','Enemies','Decrease',300),fire=skill(2,'Magic','Enemies','Decrease',100),cure=skill(3,'Magic','Friendlies','Increase',200);
+  // A Defender's spare heal doesn't pull them towards Magic.
+  const rain=core.kitProfile([slash,cure],{roles:['Defender'],stats:{Attack:35,Intelligence:16}});
+  assert.deepEqual(rain.keys,['PhysicalAttack','PhysicalDefense','MagicalDefense']);
+  assert.equal(rain.healSkills,1);
+  // A Healer's heals count, and scale on Magic like her spells.
+  const fina=core.kitProfile([slash,fire,cure],{roles:['Healer'],stats:{Attack:25,Intelligence:15}});
+  assert.deepEqual(fina.keys,['PhysicalAttack','MagicalAttack','MagicalDefense','HitPoint']);
+  const none=core.kitProfile([],{roles:['Attacker'],stats:{Attack:18,Intelligence:40}});
+  assert.deepEqual(none.keys,['MagicalAttack']);
+});

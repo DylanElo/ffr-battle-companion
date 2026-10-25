@@ -165,6 +165,9 @@ summary:hover, details[open] > summary { color: var(--ink); }
 .statline span { color: var(--dim); }
 .statline b { color: var(--ink); font-weight: 700; margin-left: 4px; }
 .statline em { font-style: normal; margin-left: 4px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.chip { border-radius: 99px; padding: 4px 14px; border-color: var(--edge); color: var(--dim); }
+.chip[aria-pressed=true] { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); font-weight: 700; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
 .note { color: var(--gold); font-size: 14px; }
 .plans li { display: flex; align-items: center; gap: 10px; }

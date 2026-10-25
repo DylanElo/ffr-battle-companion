@@ -18,7 +18,45 @@
     return total;
   }
   function score(item, goal) {
-    return Object.entries(goals[goal]?.weights || goals.physical.weights).reduce((sum,[key,weight])=>sum+(Number(item?.stats?.[key])||0)*weight,0);
+    // goal is a preset key ('physical') or a custom {weights} object from priorityGoal.
+    const weights = goal && typeof goal === 'object' ? goal.weights : (goals[goal] || goals.physical).weights;
+    return Object.entries(weights).reduce((sum,[key,weight])=>sum+(Number(item?.stats?.[key])||0)*weight,0);
+  }
+  const priorityStats = ['PhysicalAttack','MagicalAttack','PhysicalDefense','MagicalDefense','HitPoint','Agility','Divine','MagicPoint'];
+  // Combine several stats fairly: each is scaled by the best single bonus any equipment gives,
+  // so "+60 ATK" and "+60 DEF" only tie when both are equally close to their own maximum.
+  function priorityGoal(catalog, keys) {
+    const weights = {};
+    for (const key of keys) {
+      const top = Math.max(1, ...(catalog.equipment || []).map(e => Number(e.stats?.[key]) || 0));
+      weights[key] = 100 / top;
+    }
+    return {weights};
+  }
+  // What a character's usable skills (own + Resonance) actually scale on. Damage and healing both
+  // read the user's own PhysicalAttack (Physic) or MagicalAttack (Magic), whoever grants the skill.
+  // Heals only steer the attack stat for Healers; a Defender's spare Cure shouldn't make them a mage.
+  function kitProfile(skills, nativeCharacter) {
+    const roles = (nativeCharacter?.roles || []).map(clean), healer = roles.includes('Healer');
+    const power = {Physic:0, Magic:0}, counts = {damage:0, heal:0};
+    for (const s of skills || []) {
+      const calc = clean(s.calcType), mag = Number(s.mag) || 0;
+      if (!(calc in power) || mag <= 0 || clean(s.parameterType) !== 'HitPoint') continue;
+      const dir = clean(s.parameterVariationType);
+      if (s.relation === 'Enemies' && dir === 'Decrease') counts.damage++;
+      else if (s.relation === 'Friendlies' && dir === 'Increase') { counts.heal++; if (!healer) continue; }
+      else continue;
+      power[calc] += mag * Math.max(1, Number(s.hits) || 1);
+    }
+    const total = power.Physic + power.Magic, base = nativeCharacter?.stats || {};
+    const keys = [];
+    if (total > 0) {
+      if (power.Physic >= total * 0.3) keys.push('PhysicalAttack');
+      if (power.Magic >= total * 0.3) keys.push('MagicalAttack');
+    } else keys.push(Number(base.Intelligence) > Number(base.Attack) ? 'MagicalAttack' : 'PhysicalAttack');
+    if (roles.includes('Defender')) keys.push('PhysicalDefense', 'MagicalDefense');
+    if (healer) keys.push('MagicalDefense', 'HitPoint');
+    return {keys:[...new Set(keys)], physicalShare: total ? power.Physic / total : null, damageSkills: counts.damage, healSkills: counts.heal, roles};
   }
   function eligible(item, character, slot) {
     if (!item || !character) return false;
@@ -113,7 +151,7 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
+  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

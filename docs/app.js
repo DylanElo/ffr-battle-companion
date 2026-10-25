@@ -9,7 +9,7 @@ const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
 const VIEWS = [['bosses', 'Bosses'], ['optimizer', 'Party'], ['gear', 'Gear'], ['resonances', 'Resonances'], ['about', 'About the data']];
 
 let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'bosses';
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, goal: 'physical', reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, reserve: true, kitQ: '', ownedOnly: true, gearQ: '' };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
@@ -190,23 +190,47 @@ function enemyDetail(enemy) {
 
 // ---------- gear ----------
 
+const PRIORITY_LABELS = { PhysicalAttack: 'Attack', MagicalAttack: 'Magic', PhysicalDefense: 'Defence', MagicalDefense: 'Magic defence', HitPoint: 'HP', Agility: 'Speed', Divine: 'Divine', MagicPoint: 'MP' };
+// Everything the character can use with the planned Resonance: their own abilities, level and sync
+// unlocks, and the Resonance's grants (same source the party optimizer uses).
+function usableSkills(visionId) {
+  try {
+    const l = globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId);
+    return [...new Set([...l.freeActiveIds, ...l.learnedActiveIds])].map(id => index.skills.get(id)).filter(Boolean);
+  } catch { return []; }
+}
+function gearPriorities() {
+  const kitVision = index.visions.get(Number(draft?.visionId));
+  const profile = C.kitProfile(usableSkills(kitVision?.id ?? -1), index.characters.get(ui.charId));
+  return { kitVision, profile, keys: ui.prio[ui.charId] ?? profile.keys };
+}
+
 function gear() {
   if (!hasSave()) return `<section class="window"><h2>Gear</h2>${loadPrompt('Load your save to compare the equipment you own and find the best loadout for each character.')}</section>`;
   const people = recruited(), saved = snapshot.characters.find(c => c.id === ui.charId), native = index.characters.get(ui.charId);
   const side = `<section class="window" aria-label="Character and goal">
     <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}</span><small>${snapshot.party.includes(c.id) ? 'In party' : ''}${plans[c.id] ? ' · planned' : ''}</small></li>`).join('')}</ul>
-    <label class="check">Best for <select id="goal">${Object.entries(C.goals).map(([id, g]) => opt(id, g.label, id === ui.goal)).join('')}</select></label>
     <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take other characters’ gear</label>
     ${Object.keys(plans).length ? `<h3>Plans</h3><ul class="rows plans">${Object.keys(plans).map(id => `<li>${charFace(id, 'sm')}<span>${h(name('characters', id))}</span>${visionFace(plans[id].visionId, 'sm')}<button type="button" class="ghost" data-release="${id}">Remove</button></li>`).join('')}</ul>
       <button type="button" id="export">Export plans</button>` : ''}
   </section>`;
   if (!saved || !native || !draft) return `<div class="split">${side}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
 
+  // What to gear for: suggested from the planned Resonance's unlocked skills and the character's role,
+  // until the player picks their own combination for this character.
+  const { kitVision, profile, keys } = gearPriorities(), goal = C.priorityGoal(catalog, keys);
+  const goalText = keys.map(k => PRIORITY_LABELS[k]).join(' + ');
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const why = profile.physicalShare === null
+    ? `${native.name} has no damage skills unlocked${kitVision ? ` with ${kitVision.name}` : ''}, so this follows their base stats`
+    : `${native.name}${kitVision ? ` with ${kitVision.name}` : ''} can use ${plural(profile.damageSkills, 'damage skill')}${profile.healSkills ? ` and ${plural(profile.healSkills, 'heal')}` : ''}, ${Math.round(profile.physicalShare * 100)}% physical by power`;
+  const roleText = profile.roles.length ? ` Role: ${profile.roles.join(', ')}.` : '';
+
   const available = C.stock(snapshot, ui.charId, plans, ui.reserve);
   const slots = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])];
   const savedIds = [saved.equipment.weaponId, saved.equipment.armorId, ...saved.equipment.accessoryIds];
   const selects = slots.map(([slot, label, id, i = 0], n) => {
-    const list = C.candidates(catalog, native, available, slot, ui.goal), cur = Number(id);
+    const list = C.candidates(catalog, native, available, slot, goal), cur = Number(id);
     return `<label for="slot${n}">${label}</label><select id="slot${n}" data-slot="${slot}" data-index="${i}" data-key="slot${n}" class="${cur !== Number(savedIds[n]) ? 'changed' : ''}">
       ${opt(-1, 'Empty', cur <= 0)}${cur > 0 && !list.some(x => x.id === cur) ? opt(cur, `${name('equipment', cur)} (equipped)`, true) : ''}
       ${list.map(x => opt(x.id, `${x.name}: ${statsText(x)}${available.get(x.id) > 1 ? ` (${available.get(x.id)} free)` : ''}`, x.id === cur)).join('')}</select>`;
@@ -234,8 +258,13 @@ function gear() {
       <p class="sub">${h(pretty(native.weaponType))}, ${h(native.armorTypes.map(pretty).join(' or ').toLowerCase())}</p>
       ${v ? `<p class="small">${visionFace(v.id, 'sm')} With ${h(v.name)}</p>` : ''}
     </div></div>
+    <h3>Gear for</h3>
+    <div class="chips" role="group" aria-label="Stats to prioritise">${C.priorityStats.map(k => `<button type="button" class="chip" data-prio="${k}" aria-pressed="${keys.includes(k)}"
+      ${k === 'Divine' ? 'title="Spirit raises Divine. What Divine does in battle hasn’t been confirmed yet."' : ''}>${PRIORITY_LABELS[k]}</button>`).join('')}</div>
+    <p class="dim small">${ui.prio[ui.charId] ? `Your choice. <button type="button" class="ghost" data-prio-reset>Use the suggestion (${h(profile.keys.map(k => PRIORITY_LABELS[k]).join(' + '))})</button>`
+      : `Suggested: ${h(why)}.${h(roleText)} Damage and healing use ${h(native.name)}’s own Attack or Magic, whichever Resonance grants the skill.`}</p>
     <div class="toolbar">
-      <button type="button" class="primary" id="best">Find the best ${h(C.goals[ui.goal].label.toLowerCase())} loadout</button>
+      <button type="button" class="primary" id="best" ${keys.length ? '' : 'disabled'}>Find the best loadout for ${h(goalText || '…')}</button>
       <button type="button" id="saved-gear">Back to saved gear</button>
     </div>
     <div class="slots">${selects}
@@ -380,12 +409,18 @@ document.addEventListener('click', e => {
   if (t.dataset.plan) {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
-      ui.charId = ui.perspective; ui.goal = C.clean(v.attackType) === 'Magic' ? 'magic' : 'physical';
+      ui.charId = ui.perspective;
       setDraft(); draft.visionId = v.id; view = 'gear'; scrollTo({ top: 0 });
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
-  if (t.id === 'best') { try { draft = { ...C.recommend(catalog, snapshot, ui.charId, ui.goal, plans, ui.reserve), visionId: draft.visionId }; render(); } catch (err) { error(err.message); } return; }
+  if (t.dataset.prio) {
+    const keys = gearPriorities().keys, k = t.dataset.prio;
+    ui.prio[ui.charId] = keys.includes(k) ? keys.filter(x => x !== k) : [...keys, k];
+    render(); return;
+  }
+  if ('prioReset' in t.dataset) { delete ui.prio[ui.charId]; render(); return; }
+  if (t.id === 'best') { try { draft = { ...C.recommend(catalog, snapshot, ui.charId, C.priorityGoal(catalog, gearPriorities().keys), plans, ui.reserve), visionId: draft.visionId }; render(); } catch (err) { error(err.message); } return; }
   if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
@@ -407,7 +442,6 @@ document.addEventListener('change', e => {
   if (t.id === 'boss-only') ui.bossOnly = t.checked;
   else if (t.id === 'owned-only') ui.ownedOnly = t.checked;
   else if (t.id === 'perspective' || t.id === 'kit-perspective') ui.perspective = +t.value;
-  else if (t.id === 'goal') ui.goal = t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
   else if (t.id === 'vision') draft.visionId = +t.value;
   else if (t.dataset.slot) { const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }
