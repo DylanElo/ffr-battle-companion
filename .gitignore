@@ -1,0 +1,9 @@
+# Publish only the static site, its logic tests and the readme.
+# Raw game extracts, local tooling and the old local server stay out of the repo.
+/*
+!/docs/
+!/tests/
+!/README.md
+!/.gitignore
+/docs/.local-test/
+/tests/integration.test.cjs
