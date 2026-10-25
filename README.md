@@ -18,7 +18,7 @@ Works without a save for looking things up. Load your save to plan with what you
 Static files in [`docs/`](docs), no build step: `python -m http.server -d docs`.
 
 - [`docs/core.js`](docs/core.js): stock, reservations, recommendations and mastery rules. Tests: `node --test tests/core.test.cjs`.
-- [`docs/save.js`](docs/save.js): reads the encrypted save. Shared with the [Resonance Save Editor](https://github.com/DylanElo/ffrs-save-editor).
+- [`docs/save.js`](docs/save.js): reads the encrypted save (read-only use here).
 - [`docs/app.js`](docs/app.js): the interface.
 - [`docs/data/catalog.json`](docs/data/catalog.json): game tables (Resonances, skills, passives, equipment, characters, enemies), generated locally from an installed copy of the game.
 
