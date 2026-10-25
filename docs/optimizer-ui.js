@@ -74,6 +74,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   const off = busy ? 'disabled' : '';
   const toggle = (id, on, label) => `<label class="chip-check"><input type="checkbox" id="${id}" ${on ? 'checked' : ''} ${off}><span>${label}</span></label>`;
   const settings = `<div class="party-controls">
+      <label class="against"><span class="dim small">Against</span><select id="optimizer-against" ${off}>${[['enemy', 'This enemy'], ['general', 'Any fight']].map(([id, label]) => option(id, label, (state.against || 'enemy') === id)).join('')}</select></label>
       <span class="dim small">Build for</span><div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) => `<label class="chip-check"><input type="checkbox" data-party-goal="${id}" ${list(state.goals).includes(id) ? 'checked' : ''} ${off}><span>${label}</span></label>`).join('')}</div>
       <span class="dim small">Must have</span>${toggle('optimizer-healer', state.minHealers, 'Healer')}${toggle('optimizer-protector', state.minProtectors, 'Protection')}
       <details class="more" data-keep="party-more"><summary>More</summary><div>

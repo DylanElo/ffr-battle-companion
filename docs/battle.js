@@ -278,7 +278,8 @@
       for(let round=1;round<=rounds;round++)for(const s of order){
         const staggered=scenario.broken || round<recoverAt,lb=s.m.limit;
         const turn={damage:s.m.damage,brokenDamage:s.m.brokenDamage,breakDamage:s.m.breakDamage};
-        const burst=(lb?.options || []).filter(o=>o.cost<=s.gauge && value(o,staggered)>value(turn,staggered)).sort((a,b)=>value(b,staggered)-value(a,staggered))[0];
+        // With the Limit Burst goal ticked it fires as soon as it is ready; otherwise only when it beats the normal turn.
+        const burst=(lb?.options || []).filter(o=>o.cost<=s.gauge && (goals.has('limit') || value(o,staggered)>value(turn,staggered))).sort((a,b)=>value(b,staggered)-value(a,staggered))[0];
         if(burst){s.gauge-=burst.cost;fill(s,lb.recuperate*lb.mult);s.uses.push({round,skillId:burst.skillId});}
         const act=burst || turn;
         damage+=staggered?number(act.brokenDamage,act.damage):act.damage;breakDamage+=act.breakDamage;
@@ -383,7 +384,8 @@
         }
       }
       if(!results.length)return {valid:false,score:-Infinity,reason:'No supported, affordable, legally learned ordinary attack.'};
-      return results.sort((a,b)=>b.score-a.score || b.damage-a.damage)[0];
+      // Ties go to the cheaper loadout, so abilities that change nothing for these goals aren't equipped.
+      return results.sort((a,b)=>b.score-a.score || b.damage-a.damage || a.turn.reservedIds.length-b.turn.reservedIds.length)[0];
     }
     function evaluateParty(members){
       const baseline=members.reduce((sum,m)=>sum+m.evaluation.damage,0);
@@ -435,6 +437,20 @@
     }
     return {evaluate,evaluateParty,scenario,evidence,globalWarnings,prep};
   }
-  const api={createModel,knapsack,isAttack,isHealing};
+  // "Any fight": a neutral boss at the party's average level, with the median stats of the bosses nearest that level
+  // and no elemental weaknesses, resistances, passives or status resistances, so no element or matchup is favoured.
+  const GENERAL_ENEMY_ID='general';
+  function generalEnemy(catalog,snapshot){
+    const levels=snapshot.characters.filter(C.joined).filter(c=>catalog.characters.some(n=>n.id===c.id))
+      .map(c=>S.characterStats(catalog,snapshot,c.id,c.equipment,[]).level).filter(Number.isFinite);
+    const level=Math.max(1,Math.round(levels.reduce((a,b)=>a+b,0)/Math.max(1,levels.length)));
+    const bosses=(catalog.enemies || []).filter(e=>e.isBoss && e.stats).sort((a,b)=>Math.abs(a.level-level)-Math.abs(b.level-level)).slice(0,7);
+    const median=key=>{const v=bosses.map(e=>number(e.stats[key])).sort((a,b)=>a-b);return v.length?v[v.length>>1]:0;};
+    const stats=Object.fromEntries(Object.keys(bosses[0]?.stats || {}).map(key=>[key,median(key)]));
+    return {id:GENERAL_ENEMY_ID,name:'Any fight',level,isBoss:true,general:true,basis:bosses.map(e=>e.name),stats,
+      resistances:Object.fromEntries(['Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'].map(e=>[e,'None'])),
+      statusResistances:{},skillIds:[],passiveIds:[]};
+  }
+  const api={createModel,knapsack,isAttack,isHealing,generalEnemy,GENERAL_ENEMY_ID};
   if(typeof module!=='undefined')module.exports=api;else root.CompanionBattle=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

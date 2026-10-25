@@ -1,12 +1,12 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=18', 'damage.js', 'stats.js', 'battle.js?v=18', 'search.js?v=18');
+importScripts('core.js', 'passives.js?v=20', 'damage.js', 'stats.js', 'battle.js?v=22', 'search.js?v=20');
 let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
   try {
     rulesPromise ||= fetch('skill-rules.json').then(response=>{if(!response.ok)throw new Error('Native skill eligibility rules are unavailable.');return response.json();});
     catalog.skillRules=await rulesPromise;
-    const enemy=catalog.enemies.find(row=>row.id===Number(enemyId));
+    const enemy=enemyId===CompanionBattle.GENERAL_ENEMY_ID?CompanionBattle.generalEnemy(catalog,snapshot):catalog.enemies.find(row=>row.id===Number(enemyId));
     if(!enemy)throw new Error('Select an enemy from the native catalog.');
     const model=CompanionBattle.createModel(catalog,snapshot,enemy,options);
     const start=performance.now();

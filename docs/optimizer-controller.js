@@ -1,7 +1,7 @@
-import {renderOptimizer} from './optimizer-ui.js?v=19';
+import {renderOptimizer} from './optimizer-ui.js?v=20';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty}){
-  const state={enemyQ:'',bossOnly:true,enemyId:0,goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
+  const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
   function render(){
@@ -18,7 +18,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     cancel();const id=run,hash=snapshot.source?.sha256;
     busy=true;error='';result=null;state.partyIndex=0;state.progress='Preparing progression, passive packages and legal equipment…';
     const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:13000};
-    worker=new Worker(new URL('./optimizer-worker.js?v=18',import.meta.url));
+    worker=new Worker(new URL('./optimizer-worker.js?v=22',import.meta.url));
     worker.onmessage=event=>{
       if(event.data.id!==run || getSnapshot().source?.sha256!==hash)return;
       if(event.data.type==='progress')state.progress=event.data.message;
@@ -27,7 +27,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
       rerender();
     };
     worker.onerror=event=>{if(id!==run)return;error=event.message || 'The search worker could not start.';cancel();rerender();};
-    worker.postMessage({id,catalog,snapshot,enemyId:state.enemyId,options});rerender();
+    worker.postMessage({id,catalog,snapshot,enemyId:state.against==='general'?'general':state.enemyId,options});rerender();
   }
   function exportParty(index){
     const party=result?.results?.[index];if(!party)return;
@@ -53,7 +53,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
   });
   document.addEventListener('change',event=>{
     const input=event.target;
-    const fields={'optimizer-enemy':'enemyId','optimizer-boss-only':'bossOnly',
+    const fields={'optimizer-enemy':'enemyId','optimizer-against':'against','optimizer-boss-only':'bossOnly',
       'optimizer-healer':'minHealers','optimizer-protector':'minProtectors','optimizer-difficulty':'difficulty',
       'optimizer-broken':'broken','optimizer-critical':'critical','optimizer-mp':'mpPercent'};
     if(fields[input.id]){

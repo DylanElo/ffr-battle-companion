@@ -1,5 +1,5 @@
-import * as S from './save.js?v=18';
-import {createOptimizerController} from './optimizer-controller.js?v=19';
+import * as S from './save.js?v=20';
+import {createOptimizerController} from './optimizer-controller.js?v=20';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -10,7 +10,7 @@ const VIEWS = [['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deep: null,
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null,
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
@@ -245,9 +245,9 @@ let deepWorker = null, deepRun = 0;
 function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; }
 function deepSearch() {
   cancelDeep();
-  const id = deepRun, charId = ui.charId, enemyId = ui.enemyId, goals = [...ui.deepGoals];
+  const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=18', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=22', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -373,7 +373,7 @@ function deepPanel() {
       `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
     <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
     <label class="against"><span class="dim small">Against</span>
-      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, e.id === ui.enemyId)).join('')}</select></label>
+      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.enemyId)).join('')}</select></label>
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
       : `<button type="button" class="primary" id="deep">Search</button><span class="dim small">About 15 seconds</span>`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
@@ -384,14 +384,15 @@ function deepPanel() {
 function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
-  if (!d.results.length) return `<div class="deep-result"><p>No legal attack was found for this character against ${h(name('enemies', d.enemyId))}.</p></div>`;
+  const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
+  if (!d.results.length) return `<div class="deep-result"><p>No legal attack was found for this character against ${h(against)}.</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
   const goals = d.goals || ['damage'], abilities = (ev.equippedSkillIds || []).map(id => index.skills.get(id)?.name || index.passives.get(id)?.name).filter(Boolean);
   const passives = (ev.passiveIds || []).map(id => index.passives.get(id)?.name).filter(Boolean);
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   return `<div class="deep-result" aria-busy="false">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Best'}</button>`).join('')}</div>` : ''}
-    <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(name('enemies', d.enemyId))}</span>
+    <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span>
       <span class="dim small">${n(ev.breakDamage)} stagger per turn${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over a five-round fight; staggered rounds deal ×1.5.</p>
@@ -751,7 +752,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'perspective' || t.id === 'kit-perspective' || t.id === 'rf-perspective') ui.perspective = +t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
   else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
-  else if (t.id === 'deep-enemy') ui.enemyId = +t.value;
+  else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.enemyId = +t.value; }
   else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.visionWhy = ''; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;
   else if (t.dataset.slot) { ui.deep = null; const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }

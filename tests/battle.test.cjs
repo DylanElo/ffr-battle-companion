@@ -140,3 +140,13 @@ test('a Limit Burst that beats the normal turn is used once staggers fill the ga
   assert.ok(result.limitUses.length>0);
   assert.ok(result.fightDamage>result.damage);
 });
+
+test('Any fight is a neutral boss at the party level that the model can score',()=>{
+  const general=B.generalEnemy(catalog,snapshot);
+  assert.equal(general.id,B.GENERAL_ENEMY_ID);
+  assert.ok(Object.values(general.resistances).every(r=>r==='None'));
+  assert.ok(general.stats.MaxHitPoint>0 && general.stats.MaxBreakPoint>0);
+  const result=B.createModel(catalog,snapshot,general,{goals:['damage','stagger']}).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.ok(result.fightDamage>0);
+});
