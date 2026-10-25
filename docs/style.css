@@ -265,6 +265,19 @@ dialog form { text-align: right; margin-top: 12px; }
 .goal span { border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); border-radius: 99px; padding: 3px 12px; font-weight: 700; font-size: 14px; }
 .goal:hover span { background: rgba(255, 215, 94, .24); }
 .card .toolbar .primary { flex: 1; }
+.deep { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.deep h4 { font-size: 16px; }
+.deep p { margin: 0; }
+.deep .chips { margin: 0; }
+.deep .toolbar { margin: 4px 0 0; }
+.against { display: grid; gap: 4px; }
+.against select { width: 100%; }
+.deep-result { border: 1px solid var(--gold); border-radius: 8px; background: var(--gold-soft); padding: 10px 12px; margin-bottom: 14px; }
+.deep-result .tabs { margin-bottom: 8px; }
+.deep-result p { margin: 6px 0 0; }
+.deep-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.deep-num { margin-left: auto; }
+.deep-num b { font-size: 24px; font-weight: 900; color: var(--gold); }
 .vision-slot { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .vision-slot > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
 .vision-slot select { width: 100%; }

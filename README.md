@@ -7,7 +7,7 @@ Works without a save for looking things up. Load your save to plan with what you
 ## What it does
 
 - **Fight**: pick an enemy to see what it's weak to, resists and attacks with. **Best party** searches every party of four you can field, with owned Resonances, shared equipment and learned abilities, and predicts one round of damage with the game's own formula. Choose damage, break or damage + support, require a healer or protection, lock characters in, then compare three options and use one as your gear plans. Below that: your Resonances with unlocked skills it's weak to, its skills and its status resistances.
-- **Characters**: an equip screen per character with real stat totals (base, level, sync and gear). **Optimize** picks the Resonance and gear for the stats you gear for, suggested from the character's own kit and role, and never takes gear another character is wearing unless you allow it. Keep plans per character and export them.
+- **Characters**: an equip screen per character with real stat totals (base, level, sync and gear). **Build for a fight** searches one character's Resonance, gear, attack, abilities and passives together for the most damage or stagger against a chosen enemy. **Optimize stats** is the instant version: it picks the Resonance and gear for the stats you gear for, suggested from the character's own kit and role, and never takes gear another character is wearing unless you allow it. Keep plans per character and export them.
 - **Resonances**: every kit with its finisher and what unlocks at each awakening and sync level, plus your own progress.
 - **How this works** (footer): what the recommendations do and don't account for, impact tiers and source tables.
 
