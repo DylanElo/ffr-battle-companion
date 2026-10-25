@@ -150,3 +150,14 @@ test('Any fight is a neutral boss at the party level that the model can score',(
   assert.equal(result.valid,true);
   assert.ok(result.fightDamage>0);
 });
+
+test('current setup scores only what is equipped, and a short search still beats it',()=>{
+  const C=require('../docs/core.js'),options={goals:['damage'],perLoadoutBudget:250,candidatesPerVision:4,maxEvaluations:5000,timeMs:4000,visionSlices:true};
+  const model=B.createModel(catalog,snapshot,B.generalEnemy(catalog,snapshot),options);
+  const current=model.evaluate({...input,current:true}),full=model.evaluate(input);
+  assert.equal(current.valid,true);
+  assert.ok(current.score<=full.score);
+  const candidates=Search.buildCandidates(catalog,snapshot,own.id,{evaluate:a=>model.evaluate(a),enemy,options},options,new Map(C.stock(snapshot,own.id,{},true)));
+  assert.ok(candidates.some(c=>c.visionId===own.equipment.visionId),'the saved Resonance is always searched');
+  assert.ok(Math.max(...candidates.map(c=>c.score))>=current.score);
+});

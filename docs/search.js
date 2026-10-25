@@ -95,15 +95,20 @@
       accessoryIds:(saved.equipment.accessoryIds || []).map(id=>legal(id,'accessory')?id:-1)};
     if (!fits(base,available)) base.accessoryIds=Array(slots).fill(-1);
     const owned=new Set((snapshot.resonances || []).map(v=>v.id));
-    const visions=[-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)];
+    // Try every Resonance with the saved gear first, then search the strongest first, each with an equal share of the
+    // remaining time, so a time budget can't end the search before the best (or the saved) Resonance is tried.
+    const seed=visionId=>evaluateOne(state,callbacks,saved.id,visionId,{...base,visionId})?.score ?? -Infinity;
+    const seeds=new Map([-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)].map(id=>[id,seed(id)]));
+    const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || seeds.get(b)-seeds.get(a));
     const all=[];
-    for (const visionId of visions) {
+    for (const [n,visionId] of visions.entries()) {
       const local=new Map();
       let attempts=0;
+      const sliceEnd=options.visionSlices && options.timeMs>0?Date.now()+(options.timeMs-(Date.now()-state.started))/(visions.length-n):Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
         const equip={weaponId,armorId,accessoryIds,visionId},key=keyOf(equip);
         if (local.has(key)) return true;
-        if (attempts>=options.perLoadoutBudget || stopped(state)) return false;
+        if (attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd) return false;
         if (!fits(equip,available)) return true;
         attempts++;
         const candidate=evaluateOne(state,callbacks,saved.id,visionId,equip);

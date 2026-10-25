@@ -1,5 +1,6 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=21';
+import {createOptimizerController} from './optimizer-controller.js?v=23';
+import {comparison} from './optimizer-ui.js?v=22';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -277,19 +278,19 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=22', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=24', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
     else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { ui.deep = { results: e.data.result.results, pick: 0, enemyId, goals }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
+    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, pick: 0, enemyId, goals }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
     render();
   };
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
     options: { goals, difficulty: 'save', mpPercent: 100, broken: false, critical: false, minHealers: 0, minProtectors: 0,
-      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000 } });
+      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000, visionSlices: true } });
   render();
 }
 function applyDeep(i) {
@@ -425,6 +426,7 @@ function deepResult() {
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span>
       <span class="dim small">${n(ev.breakDamage)} stagger per turn${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
+    ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over a five-round fight; staggered rounds deal ×1.5.</p>
     <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, assuming the party staggers the enemy at your rate ×4. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}

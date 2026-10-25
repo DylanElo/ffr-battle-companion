@@ -1,5 +1,12 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=20', 'damage.js', 'stats.js', 'battle.js?v=22', 'search.js?v=20');
+importScripts('core.js', 'passives.js?v=20', 'damage.js', 'stats.js', 'battle.js?v=23', 'search.js?v=21');
+// The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
+const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
+function currentOf(model,snapshot,id){
+  const saved=savedSetup(snapshot,id);if(!saved?.equipment)return null;
+  const evaluation=model.evaluate({characterId:id,visionId:Number(saved.equipment.visionId),equipment:saved.equipment,current:true});
+  return evaluation.valid?evaluation:null;
+}
 let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
@@ -25,7 +32,7 @@ self.onmessage = async event => {
         seen.add(key);results.push(c);
         if(results.length===3)break;
       }
-      self.postMessage({id,type:'result',result:{results,scenario:model.scenario,elapsedMs:Math.round(performance.now()-start)}});
+      self.postMessage({id,type:'result',result:{results,current:currentOf(model,snapshot,event.data.characterId),scenario:model.scenario,elapsedMs:Math.round(performance.now()-start)}});
       return;
     }
     self.postMessage({id,type:'progress',message:'Evaluating owned skills, passive combinations and legal equipment…'});
@@ -34,6 +41,8 @@ self.onmessage = async event => {
       evaluateParty:(members,context)=>model.evaluateParty(members,context),
       enemy,options
     });
+    const members=snapshot.party.filter(n=>n>0).map(n=>({characterId:n,evaluation:currentOf(model,snapshot,n)})).filter(m=>m.evaluation);
+    result.current=members.length?{...model.evaluateParty(members),characterIds:members.map(m=>m.characterId)}:null;
     result.elapsedMs=Math.round(performance.now()-start);
     result.approximate=true;
     result.reasons=[...new Set([...(result.reasons || []),'Passive packages use a bounded surrogate search before native-formula evaluation.'])];

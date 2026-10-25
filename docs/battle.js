@@ -66,13 +66,15 @@
     if(activeNativeArtifacts.length)globalWarnings.push(`Active artifacts ${activeNativeArtifacts.map(a=>a.name || a.id).join(', ')} are listed but their modifiers are not modeled.`);
     globalWarnings.push('Native damage predictions have not been calibrated against a recorded battle. Enemy base rows may differ from the actual encounter.');
     globalWarnings.push('Numeric rankings exclude attacks below 100 native accuracy. Enemy evasion and reactive counters are not simulated.');
-    function prep(characterId,visionId){
-      const key=`${characterId}:${visionId}`;
+    // `current`: only the abilities equipped in the save (Mastery skills aren't stored there, so none), to score the setup as it is.
+    function prep(characterId,visionId,current=false){
+      const key=`${characterId}:${visionId}:${current}`;
       if(prepCache.has(key))return prepCache.get(key);
       const saved=savedById.get(characterId),native=indexes.characters.get(characterId);
-      const learn=S.learned(catalog,snapshot,characterId,visionId);
+      const equipped=new Set((saved?.equippedSkillIds || []).filter(id=>id>0)),keep=id=>!current || equipped.has(id);
+      const fullLearn=S.learned(catalog,snapshot,characterId,visionId),learn=current?{...fullLearn,masterSkillIds:[]}:fullLearn;
       const free=new Set(learn.freeActiveIds || []);
-      const skills=unique([...free,...(learn.learnedActiveIds || [])]).map(id=>indexes.skills.get(id)).filter(Boolean);
+      const skills=unique([...free,...(learn.learnedActiveIds || []).filter(keep)]).map(id=>indexes.skills.get(id)).filter(Boolean);
       const stateContext={demonForm:false,extraPhase:false,awakeningPower:false,hasEscaped:false,lbPercent:0,resources:{}};
       const eligibility=skill=>{
         const result=catalog.skillRules?P.skillEligibility(skill,stateContext,catalog.skillRules):{eligible:true,reasons:[],deferred:['Native action-state rules were not loaded.']};
@@ -82,7 +84,7 @@
       const legalSkills=skills.filter(skill=>eligibility(skill).eligible);
       const active=legalSkills.filter(isAttack);
       const excludedActions=skills.filter(isAttack).map(skill=>({skill,result:eligibility(skill)})).filter(row=>!row.result.eligible).map(row=>`${row.skill.name}: ${[...row.result.reasons,...row.result.deferred].join('; ')}`);
-      const borrowed=unique(learn.alwaysPassiveIds || []),learned=unique(learn.learnedPassiveIds || []);
+      const borrowed=unique(learn.alwaysPassiveIds || []),learned=unique(learn.learnedPassiveIds || []).filter(keep);
       const support=P.supportActions(catalog,legalSkills.map(s=>s.id));
       const healSkills=legalSkills.filter(isHealing);
       const protectSkills=unique([...support.buffs.filter(a=>['physicalReductionPercent','magicReductionPercent'].includes(a.kind)).map(a=>a.skillId),
@@ -91,7 +93,7 @@
       const learnedSpecials=new Set(saved?.activeSkillIds || []);
       const limits=(catalog.skills || []).filter(s=>clean(s.attr)==='LimitBurst' && (LB_OWNER_ALIASES[s.hasUnit] ?? catalog.characters.find(c=>c.name===s.hasUnit)?.id)===characterId &&
         (number(s.cost)<=100 || learnedSpecials.has(s.id)) && s.relation==='Enemies' && ['Physic','Magic'].includes(clean(s.calcType)) && number(s.mag)>0);
-      const result={saved,native,learn,free,skills,active,legal,limits,borrowed,learned,support,healSkills,protectSkills,excludedActions};
+      const result={saved,native,learn,free,skills,active,legal,limits,borrowed,learned,support,healSkills,protectSkills,excludedActions,current};
       prepCache.set(key,result);return result;
     }
     function analysis(ids,skill,extra={}){
@@ -165,7 +167,7 @@
       const reservedCost=equipCostOf(turn.reservedIds);
       const totalBudget=number(stats0.skillBudget,prepared.learn.skillBudget)-reservedCost,totalSlots=number(stats0.maxSkillSlots,8)-turn.reservedIds.length;
       const effectiveElement=analysis(freeIds,skill).modifiers.element;
-      const key=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}`;
+      const key=`${prepared.saved.id}:${visionId}:${prepared.current}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}`;
       if(packageCache.has(key))return packageCache.get(key);
       const reference=prepared.saved.equipment;
       const baseIds=unique(prepared.borrowed),baseAnalysis=analysis(baseIds,skill,turn.context);
@@ -309,8 +311,8 @@
       }
       return turns;
     }
-    function evaluate({characterId,visionId,equipment}){
-      const prepared=prep(characterId,visionId);
+    function evaluate({characterId,visionId,equipment,current=false}){
+      const prepared=prep(characterId,visionId,current);
       if(!prepared.saved || !C.joined(prepared.saved))return {valid:false,score:-Infinity};
       const freeIds=unique([...prepared.borrowed,...gearPassives(equipment)]),results=[];
       const consider=(skill,turn)=>{

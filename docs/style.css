@@ -402,3 +402,5 @@ dialog form { text-align: right; margin-top: 12px; }
 .steps { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 14px; padding-left: 20px; color: var(--dim); font-size: 14px; }
 .next .against select { margin-left: 8px; max-width: 100%; }
 .pick li > span > small { display: block; }
+.compare { margin: 8px 0; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, .05); }
+.compare b { margin-left: 4px; }

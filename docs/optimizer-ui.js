@@ -51,13 +51,29 @@ function memberCard(member, indexes) {
   </article>`;
 }
 
-function partyView(party, index, indexes, canEquip) {
+// Before/after: the recommended setup against the saved one, both scored by the same model.
+export function comparison(now, next) {
+  if (!now) return '<p class="compare dim small">Your current setup has no usable attack in this fight, so there’s nothing to compare.</p>';
+  const parts = [], change = now.damage > 0 ? Math.round((next.damage - now.damage) / now.damage * 100) : null;
+  if (change !== null) parts.push(change ? `${change > 0 ? '+' : ''}${change}% damage` : 'same damage');
+  if (next.firstStagger && now.firstStagger && next.firstStagger !== now.firstStagger) {
+    const n = Math.abs(now.firstStagger - next.firstStagger);
+    parts.push(`staggers ${n} round${n > 1 ? 's' : ''} ${next.firstStagger < now.firstStagger ? 'sooner' : 'later'}`);
+  } else if (next.firstStagger && !now.firstStagger) parts.push('staggers within the fight (yours doesn’t)');
+  else if (!next.firstStagger && now.firstStagger) parts.push('no longer staggers within the fight');
+  const better = change === null ? !!(next.firstStagger && (!now.firstStagger || next.firstStagger < now.firstStagger)) : change > 0;
+  return `<p class="compare small"><span class="dim">Now: ${num(now.damage)} damage per round${now.firstStagger ? `, staggers in round ${now.firstStagger}` : ''}.</span>
+    <b class="${better ? 'good' : change === 0 ? '' : 'bad'}">${h(parts.join(', ') || 'Same as now')}</b></p>`;
+}
+
+function partyView(party, index, indexes, canEquip, current) {
   const members = list(party.members ?? party.party), evaluated = party.evaluation || party;
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   return `<div class="party-head">
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
       <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
     </div>
+    ${current !== undefined ? comparison(current && { damage: current.damage, firstStagger: current.firstStagger }, { damage: finite(evaluated.damage) ? evaluated.damage : summed, firstStagger: evaluated.firstStagger }) : ''}
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}
     <div class="members">${members.map(m => memberCard(m, indexes)).join('')}</div>
     ${bullets(evaluated.warnings)}
@@ -91,7 +107,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   let body;
   if (busy) body = `<p class="dim" role="status">${h(state.progress || 'Searching your characters, Resonances, gear and abilities…')}</p>`;
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
-    ${partyView(results[pick], pick, indexes, canEquip)}`;
+    ${partyView(results[pick], pick, indexes, canEquip, result.current)}`;
   else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or fewer locked characters.</p>${bullets(result.warnings)}`;
   else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches every party of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
