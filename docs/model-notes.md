@@ -18,7 +18,7 @@ Load an inventory, select an encounter and battle state, compare legal owned par
 
 Equipment, character and Resonance choices share one inventory. Accessory pairs are evaluated together. Passive/Spirit packages use a cost/slot knapsack surrogate and are then evaluated with native damage math. Candidate pruning, a party beam and a time/evaluation budget keep browser searches bounded. Results are the strongest candidates found, not a proven global optimum.
 
-Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The scenario is one ordinary action per member, not a sustained fight simulation.
+Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The scenario is one turn per member, not a sustained fight simulation. Arms Akimbo (400650, 40 MP) and Dualcast (400730, spells only) repeat the chosen attack once; Magic Boost (400660) adds its native +100% magic damage effect 12911 into the additive damage bucket and costs 1.5× MP (rounded up, assumed). Each hit is capped at 9999, or 99999 with a DamageLimitBreak effect: the native getter at file offset 0x5147360 returns `cond ? 9999 : 99999`. Decimating Attacks (DmgMulTargetlNum) adds its percentage per enemy on Group/All attacks, using the scenario's enemy count (1); Tip-Top Shape (DmgMulBuffNum) adds per buff, which is 0 at the start of a fight.
 
 ## Evidence limits
 
@@ -26,7 +26,7 @@ Arithmetic and major native kernels were recovered statically from the installed
 
 Percentage-stat effects use the verified native pre-effect additive parameter as their basis, float32 epsilon and per-effect truncation. This includes the native rounding quirk where a 30% decrease on baseline 100 yields 71. Spirit packages derive their active/passive bundles from the source mastery rows and localized description; exact runtime expansion still needs confirmation.
 
-Nested Arms Akimbo/Dualcast execution, state-specific ultimate actions, enemy turn scripts, encounter overrides, probabilistic reactions, identical-effect multi-copy stacking, unknown active artifacts and unsupported calculation types are not fabricated. Their absence can change the real best build. Fully automated battle strategy, multi-turn MP regeneration, summoned Espers and simultaneous finishers are outside this model.
+Mixed Arms Akimbo/Dualcast pairs, native limits on repeating an action, state-specific ultimate actions, enemy turn scripts, encounter overrides, probabilistic reactions, identical-effect multi-copy stacking, unknown active artifacts and unsupported calculation types are not fabricated. Their absence can change the real best build. Fully automated battle strategy, multi-turn MP regeneration, summoned Espers and simultaneous finishers are outside this model.
 
 ## Validation and handoff
 

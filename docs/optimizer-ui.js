@@ -36,7 +36,7 @@ function memberCard(member, indexes) {
       <h4>${h(character?.name || `#${member.characterId}`)}</h4>
       <span class="member-vision">${vision ? face(`summon${vision.id}`, 'sm') : ''}${h(vision?.name || '—')}</span>
     </div></div>
-    <div class="member-hit"><span>${h(skill?.name || 'No damaging action')}${skill ? ` <small>${num(skill.cost)} MP</small>` : ''}</span>
+    <div class="member-hit"><span>${h(skill?.name || 'No damaging action')}${evaluation.actionCount > 1 ? ' ×2' : ''}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP${[evaluation.multiActionId && indexes.skills.get(evaluation.multiActionId)?.name, evaluation.magicBoost && 'Magic Boost'].filter(Boolean).map(t => ` · ${h(t)}`).join('')}</small>` : ''}</span>
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
     <p class="member-gear">${gear.map(h).join(' · ') || 'No equipment'}</p>

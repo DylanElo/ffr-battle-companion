@@ -110,3 +110,23 @@ test('weakness-only stagger passives see the final attack element',()=>{
   const neutral=B.createModel(cat,save,{...target,resistances:{Ice:'None'}},{objective:'break',difficulty:'Normal'}).evaluate({characterId:person.id,visionId:-1,equipment:person.equipment});
   assert.equal(neutral.passiveAnalysis.breakFactor,1);
 });
+
+test('hits are capped at 9999 unless a damage-limit-break effect is equipped, which then gets picked',()=>{
+  const soft={...enemy,stats:Object.fromEntries(Object.keys(enemy.stats).map(k=>[k,1])),
+    resistances:Object.fromEntries(['None','Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'].map(e=>[e,'Weakness']))};
+  const model=B.createModel(catalog,snapshot,soft,{objective:'damage',broken:true,critical:true});
+  const result=model.evaluate(input),skill=catalog.skills.find(s=>s.id===result.skillId);
+  if(!model.prep(input.characterId,input.visionId).learn.learnedPassiveIds.includes(1047))return;
+  assert.equal(result.passiveAnalysis.modifiers.damageCapRaised,true);
+  assert.ok(result.damageMax/result.actionCount/Math.max(1,skill.hits)>9999);
+});
+
+test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within the budget',()=>{
+  const model=B.createModel(catalog,snapshot,enemy,{objective:'damage'});
+  const result=model.evaluate(input);
+  if(!model.prep(input.characterId,input.visionId).legal.has(400650))return;
+  assert.equal(result.actionCount,2);
+  assert.ok(result.equippedSkillIds.includes(result.multiActionId));
+  assert.ok(Math.abs(result.damage-result.singleDamage*2)<1e-6);
+  assert.ok(result.turnMp<=result.availableMp && result.skillCost<=result.skillBudget);
+});

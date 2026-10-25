@@ -1,5 +1,5 @@
-import * as S from './save.js';
-import {createOptimizerController} from './optimizer-controller.js';
+import * as S from './save.js?v=15';
+import {createOptimizerController} from './optimizer-controller.js?v=15';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -247,7 +247,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.enemyId, goal = ui.deepGoal;
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=11', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=15', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -393,7 +393,7 @@ function deepResult() {
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(name('enemies', d.enemyId))}</span>
       <span class="deep-num"><b>${n(stagger ? ev.breakDamage : ev.damage)}</b> ${stagger ? 'stagger' : 'damage'}</span>
       <span class="dim small">${stagger ? `${n(ev.damage)} damage` : `${n(ev.breakDamage)} stagger`}</span></div>
-    <p class="small">Use <b>${h(skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
+    <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${abilities.length ? `<p class="small"><span class="dim">Abilities to equip:</span> ${abilities.map(h).join(', ')}</p>` : ''}
     ${passives.length ? `<details><summary>Passives counted (${passives.length})</summary><p class="small">${passives.map(h).join(', ')}</p></details>` : ''}
     ${(ev.warnings || []).length ? `<details><summary>Limits</summary><ul class="notes">${ev.warnings.map(w => `<li>${h(w)}</li>`).join('')}</ul></details>` : ''}
@@ -527,7 +527,7 @@ function about() {
     <ul>
       <li><b>Optimize</b> (Characters) adds up flat equipment stats for the stats you gear for, each scaled to its own range. Effects like “+20% Fire damage” aren’t scored, so they’re listed for you to judge. It picks the Resonance whose unlocked skills add the most power in those stats.</li>
       <li>Damage and healing use the user’s own Attack (physical skills) or Magic (magic skills), whichever Resonance grants the skill. What Divine does in battle hasn’t been confirmed.</li>
-      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one round with one action each. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
+      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one turn each: one action, or the same attack twice with Arms Akimbo or Dualcast, with Magic Boost on magic attacks. Hits are capped at 9,999 unless Break the Limit (or gear with it) is on. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
       <li>Owned counts include equipped copies. With “Don’t take other characters’ gear” on, their current gear and any plans are reserved.</li>
       <li>A Resonance is reserved for one character at a time. Whether two characters can share one hasn’t been confirmed.</li>
       <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>

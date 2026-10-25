@@ -119,6 +119,11 @@
       term.kind=p[1]===1?'physicalEvasionPercent':'magicEvasionPercent';term.value=Number(p[0]);return term;
     }
     if(type==='DamageLimitBreak')return {...term,kind:'damageCapRaised',value:true};
+    // Decimating Attacks: +p0% per target, when attacking all enemies. Tip-Top Shape: +p0% per buff on the user.
+    if(type==='DmgMulTargetlNum' || type==='DmgMulBuffNum'){
+      if(!allDefault(1))return reject('Unrecognized count-scaled damage layout.');
+      term.kind=type==='DmgMulTargetlNum'?'damagePerTarget':'damagePerBuff';term.value=Number(p[0]);return term;
+    }
     if(utilityTypes.has(type))return {...term,kind:'utility',value:0};
     return reject(`Effect type ${type} is not modeled.`);
   }
@@ -202,6 +207,12 @@
       const gate=filters(term,context);
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
+      if(term.kind==='damagePerTarget' || term.kind==='damagePerBuff'){
+        if(term.kind==='damagePerTarget' && !['Group','All'].includes(clean(context.skill?.target))){result.inactive.push({...term,reason:'Only when attacking all enemies.'});continue;}
+        const count=context[term.kind==='damagePerTarget'?'targetCount':'buffCount'];
+        if(!known(count)){result.deferred.push({...term,reason:`Requires ${term.kind==='damagePerTarget'?'targetCount':'buffCount'}.`});continue;}
+        modifiers.damagePercent+=term.value*Number(count);result.applied.push({...term,value:term.value*Number(count)});result.terms.push(term);continue;
+      }
       if(term.kind==='statFlat' || term.kind==='statPercent')add(modifiers[term.kind],term.parameter,term.value);
       else if(term.kind==='resistance'){
         const old=modifiers.resistances[term.element] || 'None';

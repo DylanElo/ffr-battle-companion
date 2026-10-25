@@ -1,4 +1,4 @@
-import {renderOptimizer} from './optimizer-ui.js';
+import {renderOptimizer} from './optimizer-ui.js?v=15';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,objective:'balanced',minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,fixedCharacterIds:[],progress:'',partyIndex:0};
@@ -17,8 +17,8 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     if(selected)state.enemyId=Number(selected.value);
     cancel();const id=run,hash=snapshot.source?.sha256;
     busy=true;error='';result=null;state.partyIndex=0;state.progress='Preparing progression, passive packages and legal equipment…';
-    const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:18000};
-    worker=new Worker(new URL('./optimizer-worker.js?v=11',import.meta.url));
+    const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:13000};
+    worker=new Worker(new URL('./optimizer-worker.js?v=15',import.meta.url));
     worker.onmessage=event=>{
       if(event.data.id!==run || getSnapshot().source?.sha256!==hash)return;
       if(event.data.type==='progress')state.progress=event.data.message;

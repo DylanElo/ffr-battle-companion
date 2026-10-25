@@ -13,7 +13,7 @@ Works without a save for looking things up. Load your save to plan with what you
 
 Optimize is a quick flat-stat comparison. Best party uses battle calculations and passive effects instead. It reports the strongest candidates found by a bounded search, not a proof of the global optimum. Damage is a native-formula prediction, not a live measurement.
 
-The default scenario gives each member one ordinary action, with no free setup turns or automatic finishers. A supported buff/debuff spends its caster’s action and only benefits allies acting later by Agility. Enemy entries are base rows; a specific encounter may override them. Nested multi-action commands, bespoke reactions, unknown active artifacts and unsupported calculations are explicitly excluded. Runtime Spirit expansion retains an evidence caveat; see [model notes](docs/model-notes.md).
+The default scenario gives each member one turn: one action, or the same attack twice with Arms Akimbo or Dualcast (Magic Boost doubles magic attacks for 1.5× MP). Each hit is capped at 9,999 unless Break the Limit is equipped. Members start at full HP with no buffs; no free setup turns or automatic finishers. A supported buff/debuff spends its caster’s action and only benefits allies acting later by Agility. Enemy entries are base rows; a specific encounter may override them. Mixed two-action turns (e.g. buff then attack), Limit Breaks, bespoke reactions, unknown active artifacts and unsupported calculations are explicitly excluded. Runtime Spirit expansion retains an evidence caveat; see [model notes](docs/model-notes.md).
 
 ## Development
 

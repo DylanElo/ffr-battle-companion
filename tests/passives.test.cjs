@@ -156,3 +156,12 @@ test('native damage calculation flags prevent fixed damage receiving regular dam
   assert.equal(skillRules.damageCalc.Physic.doCalcSkillDamage,true);
   assert.ok(skillRules.provenance.every(p=>p.currentGameExtract && p.matchesHistoricalSnapshot));
 });
+
+test('Decimating Attacks scales with targets on area attacks only; Tip-Top Shape scales with buffs',()=>{
+  const catalog=require('../docs/data/catalog.json'),P=require('../docs/passives.js');
+  const area={id:1,target:'Group',attr:'Magic',dmgType:'Magic',element:'None'},single={...area,target:'Single'};
+  assert.equal(P.analyze(catalog,[1337],{skill:area,targetCount:3}).modifiers.damagePercent,30);
+  assert.equal(P.analyze(catalog,[1337],{skill:single,targetCount:3}).modifiers.damagePercent,0);
+  assert.equal(P.analyze(catalog,[1428],{skill:area,buffCount:0}).modifiers.damagePercent,0);
+  assert.equal(P.analyze(catalog,[1428],{skill:area,buffCount:2}).modifiers.damagePercent,30);
+});
