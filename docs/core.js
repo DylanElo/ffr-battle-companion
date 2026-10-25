@@ -155,6 +155,82 @@
     // Command/mimic membership is not proof a skill is learned; do not add baseSkillIds.
     return catalog.skills.filter(s=>ids.has(s.id));
   }
+  // ---------- what each Resonance skill/passive does, for the Resonances filters ----------
+  // Native effect rows name their status (AttackDown, Haste, Poison…) or carry a typed effect (Revival, Counter…).
+  const STATUS_TAGS = {AttackDown:'down:ATK',IntelligenceDown:'down:MAG',DeffenceDown:'down:DEF',MindDown:'down:SPR',Slow:'down:SPD',
+    AttackUp:'up:ATK',IntelligenceUp:'up:MAG',DeffenceUp:'up:DEF',MindUp:'up:SPR',Haste:'up:SPD',
+    Poison:'status:Poison',Blind:'status:Blind',Sleep:'status:Sleep',Silence:'status:Silence',Paralyzation:'status:Paralysis',
+    Confusion:'status:Confusion',Berserk:'status:Berserk',
+    Regene:'regen',Reraise:'reraise',Reflect:'reflect',Cover:'cover',CoverAll:'cover',RoyalGuard:'cover',Taunt:'taunt'};
+  const TYPE_TAGS = {Revival:'revive',CureStatusCondition:'cure',Steal:'steal',StealStatus:'steal',Counter:'counter',HateTarget:'taunt',
+    BreakDamageVariation:'stagger-up',CriticalRateVariation:'crit-up',AddElementWhenNoneElement:'imbue',AddElement:'imbue'};
+  // Who an effect lands on: SkillTarget follows the skill; Self/Group/Random are explicit on the effect.
+  function targetsOf(target, relation) {
+    const t = clean(target), enemies = clean(relation) !== 'Friendlies';
+    if (enemies) return t === 'Single' ? ['enemy'] : t === 'Random' ? ['random'] : t === 'SingleAndGroup' ? ['enemy','enemies'] : t === 'Self' ? ['self'] : ['enemies'];
+    return t === 'Self' ? ['self'] : t === 'Single' ? ['ally'] : ['allies'];
+  }
+  function skillFacts(item, effectsById, passive) {
+    const facts = [], calc = clean(item.calcType), element = clean(item.element);
+    const skillTargets = passive ? ['self'] : targetsOf(item.target, item.relation);
+    const add = (tag, targets) => { for (const target of targets) facts.push({tag, target, calc: calc in {Physic:1,Magic:1} ? calc : null, element: element !== 'None' && element ? element : null, id: item.id, passive}); };
+    if (!passive && Number(item.mag) > 0 && clean(item.parameterType) === 'HitPoint') {
+      const dir = clean(item.parameterVariationType);
+      if (item.relation === 'Enemies' && dir === 'Decrease') add('damage', skillTargets);
+      if (item.relation === 'Friendlies' && dir === 'Increase') add('heal', skillTargets);
+    }
+    for (const bundle of item.effectBundles || []) {
+      const effect = effectsById.get(Number(bundle.effectId));
+      if (!effect) continue;
+      let tag = STATUS_TAGS[clean(effect.status)] || TYPE_TAGS[clean(effect.type)];
+      if (!tag) continue;
+      const kind = clean(bundle.TargetType);
+      // Passive effect rows all say Self; passive debuffs/statuses ("Deprotect Opener", "Add Slow") land on enemies.
+      const hostile = tag.startsWith('down:') || tag.startsWith('status:');
+      const targets = passive ? [hostile ? 'enemy' : 'self'] : kind === 'SkillTarget' ? skillTargets : kind === 'Self' ? ['self']
+        : targetsOf(kind === 'Group' ? 'Group' : kind, bundle.targetRelation);
+      // Curing an enemy removes its buffs: that's Dispel, not a cure.
+      if (tag === 'cure' && targets.every(t => ['enemy', 'enemies', 'random'].includes(t))) tag = 'dispel';
+      add(tag, targets);
+    }
+    return facts;
+  }
+  const factsCache = new WeakMap();
+  // Every fact a Resonance offers, with where it unlocks: {kind:'Awakening'|'Sync', required} or null (finisher/base kit).
+  function resonanceFacts(catalog, vision) {
+    if (!factsCache.has(catalog)) factsCache.set(catalog, new Map());
+    const cache = factsCache.get(catalog);
+    if (cache.has(vision.id)) return cache.get(vision.id);
+    const effects = new Map((catalog.effects || []).map(e => [e.id, e])), skills = new Map((catalog.skills || []).map(s => [s.id, s])), passives = new Map((catalog.passives || []).map(p => [p.id, p]));
+    const unlock = new Map();
+    for (const [kind, stages] of [['Awakening', vision.awakening || []], ['Sync', vision.synchro || []]])
+      for (const stage of stages) for (const g of stage.grants || []) if (!unlock.has(g.id)) unlock.set(g.id, {kind, required: Number(stage.requiredPoints ?? stage.masteryPoint)});
+    const ids = new Set([vision.finishBlow, ...(vision.skillIds || []), ...(vision.passiveIds || []), ...unlock.keys()]);
+    const facts = [];
+    for (const id of ids) {
+      const item = skills.get(id) || passives.get(id);
+      if (!item) continue;
+      for (const f of skillFacts(item, effects, !skills.has(id))) facts.push({...f, finisher: id === vision.finishBlow, unlock: unlock.get(id) || null});
+    }
+    cache.set(vision.id, facts);
+    return facts;
+  }
+  // A Resonance matches when every chosen effect is offered by some fact that also fits the chosen targets,
+  // damage types and elements. With no effects chosen, those other filters apply to its damage skills.
+  function matchFacts(facts, filter) {
+    const fits = f => (!filter.targets?.length || filter.targets.includes(f.target))
+      && (!filter.calcs?.length || filter.calcs.includes(f.calc))
+      && (!filter.elements?.length || filter.elements.includes(f.element));
+    const wanted = filter.tags?.length ? filter.tags : (filter.targets?.length || filter.calcs?.length || filter.elements?.length ? ['damage'] : []);
+    const hits = [];
+    for (const tag of wanted) {
+      const found = facts.filter(f => f.tag === tag && fits(f));
+      if (!found.length) return null;
+      hits.push(...found);
+    }
+    return hits;
+  }
+
   function encounterOptions(catalog,snapshot,enemy,characterId) {
     const weaknesses = Object.entries(enemy.resistances || {}).filter(([,r])=>clean(r)==='Weakness').map(([e])=>clean(e));
     const bad = Object.entries(enemy.resistances || {}).filter(([,r])=>/Resist|Absorb|Null|Invalid|Halved/.test(clean(r))).map(([e])=>clean(e));
@@ -166,7 +242,7 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
+  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

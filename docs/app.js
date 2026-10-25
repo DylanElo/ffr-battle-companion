@@ -10,7 +10,8 @@ const VIEWS = [['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 
 
 let catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, prio: {}, prioOpen: false, pickVision: true, visionWhy: '', visionAlts: [],
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoal: 'damage', deep: null };
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoal: 'damage', deep: null,
+  rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
@@ -416,22 +417,85 @@ function equipTabs(native, v, available) {
 
 // ---------- resonances ----------
 
+// Effect filters: chip groups over the tagged facts each Resonance offers (see core.resonanceFacts).
+const STAT_CHIPS = [['ATK', 'ATK'], ['MAG', 'MAG'], ['DEF', 'DEF'], ['SPR', 'SPR'], ['SPD', 'Speed']];
+const TAG_LABELS = Object.fromEntries([
+  ...STAT_CHIPS.flatMap(([k, l]) => [[`down:${k}`, `${l} down`], [`up:${k}`, `${l} up`]]),
+  ...['Poison', 'Blind', 'Sleep', 'Silence', 'Paralysis', 'Confusion', 'Berserk'].map(s => [`status:${s}`, s]),
+  ['damage', 'Damage'], ['heal', 'Heal'], ['regen', 'Regen'], ['revive', 'Revive'], ['cure', 'Cure status'], ['dispel', 'Dispel'], ['cover', 'Cover'], ['taunt', 'Provoke'],
+  ['reflect', 'Reflect'], ['reraise', 'Reraise'], ['counter', 'Counter'], ['steal', 'Steal'], ['stagger-up', 'Stagger up'], ['crit-up', 'Crit up'], ['imbue', 'Element imbue']]);
+const FILTER_GROUPS = [
+  ['Lowers enemy', 'tags', STAT_CHIPS.map(([k, l]) => [`down:${k}`, l])],
+  ['Raises', 'tags', STAT_CHIPS.map(([k, l]) => [`up:${k}`, l])],
+  ['Inflicts', 'tags', ['Poison', 'Blind', 'Sleep', 'Silence', 'Paralysis', 'Confusion', 'Berserk'].map(s => [`status:${s}`, s])],
+  ['Support', 'tags', ['heal', 'regen', 'revive', 'cure', 'dispel', 'cover', 'taunt', 'reflect', 'reraise', 'counter', 'steal'].map(t => [t, TAG_LABELS[t]])],
+  ['Boosts', 'tags', ['stagger-up', 'crit-up', 'imbue'].map(t => [t, TAG_LABELS[t]])],
+  ['Hits', 'targets', [['enemy', 'One enemy'], ['enemies', 'All enemies'], ['self', 'Self'], ['ally', 'One ally'], ['allies', 'All allies']]],
+  ['Damage', 'calcs', [['Physic', 'Physical'], ['Magic', 'Magic']]],
+  ['Element', 'elements', ELEMENTS.map(e => [e, e])]];
+const TARGET_LABELS = { enemy: 'one enemy', enemies: 'all enemies', random: 'random enemies', self: 'self', ally: 'one ally', allies: 'all allies' };
+const filterCount = () => Object.values(ui.rf).reduce((n, a) => n + a.length, 0);
+
+// The facts a Resonance offers, limited to what's unlocked for the chosen character when asked.
+function visibleFacts(v) {
+  const facts = C.resonanceFacts(catalog, v);
+  if (!(hasSave() && ui.rfUnlocked)) return facts;
+  const o = owned(v.id);
+  if (!o) return [];
+  const reached = new Set(C.mastery(v, o, ui.perspective).rows.filter(r => r.reached).map(r => r.id));
+  return facts.filter(f => f.finisher || reached.has(f.id));
+}
+
+function filterPanel(active) {
+  return `<details class="filters" data-keep="res-filters" ${active ? 'open' : ''}><summary>Filter by effect${active ? ` <b>(${active})</b>` : ''}</summary>
+    ${FILTER_GROUPS.map(([label, key, chips]) => `<div class="fgroup"><span class="dim small">${label}</span><div class="chips">${chips.map(([value, text]) =>
+      `<button type="button" class="chip" data-rf="${key}:${value}" aria-pressed="${ui.rf[key].includes(value)}">${h(text)}</button>`).join('')}</div></div>`).join('')}
+    ${hasSave() ? `<div class="unlocked-for"><label class="check"><input type="checkbox" id="rf-unlocked" ${ui.rfUnlocked ? 'checked' : ''}> Only unlocked for</label>
+      <select id="rf-perspective" aria-label="Character">${recruited().map(c => opt(c.id, name('characters', c.id), c.id === ui.perspective)).join('')}</select></div>` : ''}
+    ${active ? '<button type="button" class="ghost" data-rf-clear>Clear filters</button>' : ''}
+  </details>`;
+}
+
 function resonances() {
-  const q = ui.kitQ.trim().toLowerCase(), mine = hasSave() && ui.ownedOnly;
+  const q = ui.kitQ.trim().toLowerCase(), mine = hasSave() && ui.ownedOnly, active = filterCount() + (hasSave() && ui.rfUnlocked ? 1 : 0);
   const text = v => `${v.name} ${v.roles.join(' ')} ${v.skillIds.map(id => { const s = index.skills.get(id); return `${s?.name} ${s?.desc} ${s?.element}`; }).join(' ')} ${v.passiveIds.map(id => name('passives', id)).join(' ')}`.toLowerCase();
-  const list = catalog.visions.filter(v => (!mine || owned(v.id)) && (!q || text(v).includes(q))).sort((a, b) => a.name.localeCompare(b.name));
+  const list = catalog.visions.filter(v => (!mine || owned(v.id)) && (!q || text(v).includes(q)) && (!active || C.matchFacts(visibleFacts(v), ui.rf)))
+    .sort((a, b) => a.name.localeCompare(b.name));
   if (!list.some(v => v.id === ui.kitId)) ui.kitId = list[0]?.id ?? 0;
   const tierOf = id => catalog.legacyTiers.find(t => t.id === id)?.impact;
   return `<div class="split">
     <section class="window" aria-label="Choose a Resonance">
       <input type="search" id="kit-q" data-key="kit-q" placeholder="Search names, roles, skills or effects" value="${h(ui.kitQ)}" aria-label="Search Resonances">
       ${hasSave() ? `<label class="check"><input type="checkbox" id="owned-only" ${ui.ownedOnly ? 'checked' : ''}> Only mine</label>` : ''}
+      ${filterPanel(active)}
+      ${active ? `<p class="dim small">${list.length} match${list.length === 1 ? '' : 'es'}</p>` : ''}
       <ul class="gallery" role="listbox" aria-label="Resonances">${list.map(v => `<li role="option" tabindex="0" data-kit="${v.id}" data-key="k${v.id}" aria-selected="${v.id === ui.kitId}" class="${hasSave() && !owned(v.id) ? 'notmine' : ''}">
         ${tierOf(v.id) ? `<span class="tier ${h(tierOf(v.id))}">${h(tierOf(v.id))}</span>` : ''}${visionFace(v.id)}${h(v.name)}</li>`).join('')
-        || `<li class="dim">Nothing matches.${mine ? ' Turn off “Only mine” to see all.' : ''}</li>`}</ul>
+        || `<li class="dim">Nothing matches.${mine ? ' Turn off “Only mine” to see all.' : ''}${ui.rfUnlocked && hasSave() ? ` None of your Resonances have it unlocked for ${h(name('characters', ui.perspective))}; untick “Only unlocked” to see who offers it.` : active ? ' Try fewer filters.' : ''}</li>`}</ul>
     </section>
     <section class="window">${index.visions.get(ui.kitId) ? kit(index.visions.get(ui.kitId)) : '<p class="dim">Pick a Resonance.</p>'}</section>
   </div>`;
+}
+
+// Which skills give this Resonance the filtered effects, and where each one unlocks.
+function matchesBox(v) {
+  if (!filterCount()) return '';
+  const hits = C.matchFacts(visibleFacts(v), ui.rf);
+  if (!hits) return '';
+  const o = owned(v.id), reached = o ? new Set(C.mastery(v, o, ui.perspective).rows.filter(r => r.reached).map(r => r.id)) : new Set();
+  const rows = new Map();
+  // Same-named entries (e.g. Cure at Awakening 0 and 1) are one row, keeping the earliest unlock.
+  for (const f of [...hits].sort((a, b) => (a.unlock?.required ?? -1) - (b.unlock?.required ?? -1))) {
+    const key = (index.skills.get(f.id) || index.passives.get(f.id))?.name ?? f.id, row = rows.get(key) || { f, labels: new Set() };
+    row.labels.add(`${TAG_LABELS[f.tag] || f.tag}${f.passive ? '' : `, ${TARGET_LABELS[f.target] || f.target}`}`);
+    rows.set(key, row);
+  }
+  return `<div class="matches"><h3>Matches your filters</h3><ul class="skills">${[...rows.values()].map(({ f, labels }) => {
+    const item = index.skills.get(f.id) || index.passives.get(f.id);
+    const where = f.finisher ? 'Finisher' : f.unlock ? `${f.unlock.kind} ${f.unlock.required}` : 'In kit';
+    return `<li class="${reached.has(f.id) || (o && f.finisher) ? 'got' : ''}"><b>${h(item?.name)}</b> <span class="meta">${f.passive ? 'Passive' : 'Skill'}, ${h(where)}${reached.has(f.id) ? ', unlocked' : ''}</span>
+      <p>${[...labels].map(h).join(' · ')}</p></li>`;
+  }).join('')}</ul></div>`;
 }
 
 function kit(v) {
@@ -445,6 +509,7 @@ function kit(v) {
       ${o ? `<p class="small"><span class="owned">Yours.</span> Awakening ${m.awake}, ${h(name('characters', ui.perspective))}’s sync ${m.sync}.${next ? ` Next unlock at ${next.required} sync: ${h(grantName(next))}.` : ''}</p>` : hasSave() ? '<p class="dim small">Not in your save yet.</p>' : ''}
       ${o ? perspectivePicker('kit-perspective') : ''}
     </div></div>
+    ${matchesBox(v)}
     <h3>Finisher</h3><ul class="skills">${skillItem(index.skills.get(v.finishBlow))}</ul>
     ${stages('Awakening')}${stages('Sync')}`;
 }
@@ -559,6 +624,12 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('prioReset' in t.dataset) { delete ui.prio[ui.charId]; render(); return; }
+  if (t.dataset.rf) {
+    const cut = t.dataset.rf.indexOf(':'), key = t.dataset.rf.slice(0, cut), value = t.dataset.rf.slice(cut + 1); // values like "down:ATK" contain ':'
+    ui.rf[key] = ui.rf[key].includes(value) ? ui.rf[key].filter(x => x !== value) : [...ui.rf[key], value];
+    render(); return;
+  }
+  if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
   if (t.dataset.useVision) {
     draft.visionId = +t.dataset.useVision; ui.pickVision = false; ui.visionWhy = '';
     try { findBest(); } catch (err) { error(err.message); }
@@ -585,7 +656,8 @@ document.addEventListener('change', e => {
   if (t.matches('[data-pick], #pick')) { if (t.files[0]) loadSave(t.files[0]); return; }
   if (t.id === 'boss-only') ui.bossOnly = t.checked;
   else if (t.id === 'owned-only') ui.ownedOnly = t.checked;
-  else if (t.id === 'perspective' || t.id === 'kit-perspective') ui.perspective = +t.value;
+  else if (t.id === 'rf-unlocked') ui.rfUnlocked = t.checked;
+  else if (t.id === 'perspective' || t.id === 'kit-perspective' || t.id === 'rf-perspective') ui.perspective = +t.value;
   else if (t.id === 'reserve') ui.reserve = t.checked;
   else if (t.name === 'deep-goal') ui.deepGoal = t.value;
   else if (t.id === 'deep-enemy') ui.enemyId = +t.value;

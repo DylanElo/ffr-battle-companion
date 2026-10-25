@@ -115,3 +115,24 @@ test('resonance fit counts only skills in the stats being geared for',()=>{
   assert.deepEqual(core.resonanceFit([slash,fire,cure],['MagicalAttack'],true),{fit:450,attacks:1});
   assert.equal(core.resonanceFit([slash],['HitPoint'],false).fit,0);
 });
+
+test('resonance facts tag breaks, statuses and support with the right targets',()=>{
+  const effects=[{id:1,type:'DamageMultiplier',status:'AttackDown'},{id:2,type:'ParameterVariation',status:'Regene'},{id:3,type:'Revival',status:'None'}];
+  const b=(effectId,TargetType,targetRelation='Friendlies')=>({effectId,TargetType,targetRelation});
+  const wave={id:10,calcType:'Physic',element:'Light',target:'Group',relation:'Enemies',parameterType:'HitPoint',parameterVariationType:'Decrease',mag:150,
+    effectBundles:[b(1,'SkillTarget'),b(2,'Self'),b(-1,'Self')]};
+  const raise={id:11,calcType:'None',target:'Single',relation:'Friendlies',mag:0,effectBundles:[b(3,'SkillTarget')]};
+  const catalog={effects,skills:[wave,raise],passives:[]};
+  const vision={id:9,finishBlow:0,skillIds:[],passiveIds:[],awakening:[{level:0,requiredPoints:0,grants:[{type:'ActiveSkill',id:10}]}],synchro:[{level:3,requiredPoints:40,grants:[{type:'ActiveSkill',id:11}]}]};
+  const facts=core.resonanceFacts(catalog,vision);
+  const tags=facts.map(f=>`${f.tag}@${f.target}`).sort();
+  assert.deepEqual(tags,['damage@enemies','down:ATK@enemies','regen@self','revive@ally']);
+  assert.deepEqual(facts.find(f=>f.tag==='revive').unlock,{kind:'Sync',required:40});
+  // ATK down on all enemies from a physical skill matches; on a single enemy it doesn't.
+  assert.ok(core.matchFacts(facts,{tags:['down:ATK'],targets:['enemies'],calcs:['Physic']}));
+  assert.equal(core.matchFacts(facts,{tags:['down:ATK'],targets:['enemy']}),null);
+  // Every chosen effect must be present; damage filters alone look at damage skills.
+  assert.equal(core.matchFacts(facts,{tags:['down:ATK','cure']}),null);
+  assert.ok(core.matchFacts(facts,{elements:['Light']}));
+  assert.equal(core.matchFacts(facts,{calcs:['Magic']}),null);
+});

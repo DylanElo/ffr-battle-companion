@@ -265,6 +265,19 @@ dialog form { text-align: right; margin-top: 12px; }
 .goal span { border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); border-radius: 99px; padding: 3px 12px; font-weight: 700; font-size: 14px; }
 .goal:hover span { background: rgba(255, 215, 94, .24); }
 .card .toolbar .primary { flex: 1; }
+/* with filters open, the whole left panel scrolls so the gallery stays reachable below them */
+.split > .window:first-child:has(.filters[open]) { overflow-y: auto; }
+.filters[open] ~ .gallery { overflow: visible; flex: none; }
+.filters { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 8px 0; margin: 0; }
+.filters summary { color: var(--ink); font-weight: 700; }
+.filters summary b { color: var(--gold); }
+.fgroup { display: grid; gap: 4px; margin-top: 10px; }
+.fgroup .chips { margin: 0; }
+.filters .chip { padding: 2px 10px; font-size: 13px; }
+.filters .check { font-size: 14px; }
+.unlocked-for { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.matches { border: 1px solid var(--gold); border-radius: 8px; background: var(--gold-soft); padding: 10px 12px; margin: 12px 0; }
+.matches h3 { margin: 0 0 4px; font-size: 16px; }
 .deep { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
 .deep h4 { font-size: 16px; }
 .deep p { margin: 0; }
