@@ -239,3 +239,20 @@ test('single-character search can skip optional support abilities while fixed an
   assert.equal(party.canHeal,true);
   assert.equal(party.canProtect,true);
 });
+
+test('native Group support reaches all compatible later allies, with random order respected',()=>{
+  const {catalog,snapshot,enemy,input}=fixture([]);
+  catalog.skills=[{...catalog.skills[0],dmgType:'Magic',calcType:'Magic'},native.skills.find(s=>s.id===230110)];
+  snapshot.characters.push({...snapshot.characters[0],id:1003});
+  const model=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1});
+  const one=model.evaluate(input),two=model.evaluate({...input,characterId:1003});
+  one.stats={...one.stats,Agility:1};two.stats={...two.stats,Agility:1};
+  const action={skillId:230110,name:'Group fixture',kind:'damagePercent',value:100,mpCost:0,rootRelation:'Friendlies',rootTarget:'Group',tests:[{key:'skill.dmgType',value:'Magic'}]};
+  const caster={...one,damage:0,brokenDamage:0,breakDamage:0,hits:[],stats:{...one.stats,Agility:999},supportActions:[action]};
+  const members=[{characterId:1002,evaluation:caster},{characterId:1001,equipment:input.equipment,evaluation:one},{characterId:1003,equipment:input.equipment,evaluation:two}];
+  const result=model.evaluateParty(members);
+  assert.deepEqual(result.supportUsed.targetIds,[1001,1003]);
+  assert.equal(result.damage,result.roundDamage);
+  caster.stats.Agility=1;one.stats.Agility=999;two.stats.Agility=999;
+  assert.equal(model.evaluateParty(members).supportUsed,null,'a slower support caster cannot buff earlier attacks');
+});

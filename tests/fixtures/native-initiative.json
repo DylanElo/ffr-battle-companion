@@ -1,0 +1,297 @@
+{
+  "executable": {
+    "name": "FFRS-Win64-Shipping.exe",
+    "sha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA"
+  },
+  "method": "Copied scalar native priority and RNG-to-jitter instruction blocks in isolated temporary allocations; explicit RNG inputs. These are native arithmetic fixtures, not observed battle order.",
+  "sources": {
+    "priority": [
+      "0x144FB038B-0x144FB038F",
+      "0x144FB0399-0x144FB03E5"
+    ],
+    "jitter": [
+      "0x144FC5454-0x144FC5480"
+    ],
+    "constants": {
+      "rngNormalizer": {
+        "address": "0x14779D350",
+        "value": 3.0518509447574615e-05
+      },
+      "onePercent": "0x1477778BC",
+      "hundred": "0x14778B544"
+    }
+  },
+  "fixtures": [
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 50,
+        "denominator": 1,
+        "randomRate": 0,
+        "randomFlat": 0,
+        "waitOffset": 0
+      },
+      "expected": 50
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 50,
+        "denominator": 1,
+        "randomRate": -20,
+        "randomFlat": -5,
+        "waitOffset": 0
+      },
+      "expected": 65
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 50,
+        "denominator": 1,
+        "randomRate": 20,
+        "randomFlat": 5,
+        "waitOffset": 0
+      },
+      "expected": 34
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 60,
+        "denominator": 1,
+        "randomRate": 20,
+        "randomFlat": 5,
+        "waitOffset": 0
+      },
+      "expected": 42
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 40,
+        "denominator": 1,
+        "randomRate": -20,
+        "randomFlat": -5,
+        "waitOffset": 0
+      },
+      "expected": 52
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 100,
+        "denominator": 2,
+        "randomRate": 0,
+        "randomFlat": 0,
+        "waitOffset": 0
+      },
+      "expected": 50
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 99,
+        "denominator": 3,
+        "randomRate": 0,
+        "randomFlat": 0,
+        "waitOffset": 0
+      },
+      "expected": 33
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 1,
+        "denominator": 1,
+        "randomRate": 20,
+        "randomFlat": 5,
+        "waitOffset": 0
+      },
+      "expected": -4
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 25,
+        "denominator": 1,
+        "randomRate": 20,
+        "randomFlat": 5,
+        "waitOffset": 100000
+      },
+      "expected": 100015
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 300,
+        "denominator": 1,
+        "randomRate": 7,
+        "randomFlat": -3,
+        "waitOffset": 0
+      },
+      "expected": 282
+    },
+    {
+      "kind": "priority",
+      "input": {
+        "agility": 1,
+        "denominator": 1,
+        "randomRate": 0,
+        "randomFlat": 5,
+        "waitOffset": 0
+      },
+      "expected": -4
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 0,
+        "amplitude": 20
+      },
+      "expected": -20
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 1,
+        "amplitude": 20
+      },
+      "expected": -20
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 16383,
+        "amplitude": 20
+      },
+      "expected": 0
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 16384,
+        "amplitude": 20
+      },
+      "expected": 0
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 32766,
+        "amplitude": 20
+      },
+      "expected": 20
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 32767,
+        "amplitude": 20
+      },
+      "expected": 20
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 0,
+        "amplitude": 5
+      },
+      "expected": -5
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 16384,
+        "amplitude": 5
+      },
+      "expected": 0
+    },
+    {
+      "kind": "jitter",
+      "input": {
+        "rng": 32767,
+        "amplitude": 5
+      },
+      "expected": 5
+    }
+  ],
+  "jitterHistogram": {
+    "20": {
+      "-20": 800,
+      "-19": 799,
+      "-18": 799,
+      "-17": 799,
+      "-16": 799,
+      "-15": 800,
+      "-14": 799,
+      "-13": 799,
+      "-12": 799,
+      "-11": 799,
+      "-10": 800,
+      "-9": 799,
+      "-8": 799,
+      "-7": 799,
+      "-6": 799,
+      "-5": 800,
+      "-4": 799,
+      "-3": 799,
+      "-2": 799,
+      "-1": 799,
+      "0": 800,
+      "1": 799,
+      "2": 799,
+      "3": 799,
+      "4": 799,
+      "5": 800,
+      "6": 799,
+      "7": 799,
+      "8": 799,
+      "9": 799,
+      "10": 800,
+      "11": 799,
+      "12": 799,
+      "13": 799,
+      "14": 799,
+      "15": 800,
+      "16": 799,
+      "17": 799,
+      "18": 799,
+      "19": 799,
+      "20": 800
+    },
+    "5": {
+      "-5": 2979,
+      "-4": 2979,
+      "-3": 2979,
+      "-2": 2979,
+      "-1": 2979,
+      "0": 2978,
+      "1": 2979,
+      "2": 2979,
+      "3": 2979,
+      "4": 2979,
+      "5": 2979
+    }
+  },
+  "schemaVersion": 1,
+  "provenance": {
+    "selection": "0x144FB0170-0x144FB030F: choose highest priority among eligible living units",
+    "comparator": "0x144FB8300-0x144FB8567",
+    "waitOffsetAggregator": "0x145240700-0x145240772",
+    "waitOffsetHandler": "0x14514B640-0x14514B688",
+    "jitterGenerator": "0x144FC5370-0x144FC5510",
+    "currentPreviewCopy": "0x144FC2DEF-0x144FC2DFD",
+    "rollAtBattleStart": [
+      "0x144FAC6CC",
+      "0x144FAC6DC"
+    ],
+    "rerollPreview": "0x144FC2ED5",
+    "partyTieGetter": [
+      "0x14511C310",
+      "0x15BB35AE0-0x15BB35B8A"
+    ],
+    "scope": "Explicit scalar inputs. Priority is re-evaluated from computed current Agility and active offsets. Party ties favor later saved party slot; enemy wins a party/enemy tie. Rare Rearguard and command-priority tie paths are outside these arithmetic fixtures.",
+    "liveBattleObserved": false
+  }
+}

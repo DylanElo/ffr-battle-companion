@@ -296,9 +296,12 @@
     const visionCount=1+catalog.visions.filter(v=>(snapshot.resonances || []).some(o=>o.id===v.id)).length;
     const fairBudget=Math.floor(options.maxEvaluations/Math.max(1,people.length*visionCount*(options.reserveNonParty?teams.length:1)));
     options.perLoadoutBudget=Math.min(options.perLoadoutBudget,Math.max(2,fairBudget));
-    // Reserve a comparison for every character/vision before expensive search can consume the budget.
+    // Preserve one saved setup per character; alternative Resonances belong to the bounded search.
     const seedState=stateFor({...options,timeMs:0}),fallback=new Map();
-    for(const id of people)fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,perLoadoutBudget:2},inventory(snapshot),seedState));
+    for(const id of people){
+      const person=snapshot.characters.find(c=>c.id===id);
+      fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,perLoadoutBudget:0,visionIds:[Number(person.equipment.visionId)]},inventory(snapshot),seedState));
+    }
     state.cache=seedState.cache;state.evaluations=seedState.evaluations;
     let considered=0,teamCount=0;
     const partyScore=members=>{

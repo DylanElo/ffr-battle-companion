@@ -165,3 +165,17 @@ test('completion does not silently fill an accessory whose effects cannot be eva
   assert.ok(result.equipment.accessoryIds.every(id=>id<0));
   assert.ok(result.gearReasons.filter(r=>r.slot==='accessory').every(r=>r.reason==='unsupported'));
 });
+
+test('party startup preserves saved setups without an unbounded alternative-Resonance sweep',()=>{
+  const {catalog,snapshot}=fixture();
+  const seen=[],originalNow=Date.now;
+  let tick=0;
+  try{
+    Date.now=()=>tick++*100;
+    S.rankParties(catalog,snapshot,{options:{...options,timeMs:1,perLoadoutBudget:0,maxResults:1},evaluate:input=>{
+      seen.push(input);return {valid:true,score:1};
+    }});
+  }finally{Date.now=originalNow;}
+  assert.deepEqual(seen.slice(0,4).map(input=>input.characterId),[1,2,3,4]);
+  assert.ok(seen.every(input=>input.visionId===snapshot.characters.find(c=>c.id===input.characterId).equipment.visionId));
+});

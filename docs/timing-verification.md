@@ -2,7 +2,7 @@
 
 Current Goal: replace combat timing guesses with rules recovered from the installed executable and cooked command assets.
 
-Latest Decision: use per-hit HP/BP events, native next-turn recovery and source-only LB rewards. Exclude combined boosted multiple-action estimates while their nested effect expiry remains unresolved.
+Latest Decision: use per-hit HP/BP events, native next-turn recovery and source-only LB rewards. Support proven nested wrappers with per-leaf Boost expiry and sample native initiative.
 
 ## Reference
 
@@ -40,19 +40,11 @@ The character optimizer now counts that character's own hits. The earlier invent
 - LB refund trigger: `0x144F42812–0x144F4282D`, ActivateLimitBurst event 43.
 - Hierarchy rejection: `0x144F456B0`, FoundSkillInHierarchy branch `0x144F45D3C–0x144F45D88`.
 
-## Command recipes and the remaining Boost boundary
+## Command recipes and initiative follow-up
 
-Current `DT_BtlCmdUniqueActionBehavior` defines sequential recipes:
+The previously unresolved nested expiry and duplicate queue boundaries are now traced in [command verification](command-verification.md). Normal targeted commands allow Arms branches containing separate Boost/spell recipes and Dualcast children; repeated spells survive flattening, delegation and action creation in order. Each Boost expires after its own spell, so a following plain sibling remains unboosted.
 
-- Arms Akimbo: one SelfCast, then two Root choices. The wrapper's raw 40 MP cost is paid once; child skills retain their individual costs.
-- Dualcast: one SelfCast, then two Magic choices.
-- Magic Boost: one SelfCast, then one magical-damage choice.
-
-The Magic list requires the native Magic attribute; the magical-damage list requires a damage skill with Magic damage type. Each builds its own candidate list without consulting prior sibling selections. The optimizer repeats one compatible attack; mixed choices are not searched.
-
-Magic Boost cannot directly select Dualcast, and Dualcast cannot select Magic Boost. Arms can select two separate nested Boost/spell recipes where the command hierarchy permits. Those recipes are legal selections, but their full numeric estimates remain excluded: native effect duration depends on SkillBegin/SkillEnd dispatch, and execution-owner flags can suppress those events. A duration of two does not prove that one boost affects both casts.
-
-The remaining concrete expiry boundary is the execution-owner flag copied by action builder `0x144F40CB0` from `[owner+0x28]+0x34` to action `+0x37E` at `0x144F40F64–0x144F40FA7`; it suppresses SkillEnd at `0x144F429AA`. Event-list suppression flag `+0x386` also exists. Their full nested-owner semantics are not inferred.
+[Initiative verification](initiative-verification.md) records native randomized priority, per-turn rolls and ordinary ties. Higher Agility improves the chance of acting first; it does not guarantee it. The party forecast uses fixed reproducible samples and grants same-round support only when its caster has acted in that sample.
 
 ## Retained regression evidence
 
@@ -60,6 +52,6 @@ The remaining concrete expiry boundary is the execution-owner flag copied by act
 
 Run `node --test tests/timing.test.cjs tests/battle-reliability.test.cjs tests/search.test.cjs`. Tests cover reward recipients, overflow, recovery, within-action hit order, wrapper eligibility, support-LB capacity, critical effects after stagger, unmultiplied opening gauge, Opener ability selection and removal of invented allied contribution. A search-budget regression also preserves completed saved-loadout seeds when the deeper timing evaluations exhaust the time budget.
 
-Next Step: resolve nested execution-owner expiry flags and final duplicate-action queue preservation before enabling more complex boosted/mixed recipes.
+Next Step: exceptional initiative effects, mixed attack skills and full enemy action scripts remain separate work.
 
-Known Blockers: dynamic initiative and upstream animation hit-notify routing are not fully traced. The planning scenario orders members by Agility, omits enemy actions and damage-taken gauge, and uses a five-turn horizon. Damage effects dependent on changing gauge/status within a turn are not fully reevaluated at every event. Encounter overrides, probabilistic reactions and Spirit expansion remain separate limitations. This is not a claim that every battle script has been reproduced.
+Known Blockers: upstream animation hit-notify routing and special initiative overrides are not fully traced. Native random priority is sampled; the planning scenario omits enemy actions and damage-taken gauge, and uses a five-turn horizon. Damage effects dependent on changing gauge/status within a turn are not fully reevaluated at every event. Encounter overrides, probabilistic reactions and Spirit expansion remain separate limitations. This is not a claim that every battle script has been reproduced.

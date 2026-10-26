@@ -1,0 +1,418 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Static native control-flow and cooked Blueprint derivation; not live battle measurements",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "preconditions": [
+    "Normal targeted UI actions: CPP_BtlCmdDecideDelegateVal internal +34=0; no special event suppression.",
+    "No duration-extension modifiers, no interruption, sufficient MP, neutral damage factors apart from Magic Boost.",
+    "Each structural execute root without targets is event-neutral; only SelfCast and selected target leaves are represented here.",
+    "Compatible skills satisfy selector and hierarchy rules; synthetic leaf MP19 isolates native rounding."
+  ],
+  "evidence": {
+    "normalUiFlag": [
+      "144D8880C: incoming +34=0 constructor",
+      "1451412FD: UI emitter changes +31/+32 only",
+      "144F40F64-144F40FA7: incoming +34 copied to action +37E"
+    ],
+    "paymentBeforeBegin": [
+      "144F6519B: action initializer calls144F47340",
+      "144F4754A-144F47584: consumes actual action skillID+338 via14513BEA0",
+      "14513BF65-14513BF9F: calculates cost then subtracts MP",
+      "144F65594: only afterwards initializes task144F826D0",
+      "144F82843-144F82863: SkillBegin apply then lifetime"
+    ],
+    "effectAndEnd": [
+      "144F7F838: calls post-damage function144F7F860",
+      "144F7FA6E-144F7FA73: adds effect bundle timing1 AfterDamageCalculation",
+      "144F7E5D7: bundle timing comparison",
+      "144F429AA-144F42A12: targeted normal action SkillEnd18 apply/lifetime",
+      "145152CD1-145152D75: matching lifetime decremented/clamped and expiry removal"
+    ],
+    "mpRounding": [
+      "145149DF2: zero base cost remains zero",
+      "145149DFD-145149E09: float32 multiply, minimum1, truncate"
+    ]
+  },
+  "cases": [
+    {
+      "name": "MagicBoost(spell19)",
+      "recipe": {
+        "id": 400660,
+        "child": {
+          "id": "compatible-magic-damage-leaf",
+          "mp": 19
+        }
+      },
+      "events": [
+        {
+          "event": "pay",
+          "skill": 400660,
+          "baseMp": 0,
+          "paid": 0,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400660
+        },
+        {
+          "event": "AfterDamageCalculation",
+          "skill": 400660,
+          "addEffects": [
+            12911,
+            61004
+          ],
+          "remaining": {
+            "12911": 2,
+            "61004": 1
+          }
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400660,
+          "remaining": {
+            "12911": 1,
+            "61004": 1
+          }
+        },
+        {
+          "event": "pay",
+          "skill": "compatible-magic-damage-leaf",
+          "baseMp": 19,
+          "paid": 28,
+          "costEffect61004": 1
+        },
+        {
+          "event": "SkillBegin",
+          "skill": "compatible-magic-damage-leaf",
+          "expire61004": true
+        },
+        {
+          "event": "damage",
+          "skill": "compatible-magic-damage-leaf",
+          "index": 1,
+          "magicBoostDamageFactor": 2
+        },
+        {
+          "event": "SkillEnd",
+          "skill": "compatible-magic-damage-leaf",
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        }
+      ],
+      "expected": {
+        "totalMp": 28,
+        "damageBoostFactors": [
+          2
+        ],
+        "remaining": {
+          "12911": 0,
+          "61004": 0
+        }
+      }
+    },
+    {
+      "name": "Arms(MagicBoost(spell19),MagicBoost(spell19))",
+      "recipe": {
+        "id": 400650,
+        "children": [
+          {
+            "id": 400660,
+            "child": {
+              "id": "compatible-magic-damage-leaf",
+              "mp": 19
+            }
+          },
+          {
+            "id": 400660,
+            "child": {
+              "id": "compatible-magic-damage-leaf",
+              "mp": 19
+            }
+          }
+        ]
+      },
+      "events": [
+        {
+          "event": "pay",
+          "skill": 400650,
+          "baseMp": 40,
+          "paid": 40,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400650
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400650,
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        },
+        {
+          "event": "pay",
+          "skill": 400660,
+          "baseMp": 0,
+          "paid": 0,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400660
+        },
+        {
+          "event": "AfterDamageCalculation",
+          "skill": 400660,
+          "addEffects": [
+            12911,
+            61004
+          ],
+          "remaining": {
+            "12911": 2,
+            "61004": 1
+          }
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400660,
+          "remaining": {
+            "12911": 1,
+            "61004": 1
+          }
+        },
+        {
+          "event": "pay",
+          "skill": "compatible-magic-damage-leaf",
+          "baseMp": 19,
+          "paid": 28,
+          "costEffect61004": 1
+        },
+        {
+          "event": "SkillBegin",
+          "skill": "compatible-magic-damage-leaf",
+          "expire61004": true
+        },
+        {
+          "event": "damage",
+          "skill": "compatible-magic-damage-leaf",
+          "index": 1,
+          "magicBoostDamageFactor": 2
+        },
+        {
+          "event": "SkillEnd",
+          "skill": "compatible-magic-damage-leaf",
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        },
+        {
+          "event": "pay",
+          "skill": 400660,
+          "baseMp": 0,
+          "paid": 0,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400660
+        },
+        {
+          "event": "AfterDamageCalculation",
+          "skill": 400660,
+          "addEffects": [
+            12911,
+            61004
+          ],
+          "remaining": {
+            "12911": 2,
+            "61004": 1
+          }
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400660,
+          "remaining": {
+            "12911": 1,
+            "61004": 1
+          }
+        },
+        {
+          "event": "pay",
+          "skill": "compatible-magic-damage-leaf",
+          "baseMp": 19,
+          "paid": 28,
+          "costEffect61004": 1
+        },
+        {
+          "event": "SkillBegin",
+          "skill": "compatible-magic-damage-leaf",
+          "expire61004": true
+        },
+        {
+          "event": "damage",
+          "skill": "compatible-magic-damage-leaf",
+          "index": 2,
+          "magicBoostDamageFactor": 2
+        },
+        {
+          "event": "SkillEnd",
+          "skill": "compatible-magic-damage-leaf",
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        }
+      ],
+      "expected": {
+        "totalMp": 96,
+        "damageBoostFactors": [
+          2,
+          2
+        ],
+        "remaining": {
+          "12911": 0,
+          "61004": 0
+        }
+      }
+    },
+    {
+      "name": "Arms(MagicBoost(spell19),spell19)",
+      "recipe": {
+        "id": 400650,
+        "children": [
+          {
+            "id": 400660,
+            "child": {
+              "id": "compatible-magic-damage-leaf",
+              "mp": 19
+            }
+          },
+          {
+            "id": "compatible-magic-damage-leaf",
+            "mp": 19
+          }
+        ]
+      },
+      "events": [
+        {
+          "event": "pay",
+          "skill": 400650,
+          "baseMp": 40,
+          "paid": 40,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400650
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400650,
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        },
+        {
+          "event": "pay",
+          "skill": 400660,
+          "baseMp": 0,
+          "paid": 0,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": 400660
+        },
+        {
+          "event": "AfterDamageCalculation",
+          "skill": 400660,
+          "addEffects": [
+            12911,
+            61004
+          ],
+          "remaining": {
+            "12911": 2,
+            "61004": 1
+          }
+        },
+        {
+          "event": "SkillEnd",
+          "skill": 400660,
+          "remaining": {
+            "12911": 1,
+            "61004": 1
+          }
+        },
+        {
+          "event": "pay",
+          "skill": "compatible-magic-damage-leaf",
+          "baseMp": 19,
+          "paid": 28,
+          "costEffect61004": 1
+        },
+        {
+          "event": "SkillBegin",
+          "skill": "compatible-magic-damage-leaf",
+          "expire61004": true
+        },
+        {
+          "event": "damage",
+          "skill": "compatible-magic-damage-leaf",
+          "index": 1,
+          "magicBoostDamageFactor": 2
+        },
+        {
+          "event": "SkillEnd",
+          "skill": "compatible-magic-damage-leaf",
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        },
+        {
+          "event": "pay",
+          "skill": "compatible-magic-damage-leaf",
+          "baseMp": 19,
+          "paid": 19,
+          "costEffect61004": 0
+        },
+        {
+          "event": "SkillBegin",
+          "skill": "compatible-magic-damage-leaf"
+        },
+        {
+          "event": "damage",
+          "skill": "compatible-magic-damage-leaf",
+          "index": 2,
+          "magicBoostDamageFactor": 1
+        },
+        {
+          "event": "SkillEnd",
+          "skill": "compatible-magic-damage-leaf",
+          "remaining": {
+            "12911": 0,
+            "61004": 0
+          }
+        }
+      ],
+      "expected": {
+        "totalMp": 87,
+        "damageBoostFactors": [
+          2,
+          1
+        ],
+        "remaining": {
+          "12911": 0,
+          "61004": 0
+        }
+      }
+    }
+  ]
+}

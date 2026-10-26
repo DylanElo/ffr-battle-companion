@@ -1,5 +1,5 @@
 // The party builder shared by Next fight and Fight.
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=3';
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=4';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -30,7 +30,7 @@ function memberCard(member, indexes) {
       <h4>${h(character?.name || `#${member.characterId}`)}</h4>
       <span class="member-vision">${vision ? face(`summon${vision.id}`, 'sm') : ''}${h(vision?.name || '—')}</span>
     </div></div>
-    <div class="member-hit"><span>${h(skill?.name || 'No damaging action')}${evaluation.actionCount > 1 ? ' ×2' : ''}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP${[evaluation.multiActionId && indexes.skills.get(evaluation.multiActionId)?.name, evaluation.magicBoost && 'Magic Boost'].filter(Boolean).map(t => ` · ${h(t)}`).join('')}</small>` : ''}</span>
+    <div class="member-hit"><span>${h(evaluation.recipeLabel || skill?.name || 'No damaging action')}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP</small>` : ''}</span>
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
     ${list(evaluation.limitUses).length ? `<p class="small member-lb">Limit Burst: ${list(evaluation.limitUses).map(u => `${h(indexes.skills.get(Number(u.skillId))?.name)} in round ${u.round}`).join(', ')}</p>` : ''}
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
@@ -61,6 +61,7 @@ function partyView(party, index, indexes, canEquip, current) {
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
       <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>estimated damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
     </div>
+    ${evaluated.initiativeSamples ? `<p class="dim small">Averages ${num(evaluated.initiativeSamples)} native-priority samples. Stagger and LB round labels show one representative sample; they are not guaranteed timings.</p>` : ''}
     ${current !== undefined ? comparison(current && { damage: current.damage, firstStagger: current.firstStagger }, { damage: finite(evaluated.damage) ? evaluated.damage : summed, firstStagger: evaluated.firstStagger }) : ''}
     <p class="dim small">Current setup uses the abilities recorded in your save. Mastery that the save does not record is excluded, so the comparison may understate your current build.</p>
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}

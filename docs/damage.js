@@ -43,6 +43,17 @@
     for(const percent of percentFactors){finite('MP cost percentage',percent,0);factor=f(factor*nativePercent(percent));}
     return cost===0?0:Math.trunc(Math.max(1,f(f(cost)*factor)));
   }
+  function initiativeJitter(rng,amplitude){
+    finite('initiative RNG',rng,0,32767);finite('initiative amplitude',amplitude,0);
+    if(!Number.isInteger(rng) || !Number.isInteger(amplitude))throw new RangeError('Initiative RNG and amplitude must be integers.');
+    return Math.min(2*amplitude,Math.trunc(f(f(f(rng)*f(1/32767))*f(2*amplitude+1))))-amplitude;
+  }
+  function initiativePriority({agility,denominator=1,randomRate=0,randomFlat=0,waitOffset=0}){
+    finite('initiative Agility',agility,0);finite('initiative denominator',denominator,1);
+    finite('initiative rate jitter',randomRate);finite('initiative flat jitter',randomFlat);finite('initiative offset',waitOffset);
+    const speed=f(f(agility)/f(denominator)),rate=f(f(f(100)-f(randomRate))*f(.01));
+    return Math.trunc(f(f(f(waitOffset)+f(rate*speed))-f(randomFlat)));
+  }
   function damage(input) {
     const skill=input.skill || {};
     const calcType=clean(skill.calcType ?? skill.damageCalcType);
@@ -113,6 +124,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,damage,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,initiativeJitter,initiativePriority,damage,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

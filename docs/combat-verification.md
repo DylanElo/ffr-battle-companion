@@ -44,7 +44,7 @@ The subsequent [action, stagger and LB audit](timing-verification.md) confirms r
 
 These checks establish agreement for the sampled arithmetic kernels and identified native effect rules. They do not establish that every encounter supplies the same base stats, that every passive event fires, or that a five-round action sequence matches gameplay.
 
-Still unverified: final action-queue preservation, nested Magic Boost effect expiry, dynamic initiative, identical-effect stacking, runtime Spirit expansion, unknown artifacts and encounter overrides. Combined boosted multiple-action estimates are excluded. Opening LB and its independence from charge multipliers are now traced in the timing audit. Unsupported effects remain visible; the five-round planning result is not a proven global optimum.
+Normal nested Magic Boost expiry and duplicate action-queue preservation are now traced in [command verification](command-verification.md). Native randomized priority and ordinary ties are traced in [initiative verification](initiative-verification.md); finite order samples remain an estimate. Still unverified: special initiative/queue overrides, general identical-effect stacking, runtime Spirit expansion, unknown artifacts and encounter overrides. Opening LB and its independence from charge multipliers are now traced in the timing audit. Unsupported effects remain visible; the five-round planning result is not a proven global optimum.
 
 Next Step: trace the remaining event and action handlers when those mechanics affect a recommendation. Recorded battles can provide a separate end-to-end check; they are not a prerequisite for recovering formulas.
 

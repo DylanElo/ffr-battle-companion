@@ -17,7 +17,7 @@ function description(item, indexes) {
   });
 }
 
-export const estimateNotice = () => `<p class="model-notice small"><b>Model estimate</b> · Damage arithmetic checked against the installed executable; native stagger/LB event order is applied. Five global turns, full HP, native opening LB effects and the selected MP level. Scenario limits are listed below. Search results are the strongest found within its budget. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/combat-verification.md" target="_blank" rel="noopener noreferrer">What was verified</a></p>`;
+export const estimateNotice = () => `<p class="model-notice small"><b>Model estimate</b> · Damage arithmetic checked against the installed executable; native stagger/LB event order and nested command expiry are applied. Party order is averaged across reproducible native-priority samples. Five global turns, full HP, native opening LB effects and the selected MP level. Scenario limits are listed below. Search results are the strongest found within its budget. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/combat-verification.md" target="_blank" rel="noopener noreferrer">What was verified</a></p>`;
 
 function removalText(reason) {
   if (!reason) return 'No removal comparison is available for this result.';
@@ -62,8 +62,8 @@ export function gearExplanation(member, indexes) {
 function roleText(id, ev, indexes) {
   const reasons = [];
   if (id === Number(ev.skillId)) reasons.push('The attack selected for this build.');
-  if (id === Number(ev.multiActionId)) reasons.push('Allows the modeled two-action turn. Repeating the same action remains unverified in-game.');
-  if (id === 400660 && ev.magicBoost) reasons.push('Magic Boost is included in the attack’s damage and MP cost.');
+  if (list(ev.turn?.wrapperIds).includes(id) || id === Number(ev.multiActionId)) reasons.push('Runs the command branch shown below. Selected child order and repeated skills are preserved by the native queue.');
+  if (id === 400660 && ev.magicBoost) reasons.push('Boosts only its selected spell. Each separate Boost pays the native modified spell cost; its effects expire before a plain sibling.');
   if (list(ev.supportSkillIds).includes(id)) {
     const role = ev.supportTags?.[ev.supportSkillIds.indexOf(id)];
     reasons.push(`Keeps ${role === 'healer' ? 'a healing' : role === 'protector' ? 'a protection' : 'a support'} action available. Using it takes a turn.`);
@@ -111,10 +111,11 @@ export function buildExplanation(member, indexes) {
     ${counted.length ? `<h5>Counted for the normal attack</h5><ul class="notes">${counted.map(t => `<li>${h(t.passiveName ? `${t.passiveName}: ` : '')}${h(effectText(t))}</li>`).join('')}</ul>` : ''}
     ${ev.limit ? `<h5>LB model</h5><p class="small">Opening gauge ${n(Math.min(ev.limit.max,ev.limit.initial || 0))}; capacity ${n(ev.limit.max)}, including known support LBs. This character receives ${n(ev.limit.baseStaggerGain)} base gauge when its hit staggers the target, plus ${n(ev.limit.fillOnStagger)} at action end; ${n(ev.limit.recuperate)} is refunded after LB damage and stagger effects. Fill rate ×${n(ev.limit.mult)} applies to each earned gain before truncation and the capacity limit, but does not multiply opening gauge. Other party members receive no base reward from this character’s stagger.</p>` : ''}
     ${omitted.length ? `<h5>Not counted in the normal attack</h5><ul class="notes">${omitted.map(t => `<li>${h(t.passiveName || `Effect ${t.effectId}`)}: ${h(t.reason)}</li>`).join('')}</ul>` : ''}
+    ${ev.recipeLabel ? `<h5>Command sequence</h5><p class="small">${h(ev.recipeLabel)}</p><p class="dim small">Wrapper abilities occupy one AP slot each, even when used by both branches. MP is charged per executed command. The search repeats one selected attack; different attack pairs are not enumerated.</p>` : ''}
     <h5>Damage inputs</h5>
     <p class="small">${h(skill?.name || 'Selected attack')} uses this character’s ${h(common.attackSource || (magical ? 'MAG' : 'ATK'))} (${n(common.attack)}) against ${h(common.defenseSource || (magical ? 'magic' : 'physical'))} defense (${n(common.defense)}). Level ${n(common.level)}; skill coefficient ${n(skill?.mag)}; ${n(ev.actionCount || 1)} action(s), ${n(ev.turnMp)} MP per turn, from ${n(ev.availableMp)} starting MP.</p>
-    <p class="small">Element ${h(ev.element || 'None')} (${h(ev.resistance || 'None')}); elemental multiplier ×${n(common.elementFactor ?? 1)}; outgoing multiplier ×${n(common.outgoingFactor ?? 1)}; critical chance ${n(number(ev.criticalChance) * 100)}%; cap ${n(common.damageCap)} per hit.</p>
-    <p class="dim small">These are inputs to the recovered damage formula. HP damage is truncated and capped per hit; stagger rounds to the nearest integer. Expected damage blends normal and critical outcomes. Hits and stagger/LB events follow the recovered order; turn ordering, starting state and unmodeled enemy actions remain scenario limits.</p>
+    <p class="small">Element ${h(ev.element || 'None')} (${h(ev.resistance || 'None')}); elemental multiplier ×${n(common.elementFactor ?? 1)}; first attack’s outgoing multiplier ×${n(common.outgoingFactor ?? 1)}; critical chance ${n(number(ev.criticalChance) * 100)}%; cap ${n(common.damageCap)} per hit.</p>
+    <p class="dim small">These are inputs to the recovered damage formula. HP damage is truncated and capped per hit; stagger rounds to the nearest integer. Expected damage blends normal and critical outcomes. Hits and stagger/LB events follow the recovered order; randomized ordering is sampled rather than predicted; starting state and unmodeled enemy actions remain scenario limits.</p>
     ${list(ev.warnings).length ? `<h5>Limits of this result</h5><ul class="notes">${ev.warnings.map(w => `<li>${h(w)}</li>`).join('')}</ul>` : ''}
   </details>`;
 }

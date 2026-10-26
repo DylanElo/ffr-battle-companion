@@ -1,6 +1,6 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=32';
-import {comparison} from './optimizer-ui.js?v=32';
+import {createOptimizerController} from './optimizer-controller.js?v=34';
+import {comparison} from './optimizer-ui.js?v=34';
 import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=4';
 
 const C = globalThis.Companion;
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=32', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=34', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;

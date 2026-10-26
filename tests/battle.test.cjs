@@ -128,9 +128,10 @@ test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within th
   const model=B.createModel(catalog,snapshot,enemy,{objective:'damage',rounds:1});
   const result=model.evaluate(input);
   if(!model.prep(input.characterId,input.visionId).legal.has(400650))return;
-  assert.equal(result.actionCount,2);
+  assert.ok(result.actionCount>=2 && result.actionCount<=4);
   assert.ok(result.equippedSkillIds.includes(result.multiActionId));
-  assert.ok(Math.abs(result.damage-result.singleDamage*2)<1e-6);
+  assert.equal(result.turn.leaves.length,result.actionCount);
+  assert.ok(Math.abs(result.damage-result.hits.reduce((sum,hit)=>sum+hit.damage,0))<1e-6);
   assert.ok(result.turnMp<=result.availableMp && result.skillCost<=result.skillBudget);
 });
 

@@ -3,6 +3,26 @@ const assert=require('node:assert/strict');
 const D=require('../docs/damage.js');
 const fixture={attack:100,defense:100,level:30,skill:{calcType:'Physic',mag:100},minimumDamage:1};
 
+test('initiative jitter and priorities match independently executed native instruction fixtures',()=>{
+  const native=require('./fixtures/native-initiative.json');
+  for(const row of native.fixtures){
+    const actual=row.kind==='jitter'?D.initiativeJitter(row.input.rng,row.input.amplitude):D.initiativePriority(row.input);
+    assert.equal(actual,row.expected,JSON.stringify(row.input));
+  }
+});
+
+test('initiative RNG reproduces the native discrete bucket distributions',()=>{
+  const native=require('./fixtures/native-initiative.json');
+  for(const [amplitude,histogram] of Object.entries(native.jitterHistogram)){
+    const counts={};
+    for(let rng=0;rng<32768;rng++){const value=D.initiativeJitter(rng,Number(amplitude));counts[value]=(counts[value]||0)+1;}
+    assert.deepEqual(counts,histogram);
+  }
+  assert.throws(()=>D.initiativeJitter(32768,20),RangeError);
+  assert.throws(()=>D.initiativeJitter(.5,20),RangeError);
+  assert.throws(()=>D.initiativePriority({agility:50,denominator:0}),RangeError);
+});
+
 test('native multiplier epsilon preserves the independently executed HP counterexample',()=>{
   const result=D.damage({attack:998,defense:86,level:40,skill:{calcType:'Physic',mag:268,isApplyAllMag:true},
     critical:true,broken:true,elementFactor:.5,outgoingFactor:1.2,hitRatio:.5,damageCap:99999});

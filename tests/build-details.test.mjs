@@ -39,7 +39,7 @@ test('unavailable baseline and estimate notice avoid falsely asserting measured 
   assert.match(comparison(null,{damage:100}),/could not be fully evaluated/);
   assert.doesNotMatch(comparison(null,{damage:100}),/no usable attack/);
   assert.match(estimateNotice(),/arithmetic checked against the installed executable/);
-  assert.match(estimateNotice(),/native stagger\/LB event order is applied/);
+  assert.match(estimateNotice(),/native stagger\/LB event order and nested command expiry are applied/);
   assert.match(estimateNotice(),/native opening LB effects/);
 });
 
