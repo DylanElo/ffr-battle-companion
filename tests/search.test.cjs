@@ -99,3 +99,62 @@ test('fills slots that later members would otherwise leave empty from leftover s
     }
   }
 });
+
+test('single-character finalization fills neutral accessories left empty by a score tie',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const callbacks={evaluate:()=>({score:10,damage:10,equippedSkillIds:[500]})};
+  const candidates=S.buildCandidates(catalog,snapshot,1,callbacks,options).sort((a,b)=>b.score-a.score);
+  assert.ok(candidates[0].equipment.accessoryIds.some(id=>id<0),'fixture reproduces the bounded search result');
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidates[0]],S.inventory(snapshot),callbacks);
+  assert.ok(result.equipment.accessoryIds.every(id=>id>0));
+  assert.equal(result.gearReasons.filter(r=>r.slot==='accessory').every(r=>r.reason==='neutral-model'),true);
+  assert.equal(S.validateParty(catalog,snapshot,[result],{partySize:1}),'');
+});
+
+test('finalization respects reserved stock and explains unavailable accessory copies',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const stock=new Map([[10,1],[20,1],[30,0],[31,0],[32,1]]);
+  const callbacks={evaluate:()=>({score:10})};
+  const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,options,stock)[0];
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],stock,callbacks);
+  assert.equal(result.equipment.accessoryIds.filter(id=>id>0).length,1);
+  assert.equal(result.gearReasons.find(r=>r.slot==='accessory' && r.status==='empty').reason,'reserved-or-used');
+});
+
+test('empty-slot finalization cannot lower the party score or remove a required role',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const callbacks={evaluate:({equipment})=>({score:10,canHeal:equipment.armorId<0}),
+    evaluateParty:members=>({score:members.some(m=>m.equipment.accessoryIds.some(id=>id>0))?5:10})};
+  const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,options).find(c=>c.equipment.armorId<0 && c.equipment.accessoryIds.every(id=>id<0));
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],S.inventory(snapshot),callbacks);
+  assert.equal(result.equipment.armorId,-1);
+  assert.ok(result.equipment.accessoryIds.every(id=>id<0));
+  assert.equal(result.gearReasons.find(r=>r.slot==='armor').reason,'preserves-role');
+  assert.equal(result.gearReasons.find(r=>r.slot==='accessory').reason,'lowers-model');
+});
+
+test('gear explanations hold equipped abilities fixed and do not invent deltas for unsupported probes',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const seen=[];
+  const callbacks={evaluate:args=>{
+    seen.push(args);
+    if(args.equippedSkillIds && args.equipment.weaponId<0)return {valid:false};
+    return {score:10+(args.equipment.weaponId===10?5:0),damage:10,equippedSkillIds:[500]};
+  }};
+  const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,options).sort((a,b)=>b.score-a.score)[0];
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],S.inventory(snapshot),callbacks);
+  const weapon=result.gearReasons.find(r=>r.slot==='weapon');
+  assert.equal(weapon.reason,'required-for-evaluation');
+  assert.equal(weapon.damageDelta,undefined);
+  assert.ok(seen.some(args=>args.equippedSkillIds?.[0]===500));
+});
+
+test('completion does not silently fill an accessory whose effects cannot be evaluated',()=>{
+  const {catalog,snapshot}=fixture(1);
+  snapshot.inventory=snapshot.inventory.filter(item=>item.id===30);
+  const callbacks={evaluate:({equipment})=>({score:10,passiveAnalysis:{unsupported:equipment.accessoryIds.includes(30)?[{passiveId:1,reason:'Unknown effect.'}]:[]}})};
+  const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,options).find(c=>c.equipment.accessoryIds.every(id=>id<0));
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],S.inventory(snapshot),callbacks);
+  assert.ok(result.equipment.accessoryIds.every(id=>id<0));
+  assert.ok(result.gearReasons.filter(r=>r.slot==='accessory').every(r=>r.reason==='unsupported'));
+});

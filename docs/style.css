@@ -283,6 +283,24 @@ dialog form { text-align: right; margin-top: 12px; }
 .against select { width: 100%; }
 .deep-result { border: 1px solid var(--gold); border-radius: 8px; background: var(--gold-soft); padding: 10px 12px; margin-bottom: 14px; }
 .deep-result .tabs { margin-bottom: 8px; }
+.model-notice { padding: 9px 11px; border-left: 3px solid var(--gold); background: rgba(0,0,0,.16); line-height: 1.5; }
+.build-gear { display: grid; gap: 0; margin: 10px 0; font-size: 12px; }
+.gear-choice { border-bottom: 1px solid var(--line); padding: 7px 0; min-width: 0; }
+.gear-choice summary { display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 6px; cursor: pointer; list-style: none; }
+.gear-choice summary b { overflow-wrap: anywhere; }
+.gear-choice summary b::after { content: ' +'; color: var(--gold); }
+.gear-choice[open] summary b::after { content: ' −'; }
+.gear-choice p { margin: 6px 0 2px; line-height: 1.5; }
+.build-explanation { margin-top: 10px; min-width: 0; }
+.build-explanation > summary { cursor: pointer; font-weight: 700; line-height: 1.6; }
+.build-explanation > summary span { display: block; font-size: 11px; font-weight: 400; }
+.build-explanation h5 { margin: 16px 0 6px; font-size: 12px; color: var(--gold); }
+.build-explanation p, .build-explanation li { overflow-wrap: anywhere; line-height: 1.5; }
+.build-abilities { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+.build-abilities li { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.build-abilities li > div { display: flex; justify-content: space-between; gap: 8px; }
+.build-abilities li > div span { white-space: nowrap; color: var(--gold); }
+.build-abilities p { margin: 5px 0 0; }
 .deep-result p { margin: 6px 0 0; }
 .deep-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .deep-num { margin-left: auto; }

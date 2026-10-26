@@ -1,4 +1,5 @@
-// The "Best party" panel on the Fight page. The encounter is chosen by the Fight page's enemy list.
+// The party builder shared by Next fight and Fight.
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=1';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -7,7 +8,7 @@ const clean = value => String(value ?? '').split('::').pop();
 const joined = character => clean(character.joinStatus) === 'Join' && character.usable === true;
 const option = (value, label, selected) => `<option value="${h(value)}" ${selected ? 'selected' : ''}>${h(label)}</option>`;
 const face = (file, size = '') => file ? `<img class="face ${size}" src="img/${file}.webp" alt="" width="128" height="128" decoding="async">` : '';
-const tabName = index => index === 0 ? 'Best' : `Option ${index + 1}`;
+const tabName = index => index === 0 ? 'Top result' : `Option ${index + 1}`;
 
 function text(value) {
   if (typeof value === 'string') return value;
@@ -22,13 +23,6 @@ function memberCard(member, indexes) {
   const character = indexes.characters.get(Number(member.characterId));
   const vision = indexes.visions.get(Number(member.visionId ?? equipment.visionId));
   const skill = indexes.skills.get(Number(evaluation.skillId ?? evaluation.actionId));
-  const find = (kind, id) => indexes[kind].get(Number(id))?.name;
-  const gear = [equipment.weaponId, equipment.armorId, ...list(equipment.accessoryIds)].map(id => find('equipment', id)).filter(Boolean);
-  const passiveIds = list(evaluation.passiveIds ?? evaluation.equippedPassiveIds);
-  const analysis = evaluation.passiveAnalysis || evaluation.passives || {};
-  const applied = evaluation.appliedSynergies || evaluation.applied || analysis.applied || [];
-  const excluded = [...list(evaluation.unsupported ?? analysis.unsupported), ...list(evaluation.deferred ?? analysis.deferred)];
-  const abilities = list(evaluation.equippedSkillIds).map(id => indexes.skills.get(Number(id))?.name || indexes.passives.get(Number(id))?.name || indexes.masterSkills.get(Number(id))?.name).filter(Boolean);
   const tags = [...(evaluation.canHeal ? ['Heals'] : []), ...(evaluation.canProtect ? ['Protects'] : [])];
   const low = evaluation.damageMin ?? evaluation.damage?.min, high = evaluation.damageMax ?? evaluation.damage?.max;
   return `<article class="member">
@@ -40,20 +34,14 @@ function memberCard(member, indexes) {
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
     ${list(evaluation.limitUses).length ? `<p class="small member-lb">Limit Burst: ${list(evaluation.limitUses).map(u => `${h(indexes.skills.get(Number(u.skillId))?.name)} in round ${u.round}`).join(', ')}</p>` : ''}
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
-    <p class="member-gear">${gear.map(h).join(' · ') || 'No equipment'}</p>
-    <details><summary>Abilities and effects</summary>
-      ${abilities.length ? `<p class="small">${abilities.map(h).join(', ')}</p>` : ''}
-      ${passiveIds.length ? `<ul class="skills">${passiveIds.map(id => { const p = indexes.passives.get(Number(id)); return `<li><b>${h(p?.name || `Passive #${id}`)}</b><p>${h(p?.desc)}</p></li>`; }).join('')}</ul>` : ''}
-      ${list(applied).length ? `<h5>Counted</h5>${bullets(applied)}` : ''}
-      ${excluded.length ? `<h5>Not counted</h5>${bullets(excluded)}` : ''}
-      ${list(evaluation.warnings).length ? `<h5>Limits</h5>${bullets(evaluation.warnings)}` : ''}
-    </details>
+    ${gearExplanation(member, indexes)}
+    ${buildExplanation(member, indexes)}
   </article>`;
 }
 
 // Before/after: the recommended setup against the saved one, both scored by the same model.
 export function comparison(now, next) {
-  if (!now) return '<p class="compare dim small">Your current setup has no usable attack in this fight, so there’s nothing to compare.</p>';
+  if (!now) return '<p class="compare dim small">Your current setup could not be fully evaluated, so an improvement percentage is unavailable.</p>';
   const parts = [], change = now.damage > 0 ? Math.round((next.damage - now.damage) / now.damage * 100) : null;
   if (change !== null) parts.push(change ? `${change > 0 ? '+' : ''}${change}% damage` : 'same damage');
   if (next.firstStagger && now.firstStagger && next.firstStagger !== now.firstStagger) {
@@ -62,18 +50,19 @@ export function comparison(now, next) {
   } else if (next.firstStagger && !now.firstStagger) parts.push('staggers within the fight (yours doesn’t)');
   else if (!next.firstStagger && now.firstStagger) parts.push('no longer staggers within the fight');
   const better = change === null ? !!(next.firstStagger && (!now.firstStagger || next.firstStagger < now.firstStagger)) : change > 0;
-  return `<p class="compare small"><span class="dim">Now: ${num(now.damage)} damage per round${now.firstStagger ? `, staggers in round ${now.firstStagger}` : ''}.</span>
+  return `<p class="compare small"><span class="dim">Current setup estimate: ${num(now.damage)} damage per round${now.firstStagger ? `, staggers in round ${now.firstStagger}` : ''}.</span>
     <b class="${better ? 'good' : change === 0 ? '' : 'bad'}">${h(parts.join(', ') || 'Same as now')}</b></p>`;
 }
 
 function partyView(party, index, indexes, canEquip, current) {
   const members = list(party.members ?? party.party), evaluated = party.evaluation || party;
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
-  return `<div class="party-head">
+  return `${estimateNotice()}<div class="party-head">
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
-      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
+      <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>estimated damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
     </div>
     ${current !== undefined ? comparison(current && { damage: current.damage, firstStagger: current.firstStagger }, { damage: finite(evaluated.damage) ? evaluated.damage : summed, firstStagger: evaluated.firstStagger }) : ''}
+    <p class="dim small">Current setup uses the abilities recorded in your save. Mastery that the save does not record is excluded, so the comparison may understate your current build.</p>
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}
     <div class="members">${members.map(m => memberCard(m, indexes)).join('')}</div>
     ${bullets(evaluated.warnings)}
@@ -84,7 +73,7 @@ function partyView(party, index, indexes, canEquip, current) {
 }
 
 export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false }) {
-  const indexes = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills'].map(kind => [kind, new Map(list(catalog[kind]).map(item => [Number(item.id), item]))]));
+  const indexes = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills', 'effects'].map(kind => [kind, new Map(list(catalog[kind]).map(item => [Number(item.id), item]))]));
   const people = list(snapshot?.characters).filter(joined).filter(c => indexes.characters.has(Number(c.id)));
   const fixed = list(state.fixedCharacterIds).map(Number);
   const results = list(result?.results), pick = Math.min(state.partyIndex || 0, Math.max(0, results.length - 1));
@@ -109,6 +98,6 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
     ${partyView(results[pick], pick, indexes, canEquip, result.current)}`;
   else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or fewer locked characters.</p>${bullets(result.warnings)}`;
-  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches every party of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
+  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches parties of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
 }

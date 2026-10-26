@@ -82,7 +82,8 @@ test('all healing/protection/support choices obey zero-LB native state gates',()
 });
 
 test('a support turn replaces the caster attack and its stagger in the final action plan',()=>{
-  const model=B.createModel(catalog,snapshot,enemy,{objective:'damage',difficulty:'Normal'});
+  const supportSave={...snapshot,characters:snapshot.characters.map(c=>c.id===1003?{...c,joinStatus:'Join',usable:true}:c)};
+  const model=B.createModel(catalog,supportSave,enemy,{objective:'damage',difficulty:'Normal'});
   const receiverSaved=snapshot.characters.find(c=>c.id===1003);
   const receiver=model.evaluate({characterId:1003,visionId:receiverSaved.equipment.visionId,equipment:receiverSaved.equipment});
   receiver.stats={...receiver.stats,Agility:1};
@@ -122,7 +123,7 @@ test('hits are capped at 9999 unless a damage-limit-break effect is equipped, wh
 });
 
 test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within the budget',()=>{
-  const model=B.createModel(catalog,snapshot,enemy,{objective:'damage'});
+  const model=B.createModel(catalog,snapshot,enemy,{objective:'damage',rounds:1});
   const result=model.evaluate(input);
   if(!model.prep(input.characterId,input.visionId).legal.has(400650))return;
   assert.equal(result.actionCount,2);

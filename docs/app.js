@@ -1,6 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=24';
-import {comparison} from './optimizer-ui.js?v=22';
+import {createOptimizerController} from './optimizer-controller.js?v=25';
+import {comparison} from './optimizer-ui.js?v=23';
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=1';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -254,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=25', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=26', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -357,7 +358,7 @@ function deepPanel(native) {
   const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.enemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return `<div class="deep">
     <h4>Build ${h(native.name)}</h4>
-    <p class="dim small">Picks Resonance, gear, attack, abilities and passives together with the game’s damage and stagger formulas, and compares the result with what’s equipped now.</p>
+    <p class="dim small">Searches your owned Resonances, gear and learned abilities together. Results show their estimated effect and AP cost, compared with your saved setup.</p>
     <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
       `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
     <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
@@ -378,21 +379,21 @@ function deepResult() {
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
   if (!d.results.length) return `<div class="deep-result"><p>No legal attack was found for this character against ${h(against)}.</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
-  const goals = d.goals || ['damage'], abilities = (ev.equippedSkillIds || []).map(id => index.skills.get(id)?.name || index.passives.get(id)?.name).filter(Boolean);
-  const passives = (ev.passiveIds || []).map(id => index.passives.get(id)?.name).filter(Boolean);
+  const goals = d.goals || ['damage'];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   return `<div class="deep-result" aria-busy="false">
-    ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Best'}</button>`).join('')}</div>` : ''}
+    ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
+    ${estimateNotice()}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
-      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span>
+      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> estimated damage per round</span>
       <span class="dim small">${n(ev.breakDamage)} stagger per turn${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
+    <p class="dim small">Current setup uses recorded equipped abilities. Unrecorded Mastery is excluded; this can understate your current build.</p>
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over a five-round fight; staggered rounds deal ×1.5.</p>
     <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, assuming the party staggers the enemy at your rate ×4. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
-    ${abilities.length ? `<p class="small"><span class="dim">Abilities to equip:</span> ${abilities.map(h).join(', ')}</p>` : ''}
-    ${passives.length ? `<details><summary>Passives counted (${passives.length})</summary><p class="small">${passives.map(h).join(', ')}</p></details>` : ''}
-    ${(ev.warnings || []).length ? `<details><summary>Limits</summary><ul class="notes">${ev.warnings.map(w => `<li>${h(w)}</li>`).join('')}</ul></details>` : ''}
+    ${gearExplanation(r, index)}
+    ${buildExplanation(r, index)}
   </div>`;
 }
 
@@ -748,7 +749,7 @@ const ready = (async () => {
     if (!r.ok) throw new Error(`Couldn’t load game data (${r.status}). Reload to try again.`);
     catalog = await r.json();
     faces = await fetch('data/faces.json').then(x => x.ok ? x.json() : {}, () => ({}));
-    for (const k of ['characters', 'visions', 'equipment', 'skills', 'passives', 'enemies']) index[k] = new Map(catalog[k].map(x => [x.id, x]));
+    for (const k of ['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills', 'effects', 'enemies']) index[k] = new Map(catalog[k].map(x => [x.id, x]));
     document.body.classList.add('entering');
     render();
     setTimeout(() => document.body.classList.remove('entering'), 900);

@@ -206,32 +206,79 @@
     }
     visit(0,[]);return out;
   }
-  // Later beam members only see candidates whose gear survived earlier picks,
-  // so they can end with empty slots while matching gear sits unused. Fill those from leftovers.
-  function fillEmpty(catalog,members,stock,state,callbacks) {
+  // Complete returned builds after bounded search. Both single and party results use the same stock checks.
+  function finalizeBuilds(catalog,snapshot,members,stock,callbacks,state) {
     const gear=new Map(catalog.equipment.map(e=>[e.id,e]));
     const used=countsOf(members.flatMap(m=>C.equipmentIds(m.equipment)));
+    const owned=inventory(snapshot);
     const worth=id=>Object.values(gear.get(id)?.stats || {}).reduce((a,b)=>a+Number(b||0),0);
-    const fillState={...state,options:{...state.options,maxEvaluations:Infinity,timeMs:0}};
-    const out=members.map(member=>{
+    const unmodeled=(evaluation,item)=>[...(evaluation.passiveAnalysis?.unsupported || []),...(evaluation.passiveAnalysis?.deferred || [])]
+      .filter(effect=>(item?.passiveIds || []).includes(effect.passiveId));
+    const fillState=state?{...state,options:{...state.options,maxEvaluations:Infinity,timeMs:0}}:
+      stateFor({...defaults(callbacks.options || {}),maxEvaluations:Infinity,timeMs:0});
+    const slotsOf=equipment=>[['weapon',0,e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',0,e=>e.armorId,(e,id)=>({...e,armorId:id})],
+      ...equipment.accessoryIds.map((_,i)=>['accessory',i,e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
+    const out=members.slice();
+    const partyScore=rows=>{
+      const result=callbacks.evaluateParty?.(rows,{enemy:callbacks.enemy,options:fillState.options});
+      return callbacks.evaluateParty?Number(result?.score):rows.reduce((sum,m)=>sum+m.score,0);
+    };
+    for(let memberIndex=0;memberIndex<out.length;memberIndex++){
+      const member=out[memberIndex];
       const native=catalog.characters.find(c=>c.id===member.characterId);
-      const slots=[['weapon',e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',e=>e.armorId,(e,id)=>({...e,armorId:id})],
-        ...member.equipment.accessoryIds.map((_,i)=>['accessory',e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
       let best=member;
-      for (const [slot,get,set] of slots) {
+      for (const [slot,index,get,set] of slotsOf(best.equipment)) {
         if (Number(get(best.equipment))>0) continue;
         let pick=null;
+        const previousPartyScore=partyScore(out);
+        if(!Number.isFinite(previousPartyScore))continue;
         for (const item of catalog.equipment) {
           if ((stock.get(item.id)||0)-(used.get(item.id)||0)<1 || !C.eligible(item,native,slot)) continue;
           const c=evaluateOne(fillState,callbacks,member.characterId,member.visionId,set(best.equipment,item.id));
-          if (c && c.score>=best.score && (!pick || c.score>pick.c.score || (c.score===pick.c.score && worth(item.id)>worth(pick.id))))pick={c,id:item.id};
+          if (!c || unmodeled(c.evaluation,item).length || c.score<best.score || !best.roles.every(role=>c.roles.includes(role))) continue;
+          const next=out.slice();next[memberIndex]=c;
+          const nextPartyScore=partyScore(next);
+          if (!Number.isFinite(nextPartyScore) || nextPartyScore<previousPartyScore) continue;
+          if (!pick || nextPartyScore>pick.partyScore || (nextPartyScore===pick.partyScore && (c.score>pick.c.score || c.score===pick.c.score && worth(item.id)>worth(pick.id))))pick={c,id:item.id,partyScore:nextPartyScore};
         }
         // The cache keys accessories unordered, so keep this slot order rather than the cached one.
-        if (pick) {best={...pick.c,equipment:set(best.equipment,pick.id)};used.set(pick.id,(used.get(pick.id)||0)+1);}
+        if (pick) {best={...pick.c,equipment:set(best.equipment,pick.id)};used.set(pick.id,(used.get(pick.id)||0)+1);out[memberIndex]=best;}
       }
-      return best;
-    });
-    state.evaluations=fillState.evaluations;
+    }
+    // Explain the final allocation with the same equipped abilities and this slot empty.
+    for(const [memberIndex,member] of out.entries()){
+      const native=catalog.characters.find(c=>c.id===member.characterId);
+      const gearReasons=slotsOf(member.equipment).map(([slot,index,get,set])=>{
+        const itemId=Number(get(member.equipment));
+        const base={slot,index,itemId,status:itemId>0?'selected':'empty',unmodeledEffects:unmodeled(member.evaluation,gear.get(itemId))};
+        if(itemId>0){
+          fillState.evaluations++;
+          const without=callbacks.evaluate({characterId:member.characterId,visionId:member.visionId,equipment:set(member.equipment,-1),
+            equippedSkillIds:member.evaluation.equippedSkillIds,enemy:callbacks.enemy,options:fillState.options});
+          if(!without || without.valid===false || !Number.isFinite(Number(without.score)))return {...base,reason:'required-for-evaluation'};
+          const metrics=e=>({damage:e.fightDamage ?? e.damage,stagger:e.fightBreakDamage ?? e.breakDamage});
+          const current=metrics(member.evaluation),empty=metrics(without);
+          const delta=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?a-b:null;
+          const scoreDelta=member.score-without.score;
+          return {...base,reason:scoreDelta>0?'improves-model':scoreDelta<0?'tradeoff-model':'neutral-model',scoreDelta,
+            damageDelta:delta(current.damage,empty.damage),staggerDelta:delta(current.stagger,empty.stagger),evaluationMode:'same-abilities-without-item'};
+        }
+        const compatible=catalog.equipment.filter(item=>C.eligible(item,native,slot) && (owned.get(item.id)||0)>0);
+        if(!compatible.length)return {...base,reason:'no-owned-compatible'};
+        const remaining=compatible.filter(item=>(stock.get(item.id)||0)-(used.get(item.id)||0)>0);
+        if(!remaining.length)return {...base,reason:'reserved-or-used'};
+        let supported=false,roleLoss=false;
+        for(const item of remaining){
+          const candidate=evaluateOne(fillState,callbacks,member.characterId,member.visionId,set(member.equipment,item.id));
+          if(!candidate || unmodeled(candidate.evaluation,item).length)continue;
+          supported=true;
+          if(!member.roles.every(role=>candidate.roles.includes(role)))roleLoss=true;
+        }
+        return {...base,reason:!supported?'unsupported':roleLoss?'preserves-role':'lowers-model'};
+      });
+      out[memberIndex]={...member,gearReasons};
+    }
+    if(state)state.evaluations=fillState.evaluations;
     return out;
   }
   function rankParties(catalog,snapshot,callbacks) {
@@ -313,7 +360,7 @@
     const seen=new Set(),unique=[];
     for(const result of results) {
       if(unique.length>=options.maxResults)break;
-      result.members=fillEmpty(catalog,result.members,result.stock,state,callbacks);
+      result.members=finalizeBuilds(catalog,snapshot,result.members,result.stock,callbacks,state);
       const key=result.members.map(m=>`${m.characterId}:${m.visionId}:${keyOf(m.equipment)}`).sort().join('|');
       if(seen.has(key))continue;
       seen.add(key);unique.push(Object.assign(result,partyScore(result.members)));
@@ -324,6 +371,6 @@
       reasons:[...state.reasons],teamsConsidered:teamCount,totalTeams:teams.length,
       results:results.map(({members,score,evaluation})=>({members,score,evaluation})),baseline,elapsedMs:Date.now()-state.started};
   }
-  const api={rankParties,buildCandidates,validateParty,inventory};
+  const api={rankParties,buildCandidates,finalizeBuilds,validateParty,inventory};
   if(typeof module!=='undefined')module.exports=api;else root.CompanionSearch=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

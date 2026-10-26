@@ -2,7 +2,7 @@
 
 ## Mechanic brief
 
-Load an inventory, select an encounter and battle state, compare legal owned party/loadout candidates, inspect why each was selected, then stage or export the one to try. No save writes or battle automation occur.
+Load an inventory, select an encounter and battle state, compare legal owned party/loadout candidates, inspect why each was selected, then stage or export the one to try. Explicit Equip actions download an edited save copy and backup; searching itself never writes a save.
 
 ## Rules modeled
 
@@ -18,7 +18,13 @@ Load an inventory, select an encounter and battle state, compare legal owned par
 
 Equipment, character and Resonance choices share one inventory. Accessory pairs are evaluated together. Passive/Spirit packages use a cost/slot knapsack surrogate and are then evaluated with native damage math. Candidate pruning, a party beam and a time/evaluation budget keep browser searches bounded. Results are the strongest candidates found, not a proven global optimum.
 
-Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The scenario is one turn per member, not a sustained fight simulation. Arms Akimbo (400650, 40 MP) and Dualcast (400730, spells only) repeat the chosen attack once; Magic Boost (400660) adds its native +100% magic damage effect 12911 into the additive damage bucket and costs 1.5× MP (rounded up, assumed). Each hit is capped at 9999, or 99999 with a DamageLimitBreak effect: the native getter at file offset 0x5147360 returns `cond ? 9999 : 99999`. Decimating Attacks (DmgMulTargetlNum) adds its percentage per enemy on Group/All attacks, using the scenario's enemy count (1); Tip-Top Shape (DmgMulBuffNum) adds per buff, which is 0 at the start of a fight.
+Both character and party results finish empty slots using available compatible inventory without reducing the member or party score or losing a required role. Unmodeled/deferred item effects are not treated as safely neutral filler. Each slot has a reason; reserved stock and other party allocations are respected. Gear and ability explanations remove one choice while holding the other gear and equipped abilities fixed, then reselect the best supported action. These comparisons describe local model sensitivity, not a proof that the item is globally optimal or an additive damage bonus.
+
+Current-setup comparisons preserve all recorded equipped skills and their AP/slots. They do not optimize away unwanted passives or unused actions. A partial/invalid saved party is not used as a full-party baseline. Mastery absent from the save remains an explicit limitation.
+
+The five-round simulation spends MP on every ordinary turn. When the selected action is unaffordable, it contributes zero and that round is reported; no replacement attack or MP recovery is assumed. Support actions replace the caster's attack and stagger, spend MP and cannot simultaneously use an LB. Same-turn support is recast each round only when affordable for the full horizon; partial-duration buff strategies are not simulated.
+
+Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The default horizon is five rounds; each member repeats its selected turn when affordable, with modeled LB substitutions. Arms Akimbo (400650, 40 MP) and Dualcast (400730, spells only) repeat the chosen attack once; Magic Boost (400660) adds its native +100% magic damage effect 12911 into the additive damage bucket and costs 1.5× MP (rounded up, assumed). Each hit is capped at 9999, or 99999 with a DamageLimitBreak effect: the native getter at file offset 0x5147360 returns `cond ? 9999 : 99999`. Decimating Attacks (DmgMulTargetlNum) adds its percentage per enemy on Group/All attacks, using the scenario's enemy count (1); Tip-Top Shape (DmgMulBuffNum) adds per buff, which is 0 at the start of a fight.
 
 "Any fight" (`generalEnemy`) is a neutral boss at the party's average level with the median stats of the seven bosses nearest that level, no elemental weaknesses or resistances, and no passives or status resistances. With the Limit Burst goal ticked, a Limit Burst fires as soon as it is affordable.
 
@@ -36,9 +42,9 @@ Mixed Arms Akimbo/Dualcast pairs, native limits on repeating an action, state-sp
 
 ## Validation and handoff
 
-Current Goal: encounter-specific owned-party recommendations using supported native damage and passive rules.
+Current Goal: reliable, explainable owned-build recommendations using supported native damage and passive rules.
 
-Latest Decision: keep arithmetic/effects, loadout legality and bounded search separate, with unsupported mechanics visible.
+Latest Decision: exact saved baselines, finite MP, shared equipment completion and removal-based explanations; show uncalibrated estimates explicitly.
 
 Next Step: compare representative predicted hits and ability loadouts against in-game screens/combat, then confirm percentage bases, Spirit expansion and special multi-action queues before extending sustained battle simulation.
 
