@@ -1,5 +1,7 @@
 # Native damage research — 2026-10-25
 
+Update 2026-10-26: the ratio and multiplier arithmetic was checked against independently executed instruction blocks from the installed image. Exact percentage factors, the stagger level constant and MP rounding were corrected. See [combat verification](combat-verification.md) for the reference cases, sample counts, source locations and remaining battle-state assumptions.
+
 Current Goal: recover the installed game's actual calculation kernels for owned-build recommendations.
 
 Latest Decision: implement the statically recovered normal physical/magic kernel and EscapeNum specialization, reject other calculation types until their native paths are implemented. Call the result a native-formula estimate; it has not been calibrated against an observed battle trace.

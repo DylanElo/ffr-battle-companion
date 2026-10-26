@@ -1,5 +1,7 @@
 # Battle model and evidence
 
+Arithmetic verification and exact native regression cases: [combat verification](combat-verification.md). This includes percentage rounding, stagger level scaling, MP truncation and higher-stat effects; action timing assumptions remain separate.
+
 ## Mechanic brief
 
 Load an inventory, select an encounter and battle state, compare legal owned party/loadout candidates, inspect why each was selected, then stage or export the one to try. Explicit Equip actions download an edited save copy and backup; searching itself never writes a save.
@@ -24,7 +26,7 @@ Current-setup comparisons preserve all recorded equipped skills and their AP/slo
 
 The five-round simulation spends MP on every ordinary turn. When the selected action is unaffordable, it contributes zero and that round is reported; no replacement attack or MP recovery is assumed. Support actions replace the caster's attack and stagger, spend MP and cannot simultaneously use an LB. Same-turn support is recast each round only when affordable for the full horizon; partial-duration buff strategies are not simulated.
 
-Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The default horizon is five rounds; each member repeats its selected turn when affordable, with modeled LB substitutions. Arms Akimbo (400650, 40 MP) and Dualcast (400730, spells only) repeat the chosen attack once; Magic Boost (400660) adds its native +100% magic damage effect 12911 into the additive damage bucket and costs 1.5× MP (rounded up, assumed). Each hit is capped at 9999, or 99999 with a DamageLimitBreak effect: the native getter at file offset 0x5147360 returns `cond ? 9999 : 99999`. Decimating Attacks (DmgMulTargetlNum) adds its percentage per enemy on Group/All attacks, using the scenario's enemy count (1); Tip-Top Shape (DmgMulBuffNum) adds per buff, which is 0 at the start of a fight.
+Damage maximizes expected HP damage; break maximizes expected stagger damage. Balanced adds an explicitly subjective durability term: per member `0.01 × HP + 0.5 × (DEF + MDEF)`, with optional healing/protection constraints. That score is not DPS. The default horizon is five rounds; each member repeats its selected turn when affordable, with modeled LB substitutions. Arms Akimbo (400650, 40 MP) and Dualcast (400730, spells only) repeat the chosen attack once; Magic Boost (400660) adds its native +100% magic damage effect 12911 into the additive damage bucket and costs 1.5× MP (native float factor, nonzero minimum 1, truncated). Each hit is capped at 9999, or 99999 with a DamageLimitBreak effect: the native getter at file offset 0x5147360 returns `cond ? 9999 : 99999`. Decimating Attacks (DmgMulTargetlNum) adds its percentage per enemy on Group/All attacks, using the scenario's enemy count (1); Tip-Top Shape (DmgMulBuffNum) adds per buff, which is 0 at the start of a fight.
 
 "Any fight" (`generalEnemy`) is a neutral boss at the party's average level with the median stats of the seven bosses nearest that level, no elemental weaknesses or resistances, and no passives or status resistances. With the Limit Burst goal ticked, a Limit Burst fires as soon as it is affordable.
 
@@ -44,8 +46,8 @@ Mixed Arms Akimbo/Dualcast pairs, native limits on repeating an action, state-sp
 
 Current Goal: reliable, explainable owned-build recommendations using supported native damage and passive rules.
 
-Latest Decision: exact saved baselines, finite MP, shared equipment completion and removal-based explanations; show uncalibrated estimates explicitly.
+Latest Decision: independently execute native arithmetic blocks as the reference; correct percentage rounding, stagger level scaling and MP truncation, and model verified higher-stat effects. Preserve exact baselines, inventory completion and removal explanations.
 
-Next Step: compare representative predicted hits and ability loadouts against in-game screens/combat, then confirm percentage bases, Spirit expansion and special multi-action queues before extending sustained battle simulation.
+Next Step: trace the remaining Spirit, action-queue, stagger and LB event handlers. Executable verification is documented in combat-verification.md; recorded battles remain a separate end-to-end check.
 
-Known Blockers: no live damage calibration; the specific unverified mechanics above prevent a claim of an exact global best party.
+Known Blockers: no recorded battle measurements; encounter overrides and the specific unverified mechanics above prevent a claim of an exact global best party.

@@ -64,6 +64,32 @@ test('five-round estimates spend MP and report turns the chosen action cannot be
   assert.equal(result.mpExhaustedRounds.length,5-affordable);
 });
 
+test('Magic Boost uses native truncation for odd MP costs', () => {
+  const {catalog,snapshot,enemy,input} = fixture([400660]);
+  catalog.skills = [{...catalog.skills[0],cost:15,mag:100,dmgType:'Magic',calcType:'Magic'},native.skills.find(s=>s.id===400660)];
+  catalog.effects = native.effects;
+  const result = B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1}).evaluate({...input,current:true});
+  assert.equal(result.valid,true);
+  assert.equal(result.magicBoost,true);
+  assert.equal(result.turnMp,22);
+});
+
+test('native higher-stat effects reach the actual attack and target defense inputs', () => {
+  const {catalog,snapshot,enemy,input} = fixture([]);
+  catalog.passives = [native.passives.find(p=>p.id===1491)];
+  catalog.effects = native.effects;
+  catalog.equipment = [{id:900009,type:'Accessory',stats:{PhysicalAttack:10,MagicalAttack:300},passiveIds:[1491]}];
+  input.equipment = {...input.equipment,accessoryIds:[900009,-1]};
+  enemy.stats = {...enemy.stats,PhysicalDefense:80,MagicalDefense:200};
+  enemy.passiveIds = [1491];
+  const result = B.createModel(catalog,snapshot,enemy,{goals:['damage']}).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.equal(result.common.attack,Math.max(result.stats.PhysicalAttack,result.stats.MagicalAttack));
+  assert.equal(result.common.attackSource,'higher of ATK and MAG');
+  assert.equal(result.common.defense,225);
+  assert.equal(result.common.defenseSource,'higher of physical and magic');
+});
+
 test('party simulation uses the selected support action rather than the caster original stagger', () => {
   const {catalog,snapshot,enemy,input} = fixture([]);
   catalog.skills = [{...catalog.skills[0],dmgType:'Magic',calcType:'Magic'},native.skills.find(s=>s.id===230110)];

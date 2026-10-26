@@ -17,6 +17,7 @@
   const LB_OWNER_ALIASES={Darkfina:1006},LB_PARAMETER=4,STAGGER_PARTY_SCALE=4;
   const LB_CHARGE_IDS=[1000,1031],LB_EXTRA_IDS=[1280,1338];
   const isHealing=skill=>skill && skill.relation==='Friendlies' && clean(skill.parameterVariationType)==='Increase' && clean(skill.parameterType)==='HitPoint' && number(skill.mag)>0;
+  const defenseSum=(stats,modifiers)=>modifiers?.dominantDefence?2*Math.max(number(stats.PhysicalDefense),number(stats.MagicalDefense)):number(stats.PhysicalDefense)+number(stats.MagicalDefense);
   function knapsack(entries,budget,slots){
     const states=new Map([['0:0',{cost:0,slots:0,score:0,ids:[]}]]);
     for(const item of entries){
@@ -57,14 +58,14 @@
     const evidence={formula:'Native executable damage helpers; see docs/damage-research.md.',stats:'Native XP/growth/seed/sync/equipment derivation; cross-save HP checks.',
       passives:'Native effect IDs, timing, conditions and additive damage bucket.',
       search:'Bounded joint search; passive packages use a knapsack surrogate and are then evaluated with native math.',
-      calibration:'Static native-formula verification, not a live battle measurement.'};
+      calibration:'Damage arithmetic matches independently executed native instruction samples; see docs/combat-verification.md. Battle sequencing remains a model.'};
     const prepCache=new Map(),analysisCache=new Map(),packageCache=new Map(),valueCache=new Map();
     const unknownArtifacts=(snapshot.artifactOverrides || []).filter(a=>a.active && !(catalog.artifacts || []).some(row=>row.id===a.id));
     const activeNativeArtifacts=(catalog.artifacts || []).filter(a=>snapshot.inventory.some(i=>i.id===a.id && i.quantity>0) && ((snapshot.artifactOverrides||[]).find(o=>o.id===a.id)?.active ?? a.initialActive));
     const globalWarnings=[];
     if(unknownArtifacts.length)globalWarnings.push(`Unmapped active artifact IDs ${unknownArtifacts.map(a=>a.id).join(', ')}: their battle effects are not inferred.`);
     if(activeNativeArtifacts.length)globalWarnings.push(`Active artifacts ${activeNativeArtifacts.map(a=>a.name || a.id).join(', ')} are listed but their modifiers are not modeled.`);
-    globalWarnings.push('Native damage predictions have not been calibrated against a recorded battle. Enemy base rows may differ from the actual encounter.');
+    globalWarnings.push('Damage arithmetic was checked against the installed executable. Actual encounter stats and battle timing can differ from the five-round model; see combat-verification.md.');
     globalWarnings.push('Numeric rankings exclude attacks below 100 native accuracy. Enemy evasion and reactive counters are not simulated.');
     // Fixed loadouts preserve every recorded equipped ability; unrecorded Mastery choices are not inferred.
     function prep(characterId,visionId,current=false,fixedSkillIds){
@@ -112,7 +113,8 @@
     }
     function rollDamage(stats,skill,passiveAnalysis,context={}){
       const magical=clean(skill.calcType)==='Magic';
-      const attack=number(stats[magical?'MagicalAttack':'PhysicalAttack']);
+      const attackFor=(values,modifiers)=>modifiers.dominantPower?Math.max(number(values.PhysicalAttack),number(values.MagicalAttack)):number(values[magical?'MagicalAttack':'PhysicalAttack']);
+      const attack=attackFor(stats,passiveAnalysis.modifiers);
       const element=passiveAnalysis.modifiers.element || clean(skill.element);
       const targetAnalysis=P.analyze(catalog,enemy.passiveIds || [],{skill,element,hpPercent:100,mpPercent:100,lbPercent:0,broken:scenario.broken,extraPhase:false,critical:scenario.critical,statusIds:[],targetStatusIds:[]});
       function enemyParameter(key){
@@ -121,8 +123,8 @@
         if(context.targetStatPercent?.parameter===key)terms.push({kind:'statPercent',value:context.targetStatPercent.value});
         return Math.max(0,base+terms.reduce((sum,term)=>sum+S.effectDelta(base,term),0));
       }
-      const attribute=magical?'Mind':'Defence',derived=magical?'MagicalDefense':'PhysicalDefense';
-      const defense=number(context.defense,Math.max(1,enemyParameter(attribute)+enemyParameter(derived)));
+      const physicalDefense=enemyParameter('Defence')+enemyParameter('PhysicalDefense'),magicDefense=enemyParameter('Mind')+enemyParameter('MagicalDefense');
+      const defense=number(context.defense,Math.max(1,targetAnalysis.modifiers.dominantDefence?Math.max(physicalDefense,magicDefense):magical?magicDefense:physicalDefense));
       const originalResistance=clean(enemy.resistances?.[element] || 'None'),addedResistance=targetAnalysis.modifiers.resistances[element] || 'None';
       const priority={None:0,Weakness:25,Halved:50,Invalid:75,Absorb:100};
       const resistance=priority[addedResistance]>priority[originalResistance]?addedResistance:originalResistance;
@@ -130,7 +132,7 @@
       const incomingFactor=targetAnalysis.terms.filter(term=>term.kind===(magical?'magicReductionPercent':'physicalReductionPercent'))
         .reduce((product,term)=>Math.fround(product*Math.fround(Math.max(0,Math.min(100,100-number(term.value)))/100+2**-23)),1);
       const factor=number(catalog.battleRules.elementResistanceValues?.[`eResistance::${resistance}`] ?? catalog.battleRules.elementResistanceValues?.[resistance],{None:1,Weakness:1.5,Halved:0.5,Invalid:0,Absorb:-1}[resistance]??1);
-      const common={attack,defense,level:stats.level || context.level,targetLevel:number(enemy.level,1),skill,elementFactor:factor,
+      const common={attack,defense,attackSource:passiveAnalysis.modifiers.dominantPower?'higher of ATK and MAG':magical?'MAG':'ATK',defenseSource:targetAnalysis.modifiers.dominantDefence?'higher of physical and magic':magical?'magic':'physical',level:stats.level || context.level,targetLevel:number(enemy.level,1),skill,elementFactor:factor,
         outgoingFactor:Math.max(0,passiveAnalysis.damageFactor+number(context.additionalDamagePercent)/100)*incomingFactor,
         criticalBonus:number(passiveAnalysis.modifiers.critDamagePercent)/100,broken:context.broken ?? scenario.broken,exPhase:false,
         difficultyGiven:scenario.difficultyGiven,rules:catalog.battleRules,
@@ -144,7 +146,7 @@
       for(const hitRatio of useRatios){
         const critAnalysis=context.criticalAnalysis || passiveAnalysis;
         const criticalInput={...common,hitRatio,critical:true,
-          attack:context.criticalStats?number(context.criticalStats[magical?'MagicalAttack':'PhysicalAttack']):common.attack,
+          attack:attackFor(context.criticalStats || stats,critAnalysis.modifiers),
           outgoingFactor:Math.max(0,critAnalysis.damageFactor+number(context.additionalDamagePercent)/100)*incomingFactor,
           criticalBonus:number(critAnalysis.modifiers.critDamagePercent)/100,damageCap:critAnalysis.modifiers.damageCapRaised?RAISED_DAMAGE_CAP:DAMAGE_CAP};
         const normal=D.damage({...common,hitRatio,critical:false}),critical=D.damage(criticalInput);
@@ -198,8 +200,9 @@
         const calculated=rollDamage(final.stats,skill,candidateAnalysis,{level:final.level});
         const value=goalScore({damage:Math.max(0,calculated.damage-baseline.damage),breakDamage:Math.max(0,calculated.breakDamage-baseline.breakDamage),
           durability:Math.max(0,number(final.stats.MaxHitPoint)-number(baseFinal.stats.MaxHitPoint))*.05+
-          Math.max(0,number(final.stats.PhysicalDefense)-number(baseFinal.stats.PhysicalDefense))*2+
-          Math.max(0,number(final.stats.MagicalDefense)-number(baseFinal.stats.MagicalDefense))*2});
+          ['PhysicalDefense','MagicalDefense'].reduce((sum,key)=>sum+Math.max(0,
+            (candidateAnalysis.modifiers.dominantDefence?defenseSum(final.stats,candidateAnalysis.modifiers)/2:number(final.stats[key]))-
+            (baseAnalysis.modifiers.dominantDefence?defenseSum(baseFinal.stats,baseAnalysis.modifiers)/2:number(baseFinal.stats[key])))*2,0)});
         return Number.isFinite(value)?value:0;
       }
       const masters=(prepared.learn.masterSkillIds || []).map(id=>indexes.masterSkills.get(id)).filter(m=>m && m.grants && ((m.grants.passiveIds || []).length || (m.grants.activeIds || []).length));
@@ -321,7 +324,7 @@
       const turns=[];
       for(const boost of boosts)for(const multi of multis){
         const reservedIds=[...(boost?[MAGIC_BOOST]:[]),...(multi?[multi]:[])].filter(id=>!prepared.free.has(id));
-        const actions=multi?2:1,perAction=boost?Math.ceil(number(skill.cost)*1.5):number(skill.cost);
+        const actions=multi?2:1,perAction=D.skillMpCost(number(skill.cost),boost?[150]:[]);
         turns.push({reservedIds,reservedCost:equipCostOf(reservedIds),actions,multi,boost,
           mp:actions*perAction+(multi?number(indexes.skills.get(multi)?.cost):0),context:boost?{activeEffectIds:[MAGIC_BOOST_EFFECT]}:{}});
       }
@@ -374,7 +377,7 @@
         for(const supportId of unique([...prepared.support.buffs,...prepared.support.debuffs].filter(a=>['damagePercent','statPercent'].includes(a.kind)).map(a=>a.skillId)).slice(0,3))ensureSupport([indexes.skills.get(supportId)],'support');
         const legalSkills=new Set([...packageFree,...activeSelected,...selected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
-        const survivability=number(stats.MaxHitPoint)*.02+number(stats.PhysicalDefense)+number(stats.MagicalDefense);
+        const survivability=number(stats.MaxHitPoint)*.02+defenseSum(stats,passiveAnalysis.modifiers);
         const limit=prepared.limits.length?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
         const fight=simulateFight([{id:characterId,agility:stats.Agility,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,limit,availableMp,turnMp:turn.mp}],STAGGER_PARTY_SCALE);
         const score=goalScore({damage:fight.damage,breakDamage:damage.breakVerified?fight.breakDamage:0,gauge:fight.gauge[characterId],durability:survivability*.5});
@@ -384,7 +387,7 @@
         if(!catalog.skillRules)warnings.push('Action-state rules were not loaded; this is an arithmetic-only check.');
         if(!damage.breakVerified && goals.has('stagger'))warnings.push('Stagger damage formula is not implemented; this objective is unavailable.');
         if(turn.multi)warnings.push(`${indexes.skills.get(turn.multi).name}: both actions use ${skill.name}; native limits on repeating it are not verified.`);
-        if(turn.boost)warnings.push('Magic Boost: assumed MP cost rounds up; with Dualcast it boosts both spells (not verified).');
+        if(turn.boost)warnings.push('Magic Boost MP cost uses native truncation. With Dualcast it is assumed to boost both spells; that duration is not verified.');
         if(fight.mpExhaustedRounds[characterId].length)warnings.push(`Not enough MP for the chosen action in rounds ${fight.mpExhaustedRounds[characterId].join(', ')}; those turns contribute no damage. MP recovery and replacement actions are not modeled.`);
         results.push({valid:true,score,...damage,turn,limit,fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
           passiveIds:packageInfo.passiveIds,equippedSkillIds:unique([...selected,...activeSelected]),alwaysPassiveIds:freeIds,stats,level:calculated.level,
@@ -464,7 +467,7 @@
       }
       const roundDamage=damage,roundBreakDamage=breakDamage;
       damage=fight.damage;breakDamage=fight.breakDamage;
-      const defenseScore=members.reduce((sum,m)=>sum+number(m.evaluation.stats.MaxHitPoint)*.01+(number(m.evaluation.stats.PhysicalDefense)+number(m.evaluation.stats.MagicalDefense))*.5,0);
+      const defenseScore=members.reduce((sum,m)=>sum+number(m.evaluation.stats.MaxHitPoint)*.01+defenseSum(m.evaluation.stats,m.evaluation.passiveAnalysis?.modifiers)*.5,0);
       const gaugePerRound=members.reduce((sum,m)=>sum+number(fight.gauge[m.characterId]),0)/Math.max(1,members.length);
       const score=goalScore({damage,breakDamage,gauge:gaugePerRound,durability:defenseScore});
       return {score,damage,breakDamage,roundDamage,roundBreakDamage,limitUses:fight.uses,gauge:fight.gauge,mpExhaustedRounds:fight.mpExhaustedRounds,remainingMp:fight.remainingMp,staggers:fight.staggers,firstStagger:fight.firstStagger,rounds:scenario.rounds,supportUsed,supportDescription,actionOverrides,warnings:globalWarnings,

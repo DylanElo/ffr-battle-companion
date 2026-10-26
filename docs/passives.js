@@ -119,6 +119,15 @@
       term.kind=p[1]===1?'physicalEvasionPercent':'magicEvasionPercent';term.value=Number(p[0]);return term;
     }
     if(type==='DamageLimitBreak')return {...term,kind:'damageCapRaised',value:true};
+    if(type==='DominantPower'){
+      if(!Number.isInteger(Number(p[0])) || Number(p[0])<-1 || !allDefault(1))return reject('Unrecognized higher-attack condition.');
+      if(Number(p[0])>=0)requireValue('commandId',Number(p[0]));
+      return {...term,kind:'dominantPower',value:true};
+    }
+    if(type==='DominantDefence'){
+      if(!allDefault(0))return reject('Unrecognized higher-defense condition.');
+      return {...term,kind:'dominantDefence',value:true};
+    }
     // Limit Burst / finisher / summon power: native vtable+0x5A8 adds trunc(level) * 100/p0 to the coefficient scale (base 1).
     if(type==='MulBaseSkillByLevel'){
       if(!(Number(p[0])>0) || !allDefault(1))return reject('Unrecognized level-scaled power layout.');
@@ -136,7 +145,7 @@
     let indexes=catalogCache.get(catalog);
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
-    const modifiers={statFlat:{},statPercent:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,coefficientPerLevel:0};
+    const modifiers={statFlat:{},statPercent:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0};
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     for(const id of passiveIds || []){
@@ -224,7 +233,7 @@
         if(!known(resistancePriority[term.resistance])){result.unsupported.push({...term,reason:'Resistance priority is not defined in current battle rules.'});continue;}
         if(resistancePriority[term.resistance]>resistancePriority[old])modifiers.resistances[term.element]=term.resistance;
       }else if(term.kind==='statusResistance')add(modifiers.statusResists,term.statusId,term.value);
-      else if(term.kind==='damageCapRaised')modifiers.damageCapRaised=true;
+      else if(['damageCapRaised','dominantPower','dominantDefence'].includes(term.kind))modifiers[term.kind]=true;
       else if(term.kind!=='utility')modifiers[term.kind]+=term.value;
       result.applied.push(term);result.terms.push(term);
     }

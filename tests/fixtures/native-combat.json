@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "executable": {
+    "name": "FFRS-Win64-Shipping.exe",
+    "sha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA"
+  },
+  "method": "Isolated execution of copied scalar SSE instruction blocks from the installed executable using its constants and installed UCRT expf/powf. Explicit neutral action, encounter and target-effect inputs. No game process injection, game/save modifications or observed battle samples.",
+  "sources": {
+    "ratio-kernel": {
+      "addresses": [
+        "0x14522F1FF-0x14522F286"
+      ],
+      "calls": [
+        "UCRT expf"
+      ],
+      "coverage": "Native piecewise attack/defense ratio arithmetic; caller supplies computed stats."
+    },
+    "hp-multiplier-blocks": {
+      "addresses": [
+        "0x145232B5B-0x145232B77",
+        "0x145232B88-0x145232B8C",
+        "0x145232BD4-0x145232BDD",
+        "0x145232C44-0x145232C6B",
+        "0x145232CCB-0x145232CD0",
+        "0x145232D06-0x145232D0B",
+        "0x145232D1B-0x145232D20",
+        "0x145232D8E-0x145232D93"
+      ],
+      "percentageFactorSources": [
+        "0x145238C94-0x145238CA9",
+        "0x14523748E-0x14523749B",
+        "0x145232BC4-0x145232BCF",
+        "0x145232BFD-0x145232C08"
+      ],
+      "coverage": "Copied post-base scalar multiplier arithmetic with supplied factors. Base uses executed native ratio and independently reproduced level/variance scaling. Raw applies neutral incoming stages, minimum1, cap99999."
+    },
+    "break-arithmetic-and-level": {
+      "addresses": [
+        "0x145232253-0x14523227D",
+        "0x14523227D-0x1452322E0",
+        "0x1452322E0-0x1452322F2"
+      ],
+      "calls": [
+        "UCRT powf"
+      ],
+      "constants": {
+        "levelSlopeAddress": "0x148959F34",
+        "levelSlope": 0.09999999403953552,
+        "levelFloorAddress": "0x14779D39C",
+        "levelFloor": 0.10000000149011612
+      },
+      "coverage": "Copied break scalar and level instructions; final positive rounding is trunc(float(raw+.5))."
+    }
+  },
+  "localRerun": "With the matching installed executable and the local read-only calibration harness: python artifacts/calibration-native/execute_ratio.py; python artifacts/calibration-native/execute_damage.py; python artifacts/calibration-native/execute_break_level.py; python artifacts/calibration-native/make_public_fixture.py. The extraction harness is local-only and not bundled with this fixture.",
+  "fixtures": [
+    {
+      "id": "ratio-0-1",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 0,
+        "defense": 1
+      },
+      "expected": {
+        "ratioFactor": 1.7881393432617188e-07
+      }
+    },
+    {
+      "id": "ratio-1-3",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 1,
+        "defense": 3
+      },
+      "expected": {
+        "ratioFactor": 0.16666685044765472
+      }
+    },
+    {
+      "id": "ratio-49-100",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 49,
+        "defense": 100
+      },
+      "expected": {
+        "ratioFactor": 0.2450001835823059
+      }
+    },
+    {
+      "id": "ratio-50-100",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 50,
+        "defense": 100
+      },
+      "expected": {
+        "ratioFactor": 0.25000011920928955
+      }
+    },
+    {
+      "id": "ratio-100-100",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 100,
+        "defense": 100
+      },
+      "expected": {
+        "ratioFactor": 1.0000004768371582
+      }
+    },
+    {
+      "id": "ratio-500-100",
+      "kind": "ratio",
+      "source": "ratio-kernel",
+      "input": {
+        "attack": 500,
+        "defense": 100
+      },
+      "expected": {
+        "ratioFactor": 4.856110095977783
+      }
+    },
+    {
+      "id": "hp-1",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 100,
+        "defense": 100,
+        "level": 30,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 100
+        },
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 1920.0009765625,
+        "amount": 1920
+      }
+    },
+    {
+      "id": "hp-2",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 100,
+        "defense": 100,
+        "level": 30,
+        "skill": {
+          "calcType": "Magic",
+          "mag": 100
+        },
+        "critical": true,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 2880.001708984375,
+        "amount": 2880
+      }
+    },
+    {
+      "id": "hp-3",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 100,
+        "defense": 100,
+        "level": 30,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 100
+        },
+        "critical": true,
+        "broken": true,
+        "elementFactor": 1.5,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 6480.00439453125,
+        "amount": 6480
+      }
+    },
+    {
+      "id": "hp-4",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 100,
+        "defense": 100,
+        "level": 30,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 100,
+          "isApplyAllMag": true
+        },
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 768.0005493164062,
+        "amount": 768
+      }
+    },
+    {
+      "id": "hp-5",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 100,
+        "defense": 100,
+        "level": 30,
+        "skill": {
+          "calcType": "Magic",
+          "mag": 100,
+          "isApplyAllMag": true
+        },
+        "exPhase": true,
+        "outgoingFactor": 1.2,
+        "hitRatio": 0.3,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 276.4802551269531,
+        "amount": 276
+      }
+    },
+    {
+      "id": "hp-6",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 998,
+        "defense": 86,
+        "level": 40,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 268,
+          "breakDmg": 467,
+          "isApplyAllMag": true
+        },
+        "critical": true,
+        "broken": true,
+        "exPhase": false,
+        "elementFactor": 0.5,
+        "outgoingFactor": 1.2,
+        "hitRatio": 0.5,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 9117.0029296875,
+        "amount": 9117
+      }
+    },
+    {
+      "id": "hp-7",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 681,
+        "defense": 53,
+        "level": 88,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 202,
+          "breakDmg": 86,
+          "isApplyAllMag": true
+        },
+        "critical": false,
+        "broken": true,
+        "exPhase": false,
+        "elementFactor": 1,
+        "outgoingFactor": 1.1,
+        "hitRatio": 0.5,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 17998.001953125,
+        "amount": 17998
+      }
+    },
+    {
+      "id": "hp-8",
+      "kind": "damage",
+      "source": "hp-multiplier-blocks",
+      "input": {
+        "attack": 958,
+        "defense": 773,
+        "level": 61,
+        "skill": {
+          "calcType": "Physic",
+          "mag": 286,
+          "breakDmg": 423,
+          "isApplyAllMag": false
+        },
+        "critical": true,
+        "broken": true,
+        "exPhase": true,
+        "elementFactor": 1,
+        "outgoingFactor": 1,
+        "hitRatio": 1,
+        "damageCap": 99999
+      },
+      "expected": {
+        "raw": 35912.0,
+        "amount": 35912
+      }
+    },
+    {
+      "id": "break-1",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 1,
+        "targetLevel": 15,
+        "skill": {
+          "breakDmg": 935
+        }
+      },
+      "expected": {
+        "raw": 479.5000915527344,
+        "amount": 480,
+        "levelFactor": 0.5128343105316162
+      }
+    },
+    {
+      "id": "break-2",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 99,
+        "targetLevel": 98,
+        "skill": {
+          "breakDmg": 100
+        }
+      },
+      "expected": {
+        "raw": 110.00001525878906,
+        "amount": 110,
+        "levelFactor": 1.1000001430511475
+      }
+    },
+    {
+      "id": "break-3",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 98,
+        "targetLevel": 99,
+        "skill": {
+          "breakDmg": 100
+        }
+      },
+      "expected": {
+        "raw": 90.00000762939453,
+        "amount": 90,
+        "levelFactor": 0.9000000953674316
+      }
+    },
+    {
+      "id": "break-4",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 1,
+        "targetLevel": 99,
+        "skill": {
+          "breakDmg": 100
+        }
+      },
+      "expected": {
+        "raw": 10.0,
+        "amount": 10,
+        "levelFactor": 0.10000000149011612
+      }
+    },
+    {
+      "id": "break-5",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 50,
+        "targetLevel": 50,
+        "skill": {
+          "breakDmg": 100,
+          "isApplyAllMag": true
+        },
+        "critical": true,
+        "elementFactor": 3
+      },
+      "expected": {
+        "raw": 180.00006103515625,
+        "amount": 180,
+        "levelFactor": 1.0
+      }
+    },
+    {
+      "id": "break-6",
+      "kind": "break",
+      "source": "break-arithmetic-and-level",
+      "input": {
+        "level": 1,
+        "targetLevel": 4,
+        "skill": {
+          "breakDmg": 5672
+        }
+      },
+      "expected": {
+        "raw": 4575.5,
+        "amount": 4576,
+        "levelFactor": 0.8066819310188293
+      }
+    }
+  ]
+}

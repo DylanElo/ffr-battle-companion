@@ -4,6 +4,9 @@
   'use strict';
   const f = Math.fround;
   const EPS = f(2 ** -23);
+  const nativePercent = percent => f(f(f(percent)*f(.01))+EPS);
+  // Image 0x148959F34 is one float below .1; the lower bound remains float(.1).
+  const BREAK_LEVEL_SCALE = 0.09999999403953552;
   const DEFAULT_RULES = Object.freeze({atkDefRandomMag:0.05,criticalDamageMagnification:150,
     breakDamageMagnification:150,exPhaseDamageMagnification:100,allDamageMagnification:40,
     maxEscapeDamageMul:3});
@@ -34,6 +37,12 @@
     while(lo<hi){const mid=(lo+hi)>>>1;if(f(f(mid)*step+1)<=f(rate))lo=mid+1;else hi=mid;}
     return lo/32768;
   }
+  function skillMpCost(cost,percentFactors=[]) {
+    finite('MP cost',cost,0);
+    let factor=1;
+    for(const percent of percentFactors){finite('MP cost percentage',percent,0);factor=f(factor*nativePercent(percent));}
+    return cost===0?0:Math.trunc(Math.max(1,f(f(cost)*factor)));
+  }
   function damage(input) {
     const skill=input.skill || {};
     const calcType=clean(skill.calcType ?? skill.damageCalcType);
@@ -56,10 +65,10 @@
       special=f(Math.min(f(1+f(input.successfulEscapes/128)),rules.maxEscapeDamageMul));
     }
     const multipliers={element:elementFactor,outgoing:input.outgoingFactor??1,
-      critical:input.critical?f(f(rules.criticalDamageMagnification/100)+f(input.criticalBonus??0)):1,
-      broken:input.broken?f(rules.breakDamageMagnification/100):1,
-      exPhase:input.exPhase?f(rules.exPhaseDamageMagnification/100):1,
-      allDamage:skill.isApplyAllMag && !input.ignoreAllDamagePenalty?f(rules.allDamageMagnification/100):1,
+      critical:input.critical?f(nativePercent(rules.criticalDamageMagnification)+f(input.criticalBonus??0)):1,
+      broken:input.broken?nativePercent(rules.breakDamageMagnification):1,
+      exPhase:input.exPhase?nativePercent(rules.exPhaseDamageMagnification):1,
+      allDamage:skill.isApplyAllMag && !input.ignoreAllDamagePenalty?nativePercent(rules.allDamageMagnification):1,
       hitRatio:input.hitRatio??1,special};
     function calculate(variance){
       const base=baseDamage({...input,variance});
@@ -92,10 +101,10 @@
     finite('flat bonus',input.flatBonus??0);finite('critical bonus',input.criticalBonus??0);
     const difference=Math.abs(level-targetLevel),power=f(Math.pow(f(difference),f(0.6)));
     let levelFactor=1;
-    if(level>targetLevel)levelFactor=f(f(f(power)*f(0.1))+f(1+EPS));
-    else if(level<targetLevel)levelFactor=Math.max(f(0.1),f(f(1-f(power*f(0.1)))+EPS));
-    const allDamage=skill.isApplyAllMag && !input.ignoreAllDamagePenalty?f(rules.allDamageMagnification/100):1;
-    const critical=input.critical?f(f(rules.criticalDamageMagnification/100)+f(input.criticalBonus??0)):1;
+    if(level>targetLevel)levelFactor=f(f(power*BREAK_LEVEL_SCALE)+f(1+EPS));
+    else if(level<targetLevel)levelFactor=Math.max(f(0.1),f(f(1-f(power*BREAK_LEVEL_SCALE))+EPS));
+    const allDamage=skill.isApplyAllMag && !input.ignoreAllDamagePenalty?nativePercent(rules.allDamageMagnification):1;
+    const critical=input.critical?f(nativePercent(rules.criticalDamageMagnification)+f(input.criticalBonus??0)):1;
     let raw=f(f(f(value)*f(input.percentFactor??1))+f(input.flatBonus??0));
     raw=f(raw*f(allDamage));raw=f(raw*f(f(critical)*f(input.elementFactor??1)));
     raw=f(raw*f(input.outgoingFactor??1));raw=f(raw*f(input.targetFactor??1));
@@ -104,6 +113,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,damage,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,damage,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

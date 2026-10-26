@@ -3,6 +3,19 @@ const assert=require('node:assert/strict');
 const D=require('../docs/damage.js');
 const fixture={attack:100,defense:100,level:30,skill:{calcType:'Physic',mag:100},minimumDamage:1};
 
+test('native multiplier epsilon preserves the independently executed HP counterexample',()=>{
+  const result=D.damage({attack:998,defense:86,level:40,skill:{calcType:'Physic',mag:268,isApplyAllMag:true},
+    critical:true,broken:true,elementFactor:.5,outgoingFactor:1.2,hitRatio:.5,damageCap:99999});
+  assert.equal(result.raw,9117.0029296875);
+  assert.equal(result.amount,9117);
+});
+
+test('break level scaling uses the exact native image constant',()=>{
+  const result=D.breakDamage({skill:{breakDmg:935},level:1,targetLevel:15});
+  assert.equal(result.levelFactor,.5128343105316162);
+  assert.equal(result.amount,480);
+});
+
 test('SameLevel uses the native doubled coefficient only when levels match',()=>{
   const input={...fixture,skill:{calcType:'SameLevel',mag:100}};
   assert.equal(D.damage({...input,targetLevel:30}).amount,3840);

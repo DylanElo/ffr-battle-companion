@@ -38,7 +38,8 @@ test('ability explanations include Mastery, real AP totals and insufficient-MP r
 test('unavailable baseline and estimate notice avoid falsely asserting measured upgrades',()=>{
   assert.match(comparison(null,{damage:100}),/could not be fully evaluated/);
   assert.doesNotMatch(comparison(null,{damage:100}),/no usable attack/);
-  assert.match(estimateNotice(),/not been checked against recorded battles/);
+  assert.match(estimateNotice(),/arithmetic checked against the installed executable/);
+  assert.match(estimateNotice(),/battle timing still uses the assumptions/);
 });
 
 test('native description placeholders show their effect values instead of template keys',()=>{
