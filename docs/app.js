@@ -1,7 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=30';
-import {comparison} from './optimizer-ui.js?v=30';
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=3';
+import {createOptimizerController} from './optimizer-controller.js?v=32';
+import {comparison} from './optimizer-ui.js?v=32';
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=4';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=30', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=32', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -388,9 +388,8 @@ function deepResult() {
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> estimated damage per round</span>
       <span class="dim small">${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
-    <p class="dim small">Current setup uses recorded equipped abilities. Unrecorded Mastery is excluded; this can understate your current build.</p>
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
-    <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
+    <p class="small">Use <b>${h(ev.recipeLabel || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${gearExplanation(r, index)}
     ${buildExplanation(r, index)}
@@ -594,7 +593,11 @@ export async function savedWithPlans(bytes, snap, plans) {
   let data = save.data;
   const fields = S.parse(data), at = new Map(fields.map(f => [f.path, f]));
   const set = (path, value) => { const f = at.get(path); if (!f) throw new Error(`The save has no ${path}.`); data = S.writeField(data, f, value); };
-  const have = new Map(inventory.map(i => [i.id, i.quantity])), used = new Map(), taken = new Map(), removed = [], manual = [];
+  const have = new Map(inventory.map(i => [i.id, i.quantity])), used = new Map(), taken = new Map(), removed = [];
+  // Some gear (Fina's Loxley Bow) exists only as equipped, with no inventory entry; it is still owned.
+  const loose = new Map();
+  for (const c of snap.characters) for (const item of C.equipmentIds(c.equipment).map(Number)) if (item > 0 && !inventory.some(i => i.id === item)) loose.set(item, (loose.get(item) || 0) + 1);
+  for (const [item, n] of loose) have.set(item, n);
   const use = (item, who) => {
     const n = (used.get(item) || 0) + 1;
     if (n > (have.get(item) || 0)) throw new Error(`Your plans use ${name('equipment', item)} ${n} times, but you own ${have.get(item) || 0}.`);
@@ -626,13 +629,11 @@ export async function savedWithPlans(bytes, snap, plans) {
     set(p + 'EquipWeaponId', plan.weaponId); set(p + 'EquipArmorId', plan.armorId); set(p + 'equipVisionId', plan.visionId);
     if (plan.accessoryIds.length !== saved.equipment.accessoryIds.length) throw new Error(`${name('characters', id)}'s plan has the wrong number of accessories.`);
     plan.accessoryIds.forEach((a, i) => set(`${p}EquipAccessoryIdList[${i}]`, a));
-    const master = id => catalog.masterSkills.find(m => m.id === Number(id));
-    const wanted = (plan.equippedSkillIds || []).filter(id => !master(id));
-    for (const id of plan.equippedSkillIds || []) if (master(id)) manual.push(`${name('characters', saved.id)}: ${master(id).name}`);
+    const wanted = (plan.equippedSkillIds || []).map(Number);
     if (!plan.equippedSkillIds?.length && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
     // The plan's abilities first, then the ones already on, while they're learned and fit the slots and EquipCost budget.
-    const cost = id => Number((index.skills.get(id) || index.passives.get(id))?.equipCost || 0);
-    const learn = CompanionStats.learned(catalog, snap, saved.id, plan.visionId), known = new Set([...learn.learnedPassiveIds, ...learn.learnedActiveIds]);
+    const cost = id => Number((index.skills.get(id) || index.passives.get(id) || index.masterSkills.get(id))?.equipCost || 0);
+    const learn = CompanionStats.learned(catalog, snap, saved.id, plan.visionId), known = new Set([...learn.learnedPassiveIds, ...learn.learnedActiveIds, ...learn.masterSkillIds]);
     const budget = Number(CompanionStats.characterStats(catalog, snap, saved.id, plan).skillBudget), slots = saved.equippedSkillIds.length;
     const skills = [];
     let spent = 0;
@@ -641,16 +642,16 @@ export async function savedWithPlans(bytes, snap, plans) {
       if (!wanted.includes(id) && !known.has(id)) continue;
       skills.push(id); spent += cost(id);
     }
-    if (wanted.some(id => !skills.includes(Number(id)))) throw new Error(`${name('characters', id)}'s planned abilities don't fit its slots.`);
+    if (wanted.some(id => !skills.includes(id))) throw new Error(`${name('characters', id)}'s planned abilities don't fit its slots.`);
     for (let i = 0; i < slots; i++) set(`${p}equipSkillList[${i}]`, skills[i] ?? -1);
   }
-  return { bytes: await S.encodeSave(save, data), removed, manual };
+  return { bytes: await S.encodeSave(save, data), removed };
 }
 
 async function applyPlans() {
   try {
     const original = new Uint8Array(await saveFile.arrayBuffer());
-    const { bytes: out, removed, manual } = await savedWithPlans(original, snapshot, plans);
+    const { bytes: out, removed } = await savedWithPlans(original, snapshot, plans);
     const base = saveFile.name.replace(/\.sav$/i, '');
     download(original, `${base} (backup).sav`);
     download(out, saveFile.name);
@@ -660,7 +661,6 @@ async function applyPlans() {
       <li>Replace <b>${h(saveFile.name)}</b> with the downloaded one.</li><li>Start the game and load that save.</li></ol>
       ${(swapIn => swapIn.length ? `<p>Then put <b>${swapIn.map(id => h(name('characters', id))).join(', ')}</b> in your party in the game.</p>` : '')(Object.keys(plans).map(Number).filter(id => !snapshot.party.includes(id)))}
       ${removed.length ? `<p>Taken off characters without a plan, because a plan uses them:</p><ul>${removed.map(r => `<li>${h(r)}</li>`).join('')}</ul>` : ''}
-      ${manual.length ? `<p>Equip these Mastery skills in the game yourself (this tool can’t set them):</p><ul>${manual.map(r => `<li>${h(r)}</li>`).join('')}</ul>` : ''}
       <p class="dim">Something wrong? Put the backup back under the name ${h(saveFile.name)}.</p>`;
     $('#about').showModal();
   } catch (e) { error(e.message); }
