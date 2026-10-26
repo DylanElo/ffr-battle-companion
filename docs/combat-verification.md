@@ -40,9 +40,11 @@ Recuperate LB was also checked: its percentage operation explicitly uses a basis
 
 ## What remains an estimate
 
+The subsequent [action, stagger and LB audit](timing-verification.md) confirms recovery, reward recipients, capacity, charge stacking, refund order and command recipes, and records the corrections made after this arithmetic pass.
+
 These checks establish agreement for the sampled arithmetic kernels and identified native effect rules. They do not establish that every encounter supplies the same base stats, that every passive event fires, or that a five-round action sequence matches gameplay.
 
-Still unverified: Arms Akimbo/Dualcast repetition restrictions and sequencing, Magic Boost's duration over multiple actions, stagger recovery duration, some LB award recipients and timing, identical-effect stacking, runtime Spirit expansion, unknown artifacts and encounter overrides. Unsupported effects remain visible; the five-round result retains its timing assumptions and is not a proven global optimum.
+Still unverified: final action-queue preservation, nested Magic Boost effect expiry, dynamic initiative, identical-effect stacking, runtime Spirit expansion, unknown artifacts and encounter overrides. Combined boosted multiple-action estimates are excluded. Opening LB and its independence from charge multipliers are now traced in the timing audit. Unsupported effects remain visible; the five-round planning result is not a proven global optimum.
 
 Next Step: trace the remaining event and action handlers when those mechanics affect a recommendation. Recorded battles can provide a separate end-to-end check; they are not a prerequisite for recovering formulas.
 

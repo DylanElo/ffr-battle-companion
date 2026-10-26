@@ -1,5 +1,5 @@
 // The party builder shared by Next fight and Fight.
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=2';
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=3';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));

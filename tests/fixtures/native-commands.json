@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "provenance": [
+    {
+      "asset": "/Game/UI/Battle/Command/Data/DT_BtlCmdUniqueActionBehavior",
+      "sha256": {
+        "uasset": "5d4d677646e955354e30ab27e1184317ed8be40a31d246afbf7548c4d113bce3",
+        "uexp": "1ab8fceed316a8b8cbd418565645c19e3c8cba92957ff3d6bd28c97b48a73046"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/Data/Behavior/DT_BtlCmdBehavior_List",
+      "sha256": {
+        "uasset": "bb36594393f0ffc429bf53d7a1c9c5bfe6e985586a97d8d87c9c0f2791c4f49f",
+        "uexp": "225e53fee37588fabc646e02cb0250d641f3926cebfcb330f47c70e8c75792d5"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/Data/Behavior/DT_BtlCmdBehavior_Node",
+      "sha256": {
+        "uasset": "cd8fac1fc80c32a53b5d6aff3aff7119c4ea81284ea920577b7a3d3c3ed8e946",
+        "uexp": "e73fbecb69b3de8dd77a9d68f4f7f61cd3931ba1de715e30e09c26d89cca970d"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/Node/BP_BtlCmdNode_SelfCast",
+      "sha256": {
+        "uasset": "b42e97db25d674c1540e637cd4a62e5fd9204bce5d25e5c44e2a06c66d7ec134",
+        "uexp": "1b6c8d3f16b26e04d682f7b844e4ab4b6649d0978c486f0a70e8a77d3ef111a0"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/List/Object/BP_BtlCmdList_Magic",
+      "sha256": {
+        "uasset": "97e83c35d581e930eabb251c03bf2aa573f0ab094f04256a3da9b24e1d26dc57",
+        "uexp": "e7397a64d0244adfc171d005652511196d1a97d91f487501e388d67b4d3c41a8"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/List/Object/BP_BtlCmdList_MagicalAttack",
+      "sha256": {
+        "uasset": "3c31346bee030f6edd49b2b10fee16afaf8efbb71137cbd3759a198096692b45",
+        "uexp": "8c12e96b2445d0b37ecc20e5881b5dd56bc539bf5d435fe89d684dffee5d985b"
+      }
+    }
+  ],
+  "wrappers": [
+    {
+      "id": 400650,
+      "operation": "Execute",
+      "execution": "Sequential",
+      "steps": [
+        "Node.SelfCast",
+        "List.Root",
+        "List.Root"
+      ]
+    },
+    {
+      "id": 400710,
+      "operation": "Execute",
+      "execution": "Sequential",
+      "steps": [
+        "Node.SelfCast",
+        "List.NonMagic",
+        "List.NonMagic"
+      ]
+    },
+    {
+      "id": 400730,
+      "operation": "Execute",
+      "execution": "Sequential",
+      "steps": [
+        "Node.SelfCast",
+        "List.Magic",
+        "List.Magic"
+      ]
+    },
+    {
+      "id": 400660,
+      "operation": "Execute",
+      "execution": "Sequential",
+      "steps": [
+        "Node.SelfCast",
+        "List.MagicalAttack"
+      ]
+    }
+  ],
+  "filters": {
+    "List.Magic": {
+      "attribute": "Magic",
+      "enumValue": 4,
+      "source": "BP_BtlCmdList_Magic:AddMagicSkillToList",
+      "candidateSource": "GetActiveSkillListWithVision",
+      "checksPriorSelections": false
+    },
+    "List.MagicalAttack": {
+      "damageType": "Magic",
+      "enumValue": 2,
+      "requiresDamageSkill": true,
+      "source": "BP_BtlCmdList_MagicalAttack:Initialize",
+      "candidateSource": "GetActiveSkillListWithVision",
+      "checksPriorSelections": false
+    },
+    "Node.SelfCast": {
+      "actionKey": "BaseStackData.ActionKey",
+      "target": "BtlCmdVM.GetTargetUnitUniqueId",
+      "source": "BP_BtlCmdNode_SelfCast:Initialize"
+    }
+  },
+  "limits": [
+    "Independent child lists retain the same compatible candidates; final scheduler duplicate behavior is still not certified.",
+    "The original wrapper SelfCast occurs once in each behavior recipe; total MP is40 plus separately paid child actions, provided native scheduler does not inject further behavior.",
+    "MagicBoost recipe accepts magical damage skills, which excludes Dualcast/Arms wrappers because they do not deal damage. Arms Root children can select nestedMagicBoost recipes where command-eligibility allows.",
+    "Effect lifetime events for nested wrappers remain unresolved; do not assume one MagicBoost affects both sibling casts."
+  ]
+}

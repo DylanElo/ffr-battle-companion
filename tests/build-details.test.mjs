@@ -39,7 +39,8 @@ test('unavailable baseline and estimate notice avoid falsely asserting measured 
   assert.match(comparison(null,{damage:100}),/could not be fully evaluated/);
   assert.doesNotMatch(comparison(null,{damage:100}),/no usable attack/);
   assert.match(estimateNotice(),/arithmetic checked against the installed executable/);
-  assert.match(estimateNotice(),/battle timing still uses the assumptions/);
+  assert.match(estimateNotice(),/native stagger\/LB event order is applied/);
+  assert.match(estimateNotice(),/native opening LB effects/);
 });
 
 test('native description placeholders show their effect values instead of template keys',()=>{
@@ -47,4 +48,12 @@ test('native description placeholders show their effect values instead of templa
     effects:new Map([[10,{id:10,params:[10]}]])};
   const html=buildExplanation({characterId:1,evaluation:{equippedSkillIds:[4],skillCost:20,skillBudget:100,maxSkillSlots:8}},local);
   assert.match(html,/Fills 10% gauge/);assert.doesNotMatch(html,/Effect1Param1/);
+});
+
+test('modeled opening LB effects are explained separately without a contradictory unsupported warning',()=>{
+  const html=buildExplanation({characterId:1,evaluation:{equippedSkillIds:[],limit:{max:100,initial:50,mult:3,baseStaggerGain:50,fillOnStagger:0,recuperate:0,effectIds:[1014]},
+    passiveAnalysis:{unsupported:[{effectId:1014,passiveName:'LB Charge Opener',reason:'InitialLimitBurstPoint is not modeled.'}]}}},indexes);
+  assert.match(html,/Opening gauge 50; capacity 100/);
+  assert.match(html,/does not multiply opening gauge/);
+  assert.doesNotMatch(html,/InitialLimitBurstPoint is not modeled/);
 });

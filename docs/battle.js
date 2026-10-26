@@ -14,10 +14,12 @@
   const ARMS_AKIMBO=400650,DUALCAST=400730,MAGIC_BOOST=400660,MAGIC_BOOST_EFFECT=12911;
   // Limit Bursts: the 100-gauge one comes with the character; bigger ones once learned (saved activeSkillIdList).
   // Native skill rows name their owner; Archwitch Fina's rows say Darkfina.
-  const LB_OWNER_ALIASES={Darkfina:1006},LB_PARAMETER=4,STAGGER_PARTY_SCALE=4;
-  const LB_CHARGE_IDS=[1000,1031],LB_EXTRA_IDS=[1280,1338];
+  const LB_OWNER_ALIASES={Darkfina:1006},LB_PARAMETER=4;
+  const LB_CHARGE_IDS=[1000,1031],LB_EXTRA_IDS=[1004,1280,1338];
   const isHealing=skill=>skill && skill.relation==='Friendlies' && clean(skill.parameterVariationType)==='Increase' && clean(skill.parameterType)==='HitPoint' && number(skill.mag)>0;
   const defenseSum=(stats,modifiers)=>modifiers?.dominantDefence?2*Math.max(number(stats.PhysicalDefense),number(stats.MagicalDefense)):number(stats.PhysicalDefense)+number(stats.MagicalDefense);
+  const combatHits=(normal,broken,count=1)=>Array.from({length:count},(_,actionIndex)=>
+    (normal.hits || [{damage:normal.damage,breakDamage:normal.breakDamage}]).map((hit,i)=>({...hit,actionIndex,brokenDamage:broken.hits?.[i]?.damage ?? broken.damage}))).flat();
   function knapsack(entries,budget,slots){
     const states=new Map([['0:0',{cost:0,slots:0,score:0,ids:[]}]]);
     for(const item of entries){
@@ -54,7 +56,7 @@
     const scenario={enemyId:enemy.id,enemyName:enemy.name,difficulty:difficultyName,difficultyGiven,difficultyTaken,
       broken:!!options.broken,critical:!!options.critical,mpPercent:Math.max(0,Math.min(100,number(options.mpPercent,100))),
       enemyCount:Math.max(1,number(options.enemyCount,1)),rounds:Math.max(1,Math.round(number(options.rounds,5))),
-      horizon:'Round-based estimate from full HP and the selected MP percentage. Chosen actions spend MP; no MP recovery or replacement action is assumed after exhaustion. Arms Akimbo/Dualcast repeats the same attack twice.'};
+      horizon:'Global-turn planning estimate from full HP, native opening LB effects and the selected MP percentage. Only the listed members contribute stagger. Chosen actions spend MP; no MP recovery, enemy attacks or replacement action is assumed after exhaustion. Arms Akimbo/Dualcast selects the same attack twice.'};
     const evidence={formula:'Native executable damage helpers; see docs/damage-research.md.',stats:'Native XP/growth/seed/sync/equipment derivation; cross-save HP checks.',
       passives:'Native effect IDs, timing, conditions and additive damage bucket.',
       search:'Bounded joint search; passive packages use a knapsack surrogate and are then evaluated with native math.',
@@ -67,6 +69,7 @@
     if(activeNativeArtifacts.length)globalWarnings.push(`Active artifacts ${activeNativeArtifacts.map(a=>a.name || a.id).join(', ')} are listed but their modifiers are not modeled.`);
     globalWarnings.push('Damage arithmetic was checked against the installed executable. Actual encounter stats and battle timing can differ from the five-round model; see combat-verification.md.');
     globalWarnings.push('Numeric rankings exclude attacks below 100 native accuracy. Enemy evasion and reactive counters are not simulated.');
+    globalWarnings.push('LB starts at zero plus modeled opening effects. Magic Boost combined with multiple-action recipes is excluded because nested effect expiry is not verified. Enemy attacks and LB gained from damage taken are not simulated.');
     // Fixed loadouts preserve every recorded equipped ability; unrecorded Mastery choices are not inferred.
     function prep(characterId,visionId,current=false,fixedSkillIds){
       const fixed=current || Array.isArray(fixedSkillIds);
@@ -93,9 +96,11 @@
         ...legalSkills.filter(s=>s.relation==='Friendlies' && (s.effects || []).some(id=>clean(indexes.effects.get(id)?.type)==='Cover')).map(s=>s.id)]).map(id=>indexes.skills.get(id));
       const legal=new Set(legalSkills.map(s=>s.id));
       const learnedSpecials=new Set(saved?.activeSkillIds || []);
-      const limits=(catalog.skills || []).filter(s=>clean(s.attr)==='LimitBurst' && (LB_OWNER_ALIASES[s.hasUnit] ?? catalog.characters.find(c=>c.name===s.hasUnit)?.id)===characterId &&
-        (number(s.cost)<=100 || learnedSpecials.has(s.id)) && s.relation==='Enemies' && ['Physic','Magic'].includes(clean(s.calcType)) && number(s.mag)>0);
-      const result={saved,native,learn,free,skills,active,legal,limits,borrowed,learned,support,healSkills,protectSkills,excludedActions,current,fixed,equippedIds:[...equipped]};
+      const knownLimits=(catalog.skills || []).filter(s=>clean(s.attr)==='LimitBurst' && (LB_OWNER_ALIASES[s.hasUnit] ?? catalog.characters.find(c=>c.name===s.hasUnit)?.id)===characterId &&
+        (number(s.cost)<=100 || learnedSpecials.has(s.id)));
+      const limits=knownLimits.filter(s=>s.relation==='Enemies' && ['Physic','Magic'].includes(clean(s.calcType)) && number(s.mag)>0);
+      const limitMax=Math.max(0,...knownLimits.map(s=>number(s.cost)));
+      const result={saved,native,learn,free,skills,active,legal,limits,limitMax,borrowed,learned,support,healSkills,protectSkills,excludedActions,current,fixed,stateContext,equippedIds:[...equipped]};
       prepCache.set(key,result);return result;
     }
     function analysis(ids,skill,extra={}){
@@ -141,6 +146,7 @@
       const ratios=(skill.ratios || []).slice(0,Math.max(1,number(skill.hits,1))).map(Number).filter(v=>v>0);
       const useRatios=ratios.length?ratios:[1];
       let expected=0,min=0,max=0,breakDamage=0;
+      const hits=[];
       const critRate=number(skill.criticalHitRate)+number(passiveAnalysis.modifiers.critRatePercent);
       const criticalChance=scenario.critical?1:D.criticalProbability(critRate);
       for(const hitRatio of useRatios){
@@ -152,20 +158,30 @@
         const normal=D.damage({...common,hitRatio,critical:false}),critical=D.damage(criticalInput);
         if(!normal.supported)return {...normal,damage:0,damageMin:0,damageMax:0};
         if(normal.healsTarget)return {supported:true,damage:0,damageMin:0,damageMax:0,absorbed:true,element,resistance,common};
-        expected+=normal.amount*(1-criticalChance)+critical.amount*criticalChance;
+        const hitDamage=normal.amount*(1-criticalChance)+critical.amount*criticalChance;
+        expected+=hitDamage;
         min+=criticalChance===1?critical.min:normal.min;
         max+=criticalChance>0?critical.max:normal.max;
+        let hitBreak=0;
         if(typeof D.breakDamage==='function'){
           const breakFactor=number(catalog.battleRules.breakElementResistanceValues?.[`eResistance::${resistance}`] ?? catalog.battleRules.breakElementResistanceValues?.[resistance],{None:1,Weakness:3,Halved:.5,Invalid:0,Absorb:0}[resistance]??1);
           const input={skill,level:common.level,targetLevel:number(enemy.level,1),elementFactor:breakFactor,outgoingFactor:passiveAnalysis.breakFactor,rules:catalog.battleRules,hitRatio};
           const normalBreak=D.breakDamage({...input,critical:false}),criticalBreak=D.breakDamage({...input,critical:true});
-          breakDamage+=normalBreak.amount*(1-criticalChance)+criticalBreak.amount*criticalChance;
+          hitBreak=normalBreak.amount*(1-criticalChance)+criticalBreak.amount*criticalChance;
+          breakDamage+=hitBreak;
         }
+        hits.push({damage:hitDamage,breakDamage:hitBreak});
       }
       return {supported:true,damage:expected,damageMin:min,damageMax:max,element,resistance,criticalChance,
-        breakDamage,breakVerified:typeof D.breakDamage==='function',common};
+        breakDamage,hits,breakVerified:typeof D.breakDamage==='function',common};
     }
     function gearPassives(equipment){return unique(C.equipmentIds(equipment).flatMap(id=>indexes.equipment.get(id)?.passiveIds || []));}
+    function rollState(passiveIds,skill,characterId,equipment,context){
+      const stateAnalysis=analysis(passiveIds,skill,context),criticalAnalysis=analysis(passiveIds,skill,{...context,critical:true});
+      const state=S.characterStats(catalog,snapshot,characterId,equipment,stateAnalysis.terms);
+      const criticalStats=S.characterStats(catalog,snapshot,characterId,equipment,criticalAnalysis.terms).stats;
+      return rollDamage({...state.stats,level:state.level},skill,stateAnalysis,{...context,level:state.level,criticalAnalysis,criticalStats});
+    }
     function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}}){
       if(prepared.fixed){
         const masterIds=prepared.equippedIds.filter(id=>indexes.masterSkills.has(id));
@@ -247,14 +263,21 @@
     // LB gauge passives: fill-rate multiplier (IncreaseParameterVariation on LimitBurstPoint; strongest one counts),
     // flat fill when this unit staggers (ParameterVariation at Break) and refund after a Limit Burst (Recuperate).
     function limitTraits(passiveIds){
-      const traits={mult:1,fillOnStagger:0,recuperate:0};
+      const traits={mult:1,initial:0,fillOnStagger:0,recuperate:0,effectIds:[]};
       for(const id of passiveIds)for(const bundle of indexes.passives.get(id)?.effectBundles || []){
         const effect=indexes.effects.get(Number(bundle.effectId));
-        if(!effect || Number(effect.params?.[1])!==LB_PARAMETER)continue;
+        if(!effect || clean(bundle.TargetType)!=='Self' || clean(bundle.targetRelation)!=='Friendlies' ||
+          clean(bundle.conditionData?.Condition || 'None')!=='None' || clean(effect.condition?.Condition || 'None')!=='None' ||
+          number(effect.prob,100)!==100 || number(effect.activationProbability,100)!==100 || traits.effectIds.includes(effect.id))continue;
         const value=number(effect.params[0]);
-        if(clean(effect.type)==='IncreaseParameterVariation')traits.mult=Math.max(traits.mult,value/100);
-        else if(clean(effect.type)==='ParameterVariation' && clean(effect.applyTiming)==='Break')traits.fillOnStagger+=value;
-        else if(clean(effect.type)==='ParameterVariation' && clean(bundle.passiveSkillAddTiming)==='ActivateLimitBurst')traits.recuperate+=value;
+        const type=clean(effect.type),timing=clean(bundle.passiveSkillAddTiming);
+        if(type==='InitialLimitBurstPoint' && timing==='SpawnUnit')traits.initial+=value;
+        else if(Number(effect.params?.[1])!==LB_PARAMETER)continue;
+        else if(type==='IncreaseParameterVariation' && timing==='SpawnUnit')traits.mult=Math.max(traits.mult,value/100);
+        else if(type==='ParameterVariation' && [0,2].includes(Number(effect.params[2])) && timing==='SpawnUnit' && clean(effect.applyTiming)==='Break')traits.fillOnStagger+=value;
+        else if(type==='ParameterVariation' && [0,2].includes(Number(effect.params[2])) && timing==='ActivateLimitBurst')traits.recuperate+=value;
+        else continue;
+        traits.effectIds.push(effect.id);
       }
       return traits;
     }
@@ -265,50 +288,56 @@
       return limitCache.get(key);
     }
     function computeLimitInfo(prepared,equipment,passiveIds){
-      const traits=limitTraits(passiveIds),max=prepared.limits.some(s=>number(s.cost)>100)?200:100;
+      const traits=limitTraits(passiveIds),max=prepared.limitMax;
       const options=prepared.limits.map(skill=>{
         const selfEffects=(skill.effectBundles || []).filter(b=>Number(b.effectId)>0 && clean(b.TargetType)==='Self').map(b=>Number(b.effectId));
-        const passiveAnalysis=analysis(passiveIds,skill,{activeEffectIds:selfEffects});
-        const final=S.characterStats(catalog,snapshot,prepared.saved.id,equipment,passiveAnalysis.terms);
-        const r=rollDamage({...final.stats,level:final.level},skill,passiveAnalysis,{level:final.level});
+        const r=rollState(passiveIds,skill,prepared.saved.id,equipment,{activeEffectIds:selfEffects});
         if(!r.supported)return null;
-        const brokenAnalysis=analysis(passiveIds,skill,{activeEffectIds:selfEffects,broken:true});
-        const brokenFinal=S.characterStats(catalog,snapshot,prepared.saved.id,equipment,brokenAnalysis.terms);
-        const b=scenario.broken?r:rollDamage({...brokenFinal.stats,level:brokenFinal.level},skill,brokenAnalysis,{level:brokenFinal.level,broken:true});
-        return {skillId:skill.id,cost:number(skill.cost),damage:r.damage,brokenDamage:b.damage,breakDamage:number(r.breakDamage)};
+        const b=scenario.broken?r:rollState(passiveIds,skill,prepared.saved.id,equipment,{activeEffectIds:selfEffects,broken:true});
+        return {skillId:skill.id,cost:number(skill.cost),damage:r.damage,brokenDamage:b.damage,breakDamage:number(r.breakDamage),hits:combatHits(r,b)};
       }).filter(Boolean);
-      return {...traits,max,options};
+      return {...traits,max,baseStaggerGain:number(scenario.enemyCount===1?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,scenario.enemyCount===1?50:25),options};
     }
-    // Rounds in Agility order. Hits after a stagger, and through the next round, use staggered damage (native
-    // breakDamageMagnification and on-stagger effects). A stagger gives everyone the native breakLBIncrease and its
-    // dealer Fill LB on Stagger, scaled by each unit's fill rate. Damage taken is not simulated.
-    function simulateFight(members,breakScale=1){
-      const rounds=scenario.rounds,gain=number(catalog.battleRules.breakLBIncrease,25);
+    // HP precedes each hit's BP change. Ordinary break recovers at the next global turn boundary.
+    // Base LB belongs to the attacker; active Break/Recuperate effects follow at action end.
+    function simulateFight(members){
+      const rounds=scenario.rounds,allStaggered=scenario.enemyCount===1;
+      const gain=number(allStaggered?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,allStaggered?50:25);
       const value=(o,staggered)=>{
         const hit=staggered?number(o.brokenDamage,o.damage):o.damage;
-        return goals.has('damage') || goals.has('stagger')?(goals.has('damage')?hit/enemyHp:0)+(goals.has('stagger')?o.breakDamage/enemyBreak:0):hit;
+        return goals.has('damage') || goals.has('stagger')?(goals.has('damage')?hit/enemyHp:0)+(goals.has('stagger') && !staggered?o.breakDamage/enemyBreak:0):hit;
       };
-      const state=members.map(m=>({m,gauge:0,gained:0,uses:[],mp:number(m.availableMp),mpExhaustedRounds:[]})),order=state.slice().sort((a,b)=>number(b.m.agility)-number(a.m.agility));
-      const fill=(s,amount)=>{const before=s.gauge;s.gauge=Math.min(s.m.limit.max,s.gauge+amount);s.gained+=s.gauge-before;};
+      const state=members.map(m=>({m,gauge:Math.max(0,Math.min(number(m.limit?.max),number(m.limit?.initial))),gained:0,uses:[],mp:number(m.availableMp),mpExhaustedRounds:[]})),order=state.slice().sort((a,b)=>number(b.m.agility)-number(a.m.agility));
+      const fill=(s,amount)=>{const before=s.gauge;s.gauge=Math.max(0,Math.min(s.m.limit.max,s.gauge+Math.trunc(Math.fround(amount))));s.gained+=s.gauge-before;};
       let damage=0,breakDamage=0,gauge=0,recoverAt=0,staggers=0,firstStagger=0;
       for(let round=1;round<=rounds;round++)for(const s of order){
         const staggered=scenario.broken || round<recoverAt,lb=s.m.limit;
-        const turn={damage:s.m.damage,brokenDamage:s.m.brokenDamage,breakDamage:s.m.breakDamage};
+        const turn={damage:s.m.damage,brokenDamage:s.m.brokenDamage,breakDamage:s.m.breakDamage,hits:s.m.hits};
         // With the Limit Burst goal ticked it fires as soon as it is ready; otherwise only when it beats the normal turn.
         const burst=(lb?.options || []).filter(o=>o.cost<=s.gauge && (goals.has('limit') || value(o,staggered)>value(turn,staggered))).sort((a,b)=>value(b,staggered)-value(a,staggered))[0];
-        if(burst){s.gauge-=burst.cost;fill(s,lb.recuperate*lb.mult);s.uses.push({round,skillId:burst.skillId});}
+        if(burst){s.gauge-=burst.cost;s.uses.push({round,skillId:burst.skillId});}
         let act=burst || turn;
         if(!burst){
-          if(number(s.m.turnMp)>s.mp){s.mpExhaustedRounds.push(round);act={damage:0,brokenDamage:0,breakDamage:0};}
+          if(number(s.m.turnMp)>s.mp){s.mpExhaustedRounds.push(round);act={damage:0,brokenDamage:0,breakDamage:0,hits:[]};}
           else s.mp-=number(s.m.turnMp);
         }
-        damage+=staggered?number(act.brokenDamage,act.damage):act.damage;breakDamage+=act.breakDamage;
-        if(staggered)continue;
-        gauge+=act.breakDamage*breakScale;
-        if(gauge<enemyBreak)continue;
-        gauge=0;recoverAt=round+2;staggers++;firstStagger||=round;
-        for(const o of state)if(o.m.limit)fill(o,gain*o.m.limit.mult);
-        if(lb)fill(s,lb.fillOnStagger*lb.mult);
+        let causedStagger=false,actionIndex=0;
+        const finishAction=()=>{if(causedStagger && lb)fill(s,lb.fillOnStagger*lb.mult);causedStagger=false;};
+        for(const hit of act.hits || [act]){
+          if(number(hit.actionIndex)!==actionIndex){finishAction();actionIndex=number(hit.actionIndex);}
+          const broken=scenario.broken || round<recoverAt;
+          // Native HP calculation precedes the new break state; later hits observe the change.
+          damage+=broken?number(hit.brokenDamage,hit.damage):hit.damage;
+          if(broken)continue;
+          breakDamage+=hit.breakDamage;
+          gauge+=hit.breakDamage;
+          if(gauge<enemyBreak)continue;
+          gauge=0;recoverAt=round+1;staggers++;firstStagger||=round;causedStagger=true;
+          if(lb)fill(s,gain*lb.mult);
+        }
+        // Active Break effects and ActivateLimitBurst refunds run at action end, after damage/base gain.
+        finishAction();
+        if(burst)fill(s,lb.recuperate*lb.mult);
       }
       return {damage:damage/rounds,breakDamage:breakDamage/rounds,staggers,firstStagger,
         uses:Object.fromEntries(state.map(s=>[s.m.id,s.uses])),gauge:Object.fromEntries(state.map(s=>[s.m.id,s.gained/rounds])),
@@ -323,6 +352,9 @@
       if(has(DUALCAST) && clean(skill.attr)==='Magic')multis.push(DUALCAST);
       const turns=[];
       for(const boost of boosts)for(const multi of multis){
+        // Wrapper event suppression has not established that Magic Boost survives both casts.
+        if(boost && multi)continue;
+        if(multi && catalog.skillRules && !P.skillEligibility(skill,{...prepared.stateContext,selectorId:multi},catalog.skillRules).eligible)continue;
         const reservedIds=[...(boost?[MAGIC_BOOST]:[]),...(multi?[multi]:[])].filter(id=>!prepared.free.has(id));
         const actions=multi?2:1,perAction=D.skillMpCost(number(skill.cost),boost?[150]:[]);
         turns.push({reservedIds,reservedCost:equipCostOf(reservedIds),actions,multi,boost,
@@ -352,11 +384,9 @@
         if(!single.supported)return;
         let staggeredSingle=single;
         if(!scenario.broken){
-          const brokenAnalysis=analysis(allPassives,skill,{...turn.context,broken:true});
-          const brokenFinal=S.characterStats(catalog,snapshot,characterId,equipment,brokenAnalysis.terms);
-          staggeredSingle=rollDamage({...brokenFinal.stats,level:brokenFinal.level},skill,brokenAnalysis,{level:brokenFinal.level,broken:true});
+          staggeredSingle=rollState(allPassives,skill,characterId,equipment,{...turn.context,broken:true});
         }
-        const damage={...single,damage:single.damage*turn.actions,damageMin:single.damageMin*turn.actions,damageMax:single.damageMax*turn.actions,
+        const damage={...single,damage:single.damage*turn.actions,damageMin:single.damageMin*turn.actions,damageMax:single.damageMax*turn.actions,hits:combatHits(single,staggeredSingle,turn.actions),
           brokenDamage:staggeredSingle.damage*turn.actions,breakDamage:single.breakDamage*turn.actions};
         const cost=packageInfo.cost+turn.reservedCost,selected=[...packageInfo.equippedIds,...turn.reservedIds],packageFree=new Set(packageInfo.freeActiveIds),activeSelected=packageFree.has(skill.id)?[]:[skill.id];
         const supports=[];
@@ -378,16 +408,16 @@
         const legalSkills=new Set([...packageFree,...activeSelected,...selected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
         const survivability=number(stats.MaxHitPoint)*.02+defenseSum(stats,passiveAnalysis.modifiers);
-        const limit=prepared.limits.length?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
-        const fight=simulateFight([{id:characterId,agility:stats.Agility,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,limit,availableMp,turnMp:turn.mp}],STAGGER_PARTY_SCALE);
+        const limit=prepared.limitMax>0?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
+        const fight=simulateFight([{id:characterId,agility:stats.Agility,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,availableMp,turnMp:turn.mp}]);
         const score=goalScore({damage:fight.damage,breakDamage:damage.breakVerified?fight.breakDamage:0,gauge:fight.gauge[characterId],durability:survivability*.5});
         const warnings=[...(calculated.warnings || []),...(prepared.learn.warnings || [])];
         if(packageInfo.masterIds.length)warnings.push('Spirit bundles use native mastery grants and their descriptions; exact runtime expansion has not been traced.');
         if(prepared.excludedActions.length)warnings.push(`Actions excluded by native state/resource rules: ${prepared.excludedActions.join(' | ')}`);
         if(!catalog.skillRules)warnings.push('Action-state rules were not loaded; this is an arithmetic-only check.');
         if(!damage.breakVerified && goals.has('stagger'))warnings.push('Stagger damage formula is not implemented; this objective is unavailable.');
-        if(turn.multi)warnings.push(`${indexes.skills.get(turn.multi).name}: both actions use ${skill.name}; native limits on repeating it are not verified.`);
-        if(turn.boost)warnings.push('Magic Boost MP cost uses native truncation. With Dualcast it is assumed to boost both spells; that duration is not verified.');
+        if(turn.multi)warnings.push(`${indexes.skills.get(turn.multi).name}: two native child selections use ${skill.name}. Hierarchy restrictions are enforced; the final execution queue has not been fully replayed.`);
+        if(turn.boost)warnings.push('Magic Boost MP cost uses native truncation. Combined Magic Boost/multiple-action turns are excluded until their event sequence is verified.');
         if(fight.mpExhaustedRounds[characterId].length)warnings.push(`Not enough MP for the chosen action in rounds ${fight.mpExhaustedRounds[characterId].join(', ')}; those turns contribute no damage. MP recovery and replacement actions are not modeled.`);
         results.push({valid:true,score,...damage,turn,limit,fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
           passiveIds:packageInfo.passiveIds,equippedSkillIds:unique([...selected,...activeSelected]),alwaysPassiveIds:freeIds,stats,level:calculated.level,
@@ -399,7 +429,7 @@
       // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
       // Only the strongest learned fill-rate passive is tried (Triple over Double), on the best turn.
       const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)).slice(-1),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
-      if(!prepared.fixed && prepared.limits.length && charges.length+extras.length){
+      if(!prepared.fixed && (prepared.limits.length || (goals.has('limit') && prepared.limitMax>0)) && charges.length+extras.length){
         const sets=[];
         for(const charge of [null,...charges])for(let mask=0;mask<(1<<extras.length);mask++){
           const ids=[...(charge?[charge]:[]),...extras.filter((_,i)=>mask&(1<<i))];
@@ -420,7 +450,7 @@
       let damage=baseline,breakDamage=baselineBreak,supportDescription='',supportUsed=null,actionOverrides={};
       const simulate=overrides=>simulateFight(members.map(m=>{
         const e={...m.evaluation,...overrides[m.characterId]};
-        return {id:m.characterId,agility:e.stats.Agility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp};
+        return {id:m.characterId,agility:e.stats.Agility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp};
       }));
       let fight=simulate({});
       const fightScore=f=>goalScore({damage:f.damage,breakDamage:f.breakDamage,gauge:members.reduce((sum,m)=>sum+number(f.gauge[m.characterId]),0)/Math.max(1,members.length)});
@@ -429,6 +459,7 @@
         if(!goals.has('damage'))break;
         for(const action of caster.evaluation.supportActions || []){
           if(!['damagePercent','statPercent'].includes(action.kind))continue;
+          if(clean(action.rootTarget)==='Self' || clean(action.bundleTarget)==='Self')continue;
           if(isAttack(indexes.skills.get(action.skillId)))continue;
           const supportMp=number(action.mpCost,number(indexes.skills.get(action.skillId)?.cost));
           // Same-turn support is recast each round; partial buff uptime and MP recovery are not inferred.
@@ -442,7 +473,7 @@
           for(const targets of groups){
             let next=baseline-caster.evaluation.damage;
             let nextBreak=baselineBreak-number(caster.evaluation.breakDamage);
-            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:null,actionDescription:'Recasts a support action each round instead of attacking.'}};
+            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:null,actionDescription:'Recasts a support action each round instead of attacking.'}};
             for(const target of targets){
               const evaluation=target.evaluation,skill=indexes.skills.get(evaluation.skillId);
               if(action.tests?.some(test=>test.key==='skill.dmgType' && clean(skill.dmgType)!==clean(test.value)))continue;
@@ -451,13 +482,12 @@
               const context=action.kind==='damagePercent'?{additionalDamagePercent:action.value}:
                 {targetStatPercent:{parameter:action.parameter,value:action.value}};
               const revised=rollDamage(evaluation.stats,skill,evaluation.passiveAnalysis,{level:evaluation.level,criticalAnalysis:evaluation.criticalAnalysis,criticalStats:evaluation.criticalStats,...context});
-              const brokenAnalysis=analysis(unique([...evaluation.alwaysPassiveIds,...evaluation.passiveIds]),skill,{...evaluation.turn?.context,broken:true});
-              const brokenStats=S.characterStats(catalog,snapshot,target.characterId,target.equipment || savedById.get(target.characterId)?.equipment,brokenAnalysis.terms);
-              const revisedBroken=rollDamage({...brokenStats.stats,level:brokenStats.level},skill,brokenAnalysis,{level:brokenStats.level,...context,broken:true});
+              const revisedBroken=rollState(unique([...evaluation.alwaysPassiveIds,...evaluation.passiveIds]),skill,target.characterId,
+                target.equipment || savedById.get(target.characterId)?.equipment,{...evaluation.turn?.context,...context,broken:true});
               const n=number(evaluation.actionCount,1);
               next+=revised.damage*n-evaluation.damage;
               nextBreak+=number(revised.breakDamage)*n-number(evaluation.breakDamage);
-              overrides[target.characterId]={skillId:skill.id,damage:revised.damage*n,damageMin:revised.damageMin*n,damageMax:revised.damageMax*n,brokenDamage:revisedBroken.damage*n,breakDamage:revised.breakDamage*n,actionDescription:`Receives ${action.name} before acting.`};
+              overrides[target.characterId]={skillId:skill.id,damage:revised.damage*n,damageMin:revised.damageMin*n,damageMax:revised.damageMax*n,brokenDamage:revisedBroken.damage*n,breakDamage:revised.breakDamage*n,hits:combatHits(revised,revisedBroken,n),actionDescription:`Receives ${action.name} before acting.`};
             }
             const nextFight=simulate(overrides);
             if(fightScore(nextFight)>fightScore(fight)){fight=nextFight;damage=next;breakDamage=nextBreak;actionOverrides=overrides;supportUsed={characterId:caster.characterId,skillId:action.skillId,targetIds:targets.map(m=>m.characterId)};

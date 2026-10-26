@@ -19,6 +19,13 @@ function fixture(n=4) {
   };
 }
 const options={timeMs:0,maxEvaluations:100000,perLoadoutBudget:10000,candidatesPerVision:6,beamWidth:100,maxResults:3};
+
+test('a budget exhausted by initial evaluations still returns the saved Resonance seed',()=>{
+  const {catalog,snapshot}=fixture();
+  const result=S.buildCandidates(catalog,snapshot,1,{evaluate:()=>({valid:true,score:10})},
+    {maxEvaluations:1,timeMs:0,perLoadoutBudget:1,candidatesPerVision:1});
+  assert.ok(result.some(c=>c.visionId===snapshot.characters[0].equipment.visionId));
+});
 test('evaluates passive accessory pairs together instead of discarding individually weak effects',()=>{
   const {catalog,snapshot}=fixture(1);
   const candidates=S.buildCandidates(catalog,snapshot,1,{evaluate:({equipment})=>({score:

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "executable": {
+    "name": "FFRS-Win64-Shipping.exe",
+    "sha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA"
+  },
+  "method": "Copied native scalar fill/clamp instructions in isolated allocation; explicit input current gauge/cap/multiplier. No process injection.",
+  "provenance": {
+    "sourceAddress": "0x1452305A8-0x1452305E9",
+    "scope": "Copied scalar fill, truncation, clamp and field-update instructions. Register-restoration instructions omitted. Explicit supplied gauge, cap and already-selected multiplier. No full battle event or effect-condition simulation.",
+    "gaugeField": "unit+0x118",
+    "capField": "unit+0x2A0",
+    "rawGainCounterField": "unit+0x284",
+    "rawGainCounterMeaning": "Native code increments this separate field by the full truncated delta, including overflow and negative deltas. Its wider gameplay purpose is unverified; the builder intentionally scores retained positive gauge, not this counter.",
+    "liveBattleObserved": false
+  },
+  "cases": [
+    {
+      "input": {
+        "gauge": 0,
+        "cap": 100,
+        "amount": 25,
+        "multiplier": 1
+      },
+      "expected": {
+        "gauge": 25,
+        "rawGainedCounter": 25,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 0,
+        "cap": 100,
+        "amount": 50,
+        "multiplier": 1
+      },
+      "expected": {
+        "gauge": 50,
+        "rawGainedCounter": 50,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 0,
+        "cap": 200,
+        "amount": 50,
+        "multiplier": 2
+      },
+      "expected": {
+        "gauge": 100,
+        "rawGainedCounter": 100,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 0,
+        "cap": 200,
+        "amount": 50,
+        "multiplier": 3
+      },
+      "expected": {
+        "gauge": 150,
+        "rawGainedCounter": 150,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 95,
+        "cap": 100,
+        "amount": 10,
+        "multiplier": 3
+      },
+      "expected": {
+        "gauge": 100,
+        "rawGainedCounter": 30,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 190,
+        "cap": 200,
+        "amount": 30,
+        "multiplier": 3
+      },
+      "expected": {
+        "gauge": 200,
+        "rawGainedCounter": 90,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 0,
+        "cap": 200,
+        "amount": 25,
+        "multiplier": 1.5
+      },
+      "expected": {
+        "gauge": 37,
+        "rawGainedCounter": 37,
+        "increased": true
+      }
+    },
+    {
+      "input": {
+        "gauge": 35,
+        "cap": 100,
+        "amount": -100,
+        "multiplier": 1
+      },
+      "expected": {
+        "gauge": 0,
+        "rawGainedCounter": -100,
+        "increased": false
+      }
+    }
+  ]
+}

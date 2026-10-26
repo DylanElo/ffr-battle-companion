@@ -83,11 +83,12 @@ test('all healing/protection/support choices obey zero-LB native state gates',()
 
 test('a support turn replaces the caster attack and its stagger in the final action plan',()=>{
   const supportSave={...snapshot,characters:snapshot.characters.map(c=>c.id===1003?{...c,joinStatus:'Join',usable:true}:c)};
-  const model=B.createModel(catalog,supportSave,enemy,{objective:'damage',difficulty:'Normal'});
+  const supportCatalog={...catalog,skills:[{...catalog.skills.find(s=>s.id===403010),dmgType:'Magic',calcType:'Magic'},catalog.skills.find(s=>s.id===230110)]};
+  const model=B.createModel(supportCatalog,supportSave,enemy,{objective:'damage',difficulty:'Normal'});
   const receiverSaved=snapshot.characters.find(c=>c.id===1003);
   const receiver=model.evaluate({characterId:1003,visionId:receiverSaved.equipment.visionId,equipment:receiverSaved.equipment});
   receiver.stats={...receiver.stats,Agility:1};
-  const caster={characterId:1001,visionId:-1,equipment:own.equipment,evaluation:{...receiver,damage:0,breakDamage:7,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:50,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]}};
+  const caster={characterId:1001,visionId:-1,equipment:own.equipment,evaluation:{...receiver,damage:0,brokenDamage:0,breakDamage:7,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:50,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]}};
   const party=model.evaluateParty([caster,{characterId:1003,visionId:receiverSaved.equipment.visionId,equipment:receiverSaved.equipment,evaluation:receiver}]);
   assert.ok(party.supportUsed);
   assert.equal(party.actionOverrides[1001].skillId,230110);
@@ -112,14 +113,15 @@ test('weakness-only stagger passives see the final attack element',()=>{
   assert.equal(neutral.passiveAnalysis.breakFactor,1);
 });
 
-test('hits are capped at 9999 unless a damage-limit-break effect is equipped, which then gets picked',()=>{
+test('hits use the native cap selected by the equipped damage-limit-break effect',()=>{
   const soft={...enemy,stats:Object.fromEntries(Object.keys(enemy.stats).map(k=>[k,1])),
     resistances:Object.fromEntries(['None','Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'].map(e=>[e,'Weakness']))};
   const model=B.createModel(catalog,snapshot,soft,{objective:'damage',broken:true,critical:true});
-  const result=model.evaluate(input),skill=catalog.skills.find(s=>s.id===result.skillId);
   if(!model.prep(input.characterId,input.visionId).learn.learnedPassiveIds.includes(1047))return;
+  const result=model.evaluate({...input,equippedSkillIds:[1047]});
   assert.equal(result.passiveAnalysis.modifiers.damageCapRaised,true);
-  assert.ok(result.damageMax/result.actionCount/Math.max(1,skill.hits)>9999);
+  assert.equal(result.common.damageCap,99999);
+  assert.equal(model.evaluate({...input,equippedSkillIds:[]}).common.damageCap,9999);
 });
 
 test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within the budget',()=>{

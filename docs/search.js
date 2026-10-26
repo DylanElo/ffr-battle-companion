@@ -97,13 +97,15 @@
     const owned=new Set((snapshot.resonances || []).map(v=>v.id));
     // Try every Resonance with the saved gear first, then search the strongest first, each with an equal share of the
     // remaining time, so a time budget can't end the search before the best (or the saved) Resonance is tried.
-    const seed=visionId=>evaluateOne(state,callbacks,saved.id,visionId,{...base,visionId})?.score ?? -Infinity;
-    const pool=options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)];
-    const seeds=new Map(pool.map(id=>[id,seed(id)]));
-    const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || seeds.get(b)-seeds.get(a));
+    const pool=[...(options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
+      .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
+    const seeds=new Map(pool.map(id=>[id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id})]));
+    const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || (seeds.get(b)?.score ?? -Infinity)-(seeds.get(a)?.score ?? -Infinity));
     const all=[];
     for (const [n,visionId] of visions.entries()) {
       const local=new Map();
+      // Native timing checks can exhaust the budget during seeding; retain that completed comparison.
+      if(seeds.get(visionId))local.set(keyOf(base),seeds.get(visionId));
       let attempts=0;
       const sliceEnd=options.visionSlices && options.timeMs>0?Date.now()+(options.timeMs-(Date.now()-state.started))/(visions.length-n):Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{

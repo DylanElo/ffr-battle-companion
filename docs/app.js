@@ -1,7 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=27';
-import {comparison} from './optimizer-ui.js?v=27';
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=2';
+import {createOptimizerController} from './optimizer-controller.js?v=30';
+import {comparison} from './optimizer-ui.js?v=30';
+import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=3';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=27', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=30', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -386,12 +386,12 @@ function deepResult() {
     ${estimateNotice()}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> estimated damage per round</span>
-      <span class="dim small">${n(ev.breakDamage)} stagger per turn${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
+      <span class="dim small">${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
     <p class="dim small">Current setup uses recorded equipped abilities. Unrecorded Mastery is excluded; this can understate your current build.</p>
-    <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over a five-round fight; staggered rounds deal ×1.5.</p>
+    <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
     <p class="small">Use <b>${h(skill?.name || '—')}</b>${ev.actionCount > 1 ? ` twice with <b>${h(index.skills.get(ev.multiActionId)?.name)}</b>` : ''}${ev.magicBoost ? ', with <b>Magic Boost</b>' : ''}${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
-    ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, assuming the party staggers the enemy at your rate ×4. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
+    ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${gearExplanation(r, index)}
     ${buildExplanation(r, index)}
   </div>`;
@@ -524,7 +524,7 @@ function about() {
     <ul>
       <li><b>Optimize</b> (Characters) adds up flat equipment stats for the stats you gear for, each scaled to its own range. Effects like “+20% Fire damage” aren’t scored, so they’re listed for you to judge. It picks the Resonance whose unlocked skills add the most power in those stats.</li>
       <li>Damage and healing use the user’s own Attack (physical skills) or Magic (magic skills), whichever Resonance grants the skill. What Divine does in battle hasn’t been confirmed.</li>
-      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one turn each: one action, or the same attack twice with Arms Akimbo or Dualcast, with Magic Boost on magic attacks. Hits are capped at 9,999 unless Break the Limit (or gear with it) is on. Over a five-round fight, staggers fill the LB gauge and a Limit Burst is used when it beats a normal turn, so LB gauge abilities are picked when they pay off. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
+      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one turn each: one action, or the same attack twice with Arms Akimbo or Dualcast. Magic Boost is scored with a single magic attack; combined boosted multiple-action recipes remain excluded. Hits are capped at 9,999 unless Break the Limit (or gear with it) is on. Over a five-round fight, staggers fill the LB gauge and a Limit Burst is used when it beats a normal turn, so LB gauge abilities are picked when they pay off. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
       <li>Owned counts include equipped copies. With “Don’t take other characters’ gear” on, their current gear and any plans are reserved.</li>
       <li>A Resonance is reserved for one character at a time. Whether two characters can share one hasn’t been confirmed.</li>
       <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>

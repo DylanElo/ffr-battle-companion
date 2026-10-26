@@ -1,6 +1,6 @@
 # Battle model and evidence
 
-Arithmetic verification and exact native regression cases: [combat verification](combat-verification.md). This includes percentage rounding, stagger level scaling, MP truncation and higher-stat effects; action timing assumptions remain separate.
+Arithmetic verification and exact native regression cases: [combat verification](combat-verification.md). Recovered action, stagger and LB rules: [timing verification](timing-verification.md). Remaining queue and scenario limits are identified separately.
 
 ## Mechanic brief
 
@@ -30,9 +30,9 @@ Damage maximizes expected HP damage; break maximizes expected stagger damage. Ba
 
 "Any fight" (`generalEnemy`) is a neutral boss at the party's average level with the median stats of the seven bosses nearest that level, no elemental weaknesses or resistances, and no passives or status resistances. With the Limit Burst goal ticked, a Limit Burst fires as soon as it is affordable.
 
-Goals combine additively, each as a share of a bar per round: damage / enemy MaxHitPoint, stagger / enemy MaxBreakPoint, LB gauge gained / 100, and durability (0.5 × survivability per member) / enemy MaxHitPoint. Hits from a stagger through the following round use staggered damage (native breakDamageMagnification and on-break effects).
+Goals combine additively, each as a share of a bar per round: damage / enemy MaxHitPoint, stagger / enemy MaxBreakPoint, LB gauge gained / 100, and durability (0.5 × survivability per member) / enemy MaxHitPoint. The stagger-causing hit uses normal HP damage; later hits in that global turn use staggered damage. Recovery occurs at the next turn boundary, and already-staggered targets take no further BP damage.
 
-Limit Bursts are scored over a fight of `rounds` (default 5), members acting in Agility order. Each owns its 100-cost Limit Burst; higher ones only when listed in the saved activeSkillIdList. Power: native coefficient helper `0x14523E1D0` sums attacker effect vtable +0x5A8 into a scale starting at 1; for MulBaseSkillByLevel (`0x145149BA0`) that is `trunc(levelMultiplier × level) × 100 / p0`, p0 = 1500, so ×(1 + level/15). Gauge: a stagger (party break reaching MaxBreakPoint) gives every member breakLBIncrease (25) and its dealer Fill LB on Stagger, all × the strongest LB fill-rate passive (Double/Triple Charge); Recuperate LB refunds after use; the gauge holds 200 when a 200-cost Limit Burst is owned. Assumed, not traced: the enemy recovers one round after a stagger; who gets the base 25; LB from damage taken (damagedLBIncrease) and support Limit Bursts are not simulated. Single-character search assumes the party staggers at 4× that character's break.
+Limit Bursts are scored over a fight of `rounds` (default 5), members acting in Agility order. Each owns its 100-cost Limit Burst; higher ones only when listed in the saved activeSkillIdList. Power: native coefficient helper `0x14523E1D0` sums attacker effect vtable +0x5A8 into a scale starting at 1; for MulBaseSkillByLevel (`0x145149BA0`) that is `trunc(levelMultiplier × level) × 100 / p0`, p0 = 1500, so ×(1 + level/15). Gauge: a new stagger gives its attacker breakLBIncrease (25), or allBreakLBIncrease (50) when all living enemies are staggered, then the attacker's Fill LB on Stagger at action end, all × the strongest LB fill-rate passive (Double/Triple Charge); Recuperate LB refunds after use; the gauge holds 200 when a 200-cost Limit Burst is owned. Recovered event order and offsets are documented in timing-verification.md. LB from damage taken and support LB effects are not simulated; known support LBs still count toward gauge capacity. Single-character search uses only that character's hits and invents no allied stagger contribution.
 
 ## Evidence limits
 
@@ -46,8 +46,8 @@ Mixed Arms Akimbo/Dualcast pairs, native limits on repeating an action, state-sp
 
 Current Goal: reliable, explainable owned-build recommendations using supported native damage and passive rules.
 
-Latest Decision: independently execute native arithmetic blocks as the reference; correct percentage rounding, stagger level scaling and MP truncation, and model verified higher-stat effects. Preserve exact baselines, inventory completion and removal explanations.
+Latest Decision: apply native per-hit HP/BP order, next-turn recovery, attacker-only LB rewards, refund order, support-LB capacity and hierarchy eligibility. Remove invented allied stagger and exclude unsupported boosted multiple-action estimates.
 
-Next Step: trace the remaining Spirit, action-queue, stagger and LB event handlers. Executable verification is documented in combat-verification.md; recorded battles remain a separate end-to-end check.
+Next Step: resolve nested execution-owner expiry flags and final action-queue preservation; investigate dynamic initiative and Spirit expansion separately. Opening LB initialization is now traced. Recorded battles remain a separate end-to-end check.
 
 Known Blockers: no recorded battle measurements; encounter overrides and the specific unverified mechanics above prevent a claim of an exact global best party.

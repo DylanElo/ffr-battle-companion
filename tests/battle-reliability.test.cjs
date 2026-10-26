@@ -74,6 +74,98 @@ test('Magic Boost uses native truncation for odd MP costs', () => {
   assert.equal(result.turnMp,22);
 });
 
+test('a known support Limit Burst contributes to gauge capacity without becoming a damage option', () => {
+  const {catalog,snapshot,enemy,input} = fixture([]);
+  catalog.skills = [...catalog.skills,native.skills.find(s=>s.id===403030)];
+  snapshot.characters[0].id=1003;
+  snapshot.characters[0].activeSkillIds.push(403030);
+  input.characterId=1003;
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['limit']}).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.equal(result.limit.max,200);
+  assert.deepEqual(result.limit.options,[]);
+});
+
+test('Arms Akimbo honors the native forbidden hierarchy instead of doubling a blocked attack', () => {
+  const {catalog,snapshot,enemy,input}=fixture([400650]);
+  catalog.skills=[{...catalog.skills[0],id:400210},native.skills.find(s=>s.id===400650)];
+  catalog.skillRules=require('../docs/skill-rules.json');
+  snapshot.characters[0].activeSkillIds=[400210,400650];
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1}).evaluate({...input,current:true});
+  assert.equal(result.valid,true);
+  assert.equal(result.skillId,400210);
+  assert.equal(result.actionCount,1);
+});
+
+test('unverified combined boost and multiple-action turns are excluded rather than multiplied optimistically', () => {
+  const {catalog,snapshot,enemy,input}=fixture([400660,400730]);
+  catalog.skills=[{...catalog.skills[0],dmgType:'Magic',calcType:'Magic',attr:'Magic',cost:15,mag:100},...native.skills.filter(s=>[400660,400730].includes(s.id))];
+  catalog.effects=native.effects;
+  catalog.equipment=[{id:900010,type:'Accessory',stats:{MagicPoint:200},passiveIds:[]}];
+  input.equipment={...input.equipment,accessoryIds:[900010,-1]};
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1}).evaluate({...input,current:true});
+  assert.equal(result.valid,true);
+  assert.equal(result.magicBoost && result.actionCount>1,false);
+});
+
+test('Magic Boost cannot be recast as a buff on a different party member', () => {
+  const {catalog,snapshot,enemy,input}=fixture([]);
+  catalog.skills=[{...catalog.skills[0],dmgType:'Magic',calcType:'Magic'},native.skills.find(s=>s.id===400660)];
+  catalog.effects=native.effects;
+  const model=B.createModel(catalog,snapshot,enemy,{goals:['damage']});
+  const receiver=model.evaluate(input);
+  receiver.stats={...receiver.stats,Agility:1};
+  const support=require('../docs/passives.js').supportActions(catalog,[400660]).buffs;
+  const caster={...receiver,damage:0,brokenDamage:0,breakDamage:0,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:support};
+  const party=model.evaluateParty([{characterId:1002,evaluation:caster},{characterId:1001,evaluation:receiver}]);
+  assert.equal(party.supportUsed,null);
+});
+
+test('a hit becoming staggered retains critical-conditional passive effects', () => {
+  const {catalog,snapshot,enemy,input}=fixture([]);
+  const passive=native.passives.find(p=>p.effects.includes(12928));
+  catalog.passives=[passive];catalog.effects=native.effects;
+  catalog.skills=[{...catalog.skills[0],criticalHitRate:100,mag:1000}];
+  catalog.equipment=[{id:900011,type:'Accessory',stats:{},passiveIds:[passive.id]}];
+  input.equipment={...input.equipment,accessoryIds:[900011,-1]};
+  const normal=B.createModel(catalog,snapshot,enemy,{goals:['damage']}).evaluate(input);
+  const alreadyBroken=B.createModel(catalog,snapshot,enemy,{goals:['damage'],broken:true}).evaluate(input);
+  assert.equal(normal.hits[0].brokenDamage,alreadyBroken.hits[0].damage);
+});
+
+test('single-character results never invent four times the character own stagger contribution', () => {
+  const {catalog,snapshot,enemy,input}=fixture([]);
+  catalog.skills=[{...catalog.skills[0],breakDmg:30}];
+  enemy.stats.MaxBreakPoint=100;
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['stagger'],rounds:1}).evaluate(input);
+  assert.equal(result.firstStagger,0);
+  assert.equal(result.fightBreakDamage,30);
+});
+
+test('native LB Charge Opener supplies 50 opening gauge independently of Triple Charge', () => {
+  const {catalog,snapshot,enemy,input}=fixture([1004,1031]);
+  catalog.skills=[...catalog.skills,native.skills.find(s=>s.id===401040)];
+  catalog.passives=native.passives.filter(p=>[1004,1031].includes(p.id));
+  catalog.effects=native.effects;
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1}).evaluate({...input,current:true});
+  assert.equal(result.valid,true);
+  assert.equal(result.limit.initial,50);
+  assert.equal(result.limit.mult,3);
+  assert.equal(result.gaugePerRound,0);
+  assert.ok(result.limit.effectIds.includes(1014));
+});
+
+test('the optimizer can select LB Charge Opener when it enables an earlier damaging LB', () => {
+  const {catalog,snapshot,enemy,input}=fixture([1004]);
+  catalog.skills=[{...catalog.skills[0],mag:1,breakDmg:100},native.skills.find(s=>s.id===401040)];
+  catalog.passives=[native.passives.find(p=>p.id===1004)];catalog.effects=native.effects;
+  enemy.stats.MaxBreakPoint=100;
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:2}).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.ok(result.equippedSkillIds.includes(1004));
+  assert.equal(result.limitUses[0]?.round,2);
+});
+
 test('native higher-stat effects reach the actual attack and target defense inputs', () => {
   const {catalog,snapshot,enemy,input} = fixture([]);
   catalog.passives = [native.passives.find(p=>p.id===1491)];
@@ -96,7 +188,7 @@ test('party simulation uses the selected support action rather than the caster o
   const model = B.createModel(catalog,snapshot,enemy,{goals:['damage']});
   const receiver = model.evaluate(input);
   receiver.stats = {...receiver.stats,Agility:1};
-  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:10000,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:100,mpCost:6,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]};
+  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:10000,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:100,mpCost:6,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]};
   const party = model.evaluateParty([{characterId:1002,evaluation:caster},{characterId:1001,evaluation:receiver}]);
   assert.ok(party.supportUsed);
   assert.equal(party.firstStagger,0,'support caster never performs the original stagger attack');
@@ -122,7 +214,7 @@ test('defense breaks preserve derived enemy defense and existing passive effects
   const model = B.createModel(catalog,snapshot,enemy,{goals:['damage']});
   const receiver = model.evaluate(input);
   receiver.stats = {...receiver.stats,Agility:1};
-  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:0,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Fixture defense break',kind:'statPercent',parameter:'Defence',value:-50,mpCost:6,rootRelation:'Enemies',rootTarget:'Single',tests:[]}]};
+  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:0,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Fixture defense break',kind:'statPercent',parameter:'Defence',value:-50,mpCost:6,rootRelation:'Enemies',rootTarget:'Single',tests:[]}]};
   const party = model.evaluateParty([{characterId:1002,evaluation:caster},{characterId:1001,evaluation:receiver}]);
   // Native per-effect rounding: base DEF25 -12, plus the existing flat50 and derived80 =143.
   const expected = B.createModel(catalog,snapshot,{...enemy,stats:{...enemy.stats,Defence:13}},{goals:['damage']}).evaluate(input);
