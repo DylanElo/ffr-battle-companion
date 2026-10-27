@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=24', 'damage.js?v=5', 'stats.js?v=22', 'battle.js?v=33', 'search.js?v=25');
+importScripts('core.js', 'passives.js?v=24', 'damage.js?v=6', 'stats.js?v=22', 'battle.js?v=34', 'search.js?v=25');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -55,7 +55,7 @@ self.onmessage = async event => {
     for(const party of result.results || []){
       party.members=party.members.map(member=>{
         const state={};
-        for(const key of ['remainingHp','hpSpent','resourceSkips','stateLeafResults','resourceEvents','remainingGoodLuck','overclockCharges','overclockStates','overheat','demonForm','remainingMp','mpExhaustedRounds','extraActions','expectedExtraActions','phaseEvents']){
+        for(const key of ['remainingHp','hpSpent','resourceSkips','stateLeafResults','resourceEvents','remainingGoodLuck','overclockCharges','overclockStates','overheat','demonForm','remainingMp','mpExhaustedRounds','extraActions','expectedExtraActions','phaseEvents','finishUses','expectedFinishUses','remainingGuards']){
           const values=party.evaluation?.[key];
           if(values && Object.hasOwn(values,member.characterId))state[key]=values[member.characterId];
         }

@@ -1,7 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=38';
-import {comparison} from './optimizer-ui.js?v=38';
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions} from './build-details.js?v=8';
+import {createOptimizerController} from './optimizer-controller.js?v=39';
+import {comparison} from './optimizer-ui.js?v=39';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions, finishActions} from './build-details.js?v=9';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=38', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=39', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -395,7 +395,7 @@ function deepResult() {
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
     <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${ev.turn?.openingTurn || ev.turn?.rotationTurns ? ' for the regular action' : ''}${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
-    ${bonusActions(ev)}
+    ${bonusActions(ev)}${finishActions(ev, index)}
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${gearExplanation(r, index)}
     ${buildExplanation(r, index)}
@@ -535,6 +535,7 @@ function about() {
       <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>
       <li>Enemy entries are base data. A specific fight may change level, stats or actions. Enemy data can spoil later content.</li>
     </ul>
+    <p class="dim small">Finish: after Additional, the party can choose one equipped Resonance finisher when all modeled enemies are staggered. The build compares damage, verified recovery and next-hit protection. Cure, Regen, Protect/Shell and additional recovery bonuses are listed when they are not scored.</p>
     <h3>Impact tiers</h3>
     <p class="dim small">${h(catalog.meta.legacyTierMethod)} Calculated on 28 September 2026.</p>
     <table><tbody>${tiers.map(([t, l]) => `<tr><td><span class="tier ${t}">${t}</span></td><td>${l.map(v => h(v.name)).join(', ') || '<span class="dim">None</span>'}</td></tr>`).join('')}</tbody></table>

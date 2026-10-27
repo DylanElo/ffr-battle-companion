@@ -1,0 +1,1618 @@
+{
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "method": "Copied native SSE recovery core plus its actual imported Windows CRT expf, executed in an isolated allocation with explicit inputs. No game injection or battle measurements. Collection of coefficient/effects and state clamping are separately source traced, not included in these arithmetic vectors.",
+  "sources": [
+    "145234548-1452345BB",
+    "1452345CB-1452345F1"
+  ],
+  "fixtures": [
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 95
+    },
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 99
+    },
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 105
+    },
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 285
+    },
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 299
+    },
+    {
+      "input": {
+        "divine": 0,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 315
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 95
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 100
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 105
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 286
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 301
+    },
+    {
+      "input": {
+        "divine": 1,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 316
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 132
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 139
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 146
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 396
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 417
+    },
+    {
+      "input": {
+        "divine": 100,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 438
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 189
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 199
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 209
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 568
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 598
+    },
+    {
+      "input": {
+        "divine": 255,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 628
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 190
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 199
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 210
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 570
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 599
+    },
+    {
+      "input": {
+        "divine": 256,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 630
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 190
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 200
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 210
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 571
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 601
+    },
+    {
+      "input": {
+        "divine": 257,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 631
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 277
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 292
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 307
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 833
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 877
+    },
+    {
+      "input": {
+        "divine": 512,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 921
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 361
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 381
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 100,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 400
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 0,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 1085
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 1143
+    },
+    {
+      "input": {
+        "divine": 1024,
+        "coefficient": 300,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 32767,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1
+      },
+      "expected": 1200
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 107
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 161
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 322
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 362
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 544
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1088
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 765
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1148
+    },
+    {
+      "input": {
+        "divine": 2,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2297
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 159
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 239
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 478
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 538
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 807
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1615
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1137
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1705
+    },
+    {
+      "input": {
+        "divine": 127,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3411
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 212
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 318
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 637
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 717
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1075
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2151
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1514
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2271
+    },
+    {
+      "input": {
+        "divine": 254,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4542
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 214
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 321
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 642
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 722
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1084
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2168
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1525
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2288
+    },
+    {
+      "input": {
+        "divine": 258,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4577
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 311
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 467
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 934
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1051
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1577
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3154
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2220
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3330
+    },
+    {
+      "input": {
+        "divine": 511,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 6660
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 312
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 468
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 936
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1053
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1580
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3161
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2224
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3337
+    },
+    {
+      "input": {
+        "divine": 513,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 6674
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 404
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 606
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1213
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1365
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2047
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4095
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2881
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4322
+    },
+    {
+      "input": {
+        "divine": 999,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 8645
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 426
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 639
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1278
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1438
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2158
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4316
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3037
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4555
+    },
+    {
+      "input": {
+        "divine": 2048,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 9111
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 426
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 639
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1279
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1439
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2159
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4319
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3039
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4559
+    },
+    {
+      "input": {
+        "divine": 4096,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 9119
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 106.66667175292969,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 426
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 160.00001525878906,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 639
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 320.0000305175781,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1279
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 360.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 1439
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 540.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 2159
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 1080.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4319
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 760.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 3039
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 1140.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 4559
+    },
+    {
+      "input": {
+        "divine": 9999,
+        "coefficient": 2280.0,
+        "baseRecoveryCalcFactor": 256,
+        "random15": 16383,
+        "randomMagnitude": 0.05,
+        "extraFactor": 1,
+        "cap": 99999999
+      },
+      "expected": 9119
+    }
+  ]
+}

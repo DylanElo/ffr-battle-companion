@@ -146,6 +146,28 @@
         'Caller must supply actual computed combat stats, legal skill availability, active passives, encounter scaling and battle-state factors.',
         'One damage event: do not multiply again by hit count; use native per-hit ratios and sum rounded events when available.']};
   }
+  // Native recovery 1452342C0 uses Divine, not the attack/defense damage ratio.
+  function recovery(input) {
+    const rules={...DEFAULT_RULES,baseRecoveryCalcFactor:256,...input.rules};
+    const divine=finite('Divine',input.divine,0),coefficient=finite('recovery coefficient',input.coefficient,0);
+    const basis=finite('recovery divisor',input.baseRecoveryCalcFactor??rules.baseRecoveryCalcFactor,Number.MIN_VALUE);
+    const ratio=f(f(divine)/f(basis)),threshold=f(1-EPS);
+    const factor=ratio<threshold?f(ratio+f(1+EPS)):f(f(4)/f(f(Math.exp(f(threshold-ratio)))+f(1)));
+    const amplitude=finite('recovery variance',input.randomMagnitude??rules.atkDefRandomMag,0,1);
+    let variance=finite('recovery variance factor',input.variance??1,0);
+    if(input.random15!==undefined){
+      finite('recovery RNG',input.random15,0,32767);
+      if(!Number.isInteger(input.random15))throw new RangeError('Recovery RNG must be a native integer.');
+      variance=f(f(f(f(f(input.random15)*f(amplitude))*f(2/32767))-f(amplitude))+f(1));
+    }
+    let raw=f(f(coefficient)*factor);raw=f(raw*f(variance));
+    raw=f(raw*f(finite('recovery effects factor',input.recoveryFactor??1,0)));
+    if(input.exPhase)raw=f(raw*nativePercent(rules.exPhaseDamageMagnification));
+    if(input.allDamage)raw=f(raw*nativePercent(rules.allDamageMagnification));
+    raw=f(raw*f(finite('recovery external factor',input.extraFactor??1,0)));
+    raw=f(raw*f(finite('recovery hit ratio',input.hitRatio??1,0)));
+    return {amount:Math.min(Math.trunc(raw),finite('recovery cap',input.cap??9999,0)),raw,factor,coefficient,variance};
+  }
   function breakDamage(input) {
     const skill=input.skill || {},rules={...DEFAULT_RULES,...input.rules};
     const value=Number(skill.breakDmg??skill.breakDamageValue);
@@ -167,6 +189,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,gambleSuccess,gambleHitProbability,skillHitSuccess,skillHitProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,gambleSuccess,gambleHitProbability,skillHitSuccess,skillHitProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,recovery,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

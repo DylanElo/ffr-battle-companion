@@ -64,7 +64,7 @@ Mixed command evidence: [mixed skills and status refresh](mixed-command-verifica
 
 Paid opening and rotation plans track current HP/MP, luck, independently charged Overclock states, Overheat, Demon Form and Focus. HP/MP-dependent bonuses are recomputed after payment. Luck policies generate until the selected command is affordable, then spend; unverified same-selection resource gains are not credited. Ordinary queued attacks retain native queue semantics when Overclock expires; fresh selections remain subject to Overheat.
 
-An optional incoming-hit scenario applies one fixed post-defense hit per character after its action each round, with physical/magical type selected explicitly. Mirror reduction, received-damage LB, counter costs and source survival are evaluated. It defaults to zero and does not predict enemy targeting or multi-hit reaction multiplicity. Initial combined counter-selection MP reservation remains unproven, so generated recommendations require a fully affordable response pair for each fresh stance. Bespoke reactions and Finish readiness remain outside this model.
+An optional incoming-hit scenario applies one fixed post-defense hit per character after its action each round, with physical/magical type selected explicitly. Mirror reduction, received-damage LB, counter costs and source survival are evaluated. It defaults to zero and does not predict enemy targeting or multi-hit reaction multiplicity. Initial combined counter-selection MP reservation remains unproven, so generated recommendations require a fully affordable response pair for each fresh stance. Bespoke reactions and encounter-specific Finish overrides remain outside this model.
 
 Evidence: [HP payment](hp-cost-verification.md), [luck and Overclock](resource-state-verification.md), [forms, reactions and Focus](state-action-verification.md).
 
@@ -76,4 +76,14 @@ A new stagger grants normal-phase participation to its attacker; staggering all 
 
 Noctis and Vaan phase grants use native additive percentage-point passives, current-action landed criticals, and action-end Break timing. Call to Action costs its actual 10 AP and 40 MP and targets another living ally. Bonus Damage is evaluated only in the additional phase. Pilebunker adds stagger at the actual full LB capacity before damage; paid LBs consume gauge first. Hit and Run uses the explicitly configured incoming physical attack and committed attack history; it nullifies HP damage rather than cancelling the queue. Random outcomes are sampled, and the displayed resource trace is representative.
 
-See [phase evidence](phase-verification.md) and [interrupt and conditional-passive evidence](interrupt-verification.md). Finish readiness and arbitrary external interruption remain unmodeled; this is executable verification, not a live combat calibration.
+See [phase evidence](phase-verification.md) and [interrupt and conditional-passive evidence](interrupt-verification.md). Ordinary Finish selection is supported; arbitrary external interruption remains unmodeled; this is executable verification, not a live combat calibration.
+
+## Finish attacks and healing
+
+After an entered Additional phase and an all-enemies-staggered state, the party may choose one equipped Resonance finisher. The builder compares supported Finish options using current owner stats and effects. Physical/magic damage uses ATK/MAG; friendly recovery uses Divine and a separately verified recovery kernel. There is no equipped ability slot or AP charge, and the current rows have zero base MP cost. Ordinary skill payment and source survival still apply; normal actor-start effects do not retrigger. Readiness has no demonstrated once-per-battle charge.
+
+Tidus contributes nine single-target parts plus one group append, with no second payment or level boost. Firion/Shantotto's Finish LB gain uses20 base points with ordinary charge and actual capacity. Leah OverHeal can exceed maximum HP; Ayaka/Charlotte's base recovery clamps ordinary recipients. Durability uses final HP and configured incoming hits, including earned recovery. Secondary effects and unsupported recovery modifiers are reported explicitly. See [Finish verification](finish-verification.md).
+
+Queued-child rejection preserves prior committed actions and does not imply SkillEnd or payment for the rejected child. Stagger removes future normal selections rather than proving a blanket cancellation of committed children. The traced delayed finalizer is tied to sequencer spawn handling. No random interruption frequency is invented for the optimizer.
+
+Wilhelm and Cecil also supply their verified next-incoming-skill party barriers. These reduce physical or magical hits, expire after that selected incoming skill (including a Hit and Run nullification), and share the Finish's payment/cast count. Durability compares actual final HP; shield-only Finish selection requires a future configured incoming hit to gain protection value.

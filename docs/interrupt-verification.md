@@ -64,3 +64,17 @@ This does not justify assuming that an enemy has or has not acted in a forecast 
 The smallest proven additions are current-gauge Crusher and Hit and Run under one explicitly configured incoming physical skill event, using actual committed own-skill history. Preserve native source/target/status checks separately from optional affordability flags. Keep before-commit rejection separate from already-committed skill finalization and advance Boost lifetimes only at the proven event boundary.
 
 General enemy AI, arbitrary extra-phase scripts, the external callers of the alternate finalization callback, and arbitrary interrupted animation-notify sequences remain unverified. No extra damage, extra turns or reactive trigger frequency should be invented for them.
+
+## Follow-up: the delayed finalization caller
+
+One external dispatch is now certified. Successful skill initialization sets job+384 at `0x144F659B3`; skill update requires that flag and calls common job update at `0x144F69A89`. Common update `0x144F69330` checks an armed byte +D1, accumulates elapsed delta time into +D4, and calls virtual +2E8 at `0x144F693C6` when elapsed exceeds the configured threshold. On `CPP_BtlJobSkill`, this reaches `0x144F41DA0` and its guarded shared finalization described above.
+
+The threshold is **BTL_GENERAL_DATA.UnitSpawnDelayTime**, native offset +328, certified by reflected property record `0x14861FEF0` and name `0x1486218D0`. It must not be described as a generic watchdog or enemy damage interruption. Leaf helper `0x144F603A0` arms +D1 only when job+61 and +CE are true and the job is not already marked +60. Sequencer paths call that helper at `0x144F7A39D` and `0x144F7B095`; the complete set of authored events that reaches them remains outside this proof.
+
+This callback does not repay the skill cost or contain a queue-wide child-deletion loop. Neither fact proves that every wider cancellation path preserves all children. Its shared finalization still obeys the native SkillEnd suppression and lifetime guards. The supported forecast should retain valid ordinary combinations and avoid inventing an interruption rate from this animation/sequencer route. These conclusions come from executable control flow and reflected offsets; no in-game interruption was observed.
+
+## Follow-up: rejected leaves and Break
+
+Manager `0x144F693F0` calls job initialization +2B0 at `0x144F6947B`; failure invokes cleanup +2B8 at `0x144F6948B`. For skill jobs these are `0x144F65040` and `0x144F49900`. A failed precheck never sets successful-init flag +384, so later skill update returns before shared finalization. This manager route therefore does not emit an invented SkillEnd for a rejected leaf. Source cleanup also checks both pending/active job arrays for same-source siblings through `0x144F579F0`; one rejection does not justify deleting every sibling.
+
+Native Break handler `0x145109AB0` exhausts the actor's future normal-selection budget through `0x144FA97A0` and resets enemy planned AI through `0x144F451D0`. Normal selection checks that budget at `0x144FB0288–0x144FB02A0`. This proves loss of future normal actor selections and replacement of planned AI, rather than erasure of already committed nested jobs. Sleep, Paralyzation, Stoned and Stop are the table's action-disabled statuses; control-disabled and remove-additional flags are separate categories. Arbitrary immediate cancellation of a committed leaf still requires a concrete external caller chain.

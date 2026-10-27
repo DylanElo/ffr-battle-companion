@@ -1,5 +1,5 @@
 // The party builder shared by Next fight and Fight.
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions} from './build-details.js?v=8';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions, finishActions} from './build-details.js?v=9';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -33,7 +33,7 @@ function memberCard(member, indexes) {
     <div class="member-hit"><span>${h(commandPlan(evaluation, indexes) || skill?.name || 'No damaging action')}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP${evaluation.turn?.openingTurn || evaluation.turn?.rotationTurns ? ' for the regular action' : ''}</small>` : ''}</span>
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
     ${list(evaluation.limitUses).length ? `<p class="small member-lb">Limit Burst: ${list(evaluation.limitUses).map(u => `${h(indexes.skills.get(Number(u.skillId))?.name)} in round ${u.round}`).join(', ')}</p>` : ''}
-    ${bonusActions(evaluation)}
+    ${bonusActions(evaluation)}${finishActions(evaluation, indexes)}
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
     ${gearExplanation(member, indexes)}
     ${buildExplanation(member, indexes)}
