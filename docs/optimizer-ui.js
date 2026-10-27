@@ -1,5 +1,5 @@
 // The party builder shared by Next fight and Fight.
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=5';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=6';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -30,7 +30,7 @@ function memberCard(member, indexes) {
       <h4>${h(character?.name || `#${member.characterId}`)}</h4>
       <span class="member-vision">${vision ? face(`summon${vision.id}`, 'sm') : ''}${h(vision?.name || '—')}</span>
     </div></div>
-    <div class="member-hit"><span>${h(evaluation.recipeLabel || skill?.name || 'No damaging action')}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP</small>` : ''}</span>
+    <div class="member-hit"><span>${h(commandPlan(evaluation, indexes) || skill?.name || 'No damaging action')}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP${evaluation.turn?.openingTurn || evaluation.turn?.rotationTurns ? ' for the regular action' : ''}</small>` : ''}</span>
       <b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b></div>
     ${list(evaluation.limitUses).length ? `<p class="small member-lb">Limit Burst: ${list(evaluation.limitUses).map(u => `${h(indexes.skills.get(Number(u.skillId))?.name)} in round ${u.round}`).join(', ')}</p>` : ''}
     ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
@@ -87,6 +87,9 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
       <details class="more" data-keep="party-more"><summary>More</summary><div>
         <label>Difficulty <select id="optimizer-difficulty" ${off}>${[['save', 'From save'], ['Easy', 'Easy'], ['Normal', 'Normal'], ['Expert', 'Expert']].map(([id, label]) => option(id, label, (state.difficulty || 'save') === id)).join('')}</select></label>
         <label>MP available <input type="number" id="optimizer-mp" min="0" max="100" step="1" value="${h(state.mpPercent ?? 100)}" ${off}>%</label>
+        <label>Incoming hit damage <input type="number" id="optimizer-incoming-damage" min="0" max="99999999" step="1" value="${h(state.incomingDamage ?? 0)}" ${off}></label>
+        <label>Incoming hit type <select id="optimizer-incoming-type" ${off}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>option(value,label,(state.incomingType || 'Physic')===value)).join('')}</select></label>
+        <p class="dim small">One fixed hit per character after acting, each round. Damage is after defense, before Mirror reduction. Set 0 for no incoming hits.</p>
         <label class="check"><input type="checkbox" id="optimizer-broken" ${state.broken ? 'checked' : ''} ${off}> Enemy already broken</label>
         <label class="check"><input type="checkbox" id="optimizer-critical" ${state.critical ? 'checked' : ''} ${off}> Assume critical hits</label>
         <p class="dim small">Always in the party:</p>
@@ -99,6 +102,6 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
     ${partyView(results[pick], pick, indexes, canEquip, result.current)}`;
   else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or fewer locked characters.</p>${bullets(result.warnings)}`;
-  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches parties of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Takes about 15 seconds.'}</p>`;
+  else body = `<p class="dim">${people.length < 4 ? 'This save needs four recruited characters for a party search.' : 'Searches parties of four you can field, with their Resonances, gear and abilities, and predicts damage per round over a five-round fight, Limit Bursts included. Complex builds can take a minute or more.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
 }

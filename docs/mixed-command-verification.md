@@ -61,3 +61,7 @@ Focus 400460 is not another Magic Boost. Its damage effect 12907 has duration 2 
 Next Step: use the retained selector/effect/refresh facts in sequence evaluation; verify model regressions for mixed IDs, reversed setup order, cumulative MP/AP, and one-instance status refresh.
 
 Known Blockers: no live battle recording, no arbitrary reactive/interrupted command proof, and no blanket support for every special action. Native `nonRepeatSkillsIds` is a separate caller audit; its name alone does not prove a same-turn sibling ban.
+
+## Resource-state implementation follow-up
+
+The dedicated live-state evaluator now supports paid HP costs, Good Luck generation/spending, Overclock expiry, form transitions, Focus lifetime and controlled incoming reactions. Earlier notes identifying these as implementation requirements describe the preceding audit. Current evidence and remaining limits are in [resource states](resource-state-verification.md), [HP costs](hp-cost-verification.md) and [state actions](state-action-verification.md).

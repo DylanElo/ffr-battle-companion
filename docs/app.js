@@ -1,7 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=35';
-import {comparison} from './optimizer-ui.js?v=35';
-import {gearExplanation, buildExplanation, estimateNotice} from './build-details.js?v=5';
+import {createOptimizerController} from './optimizer-controller.js?v=36';
+import {comparison} from './optimizer-ui.js?v=36';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=6';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -12,7 +12,7 @@ const VIEWS = [['next', 'Next fight'], ['fight', 'Fight'], ['characters', 'Chara
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, pickVision: true,
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null,
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=35', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=36', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -266,7 +266,7 @@ function deepSearch() {
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
-    options: { goals, difficulty: 'save', mpPercent: 100, broken: false, critical: false, minHealers: 0, minProtectors: 0,
+    options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: ui.deepIncomingDamage, incomingType: ui.deepIncomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
       perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000, visionSlices: true,
       visionIds: ui.pickVision || !(Number(draft.visionId) > 0) ? null : [Number(draft.visionId)] } });
   render();
@@ -364,10 +364,15 @@ function deepPanel(native) {
     <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
     <label class="against"><span class="dim small">Against</span>
       <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.enemyId)).join('')}</select></label>
+    <details data-keep="deep-advanced"><summary>Incoming hit scenario</summary>
+      <p class="dim small">One fixed hit per character after acting, each round. Damage is after defense, before Mirror reduction. Set 0 for no incoming hits.</p>
+      <label class="small">Hit damage <input type="number" id="deep-incoming-damage" min="0" max="99999999" step="1" value="${h(ui.deepIncomingDamage)}" ${busy ? 'disabled' : ''}></label>
+      <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,ui.deepIncomingType===value)).join('')}</select></label>
+    </details>
     <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''} ${busy ? 'disabled' : ''}> Let it pick the Resonance</label>
     ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}. Pick another in the Resonance box, or tick the box above.</p>` : ''}
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
-      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button><span class="dim small">About 15 seconds</span>`}</div>
+      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button><span class="dim small">Search time varies with learned skills</span>`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
   </div>`;
 }
@@ -389,7 +394,7 @@ function deepResult() {
       <span class="dim small">${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
-    <p class="small">Use <b>${h(ev.recipeLabel || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
+    <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${ev.turn?.openingTurn || ev.turn?.rotationTurns ? ' for the regular action' : ''}${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${gearExplanation(r, index)}
     ${buildExplanation(r, index)}
@@ -523,7 +528,7 @@ function about() {
     <ul>
       <li><b>Optimize</b> (Characters) adds up flat equipment stats for the stats you gear for, each scaled to its own range. Effects like “+20% Fire damage” aren’t scored, so they’re listed for you to judge. It picks the Resonance whose unlocked skills add the most power in those stats.</li>
       <li>Damage and healing use the user’s own Attack (physical skills) or Magic (magic skills), whichever Resonance grants the skill. What Divine does in battle hasn’t been confirmed.</li>
-      <li><b>Best party</b> (Fight) uses the damage formula recovered from the game, your progression and modelled passive effects, and predicts one turn each: one action, or the same attack twice with Arms Akimbo or Dualcast. Magic Boost is scored with a single magic attack; combined boosted multiple-action recipes remain excluded. Hits are capped at 9,999 unless Break the Limit (or gear with it) is on. Over a five-round fight, staggers fill the LB gauge and a Limit Burst is used when it beats a normal turn, so LB gauge abilities are picked when they pay off. It’s a bounded search: the strongest parties it found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes</a>.</li>
+      <li><b>Best party</b> (Fight) compares owned gear, Resonances and legal AP/slot packages using recovered native damage rules. Compatible nested and mixed actions, paid opening turns, luck generation, Overclock, Demon Form and Focus are scored over five rounds. Costs, state expiry, stagger and LB timing affect the result. Optional incoming-hit settings enable controlled counter forecasts. It is a bounded search: the strongest parties found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes and evidence</a>.</li>
       <li>Owned counts include equipped copies. With “Don’t take other characters’ gear” on, their current gear and any plans are reserved.</li>
       <li>A Resonance is reserved for one character at a time. Whether two characters can share one hasn’t been confirmed.</li>
       <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>
@@ -735,6 +740,8 @@ document.addEventListener('change', e => {
   else if (t.id === 'reserve') ui.reserve = t.checked;
   else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
   else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
+  else if (t.id === 'deep-incoming-damage') { ui.deepIncomingDamage = Math.max(0, Math.min(99999999, Math.trunc(Number(t.value) || 0))); cancelDeep(); ui.deep = null; }
+  else if (t.id === 'deep-incoming-type') { ui.deepIncomingType = t.value === 'Magic' ? 'Magic' : 'Physic'; cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.enemyId = +t.value; }
   else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;

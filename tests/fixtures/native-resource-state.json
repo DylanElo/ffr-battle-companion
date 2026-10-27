@@ -1,0 +1,762 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Read-only native control-flow, enum dispatch, vtable methods and cooked data; derived vectors are not live battle measurements.",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "provenance": {
+    "skillRulesSha256": "ff64ca687a05b25a7da3569b9e5409ff69fcadc680467699fe1180b4e517d01d",
+    "statusRowsSha256": "e6e7ce4599b490f48985151870c82ea3711e55a27f5f707b739eaaa443f63eea"
+  },
+  "goodLuck": {
+    "initial": 0,
+    "maximum": 10,
+    "critRatePerStack": 3,
+    "ordinaryBeforeGain": {
+      "406080": 1
+    },
+    "openingPassives": {
+      "1511": 8
+    },
+    "actionBeginPassives": {
+      "1499": 1
+    },
+    "criticalCoefficientAdds": {
+      "406080": 7
+    },
+    "lbCoefficientAddPerStack": {
+      "406040": 3
+    },
+    "afterResetSkills": [
+      406040,
+      406140
+    ]
+  },
+  "thresholds": [
+    {
+      "SkillId": 406110,
+      "costType": "GoodLuck",
+      "Cost": 4
+    },
+    {
+      "SkillId": 406130,
+      "costType": "GoodLuck",
+      "Cost": 5
+    },
+    {
+      "SkillId": 404140,
+      "costType": "OverClock",
+      "Cost": 0
+    },
+    {
+      "SkillId": 406050,
+      "costType": "GoodLuck",
+      "Cost": 8
+    },
+    {
+      "SkillId": 406070,
+      "costType": "GoodLuck",
+      "Cost": 3
+    },
+    {
+      "SkillId": 406140,
+      "costType": "GoodLuck",
+      "Cost": 9
+    }
+  ],
+  "additionalPayments": [
+    {
+      "SkillId": 406110,
+      "costType": "GoodLuck",
+      "Cost": 4
+    },
+    {
+      "SkillId": 406120,
+      "costType": "GoodLuck",
+      "Cost": 3
+    },
+    {
+      "SkillId": 406130,
+      "costType": "GoodLuck",
+      "Cost": 5
+    },
+    {
+      "SkillId": 406050,
+      "costType": "GoodLuck",
+      "Cost": 5
+    },
+    {
+      "SkillId": 408070,
+      "costType": "HPRatio",
+      "Cost": 10
+    },
+    {
+      "SkillId": 406070,
+      "costType": "GoodLuck",
+      "Cost": 3
+    }
+  ],
+  "overclock": {
+    "targetSkillIds": [
+      404080,
+      404110,
+      404060,
+      404070
+    ],
+    "normal": {
+      "skillId": 404130,
+      "mp": 12,
+      "effectId": 19003,
+      "charges": 3,
+      "childEffects": [
+        12913,
+        15113
+      ],
+      "basePercent": 150,
+      "overheat": 19005
+    },
+    "zero": {
+      "skillId": 404140,
+      "mp": 35,
+      "requiresAnyActiveOverclock": true,
+      "effectId": 19004,
+      "charges": 3,
+      "childEffects": [
+        12914,
+        15114
+      ],
+      "basePercent": 300,
+      "overheat": 19006
+    },
+    "chargeEvent": "End of each listed skill activation, after its damage",
+    "overheatBeginTurnEvents": 2,
+    "recastSameStatusRefreshes": false,
+    "normalAfterZeroCanCoexist": true,
+    "coexistingBaseScale": 5.5
+  },
+  "effects": [
+    {
+      "id": 1195,
+      "type": "GoodLuck",
+      "params": [
+        3,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "GoodLuck",
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 12913,
+      "type": "MulBaseSkillBySkill",
+      "params": [
+        150,
+        404080,
+        404110,
+        404060,
+        404070,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 12914,
+      "type": "MulBaseSkillBySkill",
+      "params": [
+        300,
+        404080,
+        404110,
+        404060,
+        404070,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 12918,
+      "type": "AddSkillBaseMag",
+      "params": [
+        7,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "None",
+      "proceedTiming": "DamageCalcEnd"
+    },
+    {
+      "id": 12930,
+      "type": "AddSkillBaseMagGoodLuck",
+      "params": [
+        3,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "None",
+      "proceedTiming": "DamageCalcEnd"
+    },
+    {
+      "id": 15113,
+      "type": "MulBaseBreakBySkill",
+      "params": [
+        150,
+        404080,
+        404110,
+        404060,
+        404070,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 15114,
+      "type": "MulBaseBreakBySkill",
+      "params": [
+        300,
+        404080,
+        404110,
+        404060,
+        404070,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 15124,
+      "type": "DmgMulGoodLuckNum",
+      "params": [
+        10,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "BreakDmgCalculation",
+      "proceedTiming": "DamageCalcEnd"
+    },
+    {
+      "id": 19003,
+      "type": "OverClock",
+      "params": [
+        -1,
+        12913,
+        15113,
+        19005,
+        404130,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "OverClock",
+      "duration": 3,
+      "applyTiming": "None",
+      "proceedTiming": "OverclockTgtSkillActivate"
+    },
+    {
+      "id": 19004,
+      "type": "OverClock",
+      "params": [
+        1,
+        12914,
+        15114,
+        19006,
+        404130,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "OverClockZero",
+      "duration": 3,
+      "applyTiming": "None",
+      "proceedTiming": "OverclockTgtSkillActivate"
+    },
+    {
+      "id": 19005,
+      "type": "SkillUnavailable",
+      "params": [
+        8,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "OverHeat",
+      "duration": 2,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn"
+    },
+    {
+      "id": 19006,
+      "type": "SkillUnavailable",
+      "params": [
+        8,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "OverHeat",
+      "duration": 2,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn"
+    },
+    {
+      "id": 63001,
+      "type": "AddGoodLuck",
+      "params": [
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "AddEffect"
+    },
+    {
+      "id": 63002,
+      "type": "CureStatusCondition",
+      "params": [
+        0,
+        0,
+        0,
+        38,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "AddEffect"
+    },
+    {
+      "id": 65004,
+      "type": "AddGoodLuck",
+      "params": [
+        1,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": -1,
+      "applyTiming": "ActionBegin",
+      "proceedTiming": "None"
+    },
+    {
+      "id": 65005,
+      "type": "AddGoodLuck",
+      "params": [
+        8,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "AddEffect"
+    }
+  ],
+  "statusPolicies": [
+    {
+      "statusCondition": "OverHeat",
+      "isBadStatus": false,
+      "isDebuff": false,
+      "negateStatusCondition": "None",
+      "isEsunaToOut": false,
+      "isDispelToOut": false,
+      "isDispellingEvilToOut": false,
+      "isAngelicFeatherToOut": false,
+      "isExtendLifeTurn": false,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false,
+      "isRemoveAdditionalTurn": false,
+      "isControlDisabled": false,
+      "isActionDisabled": false,
+      "isBuffTurnExtensionTarget": false,
+      "canPlayVoice": true,
+      "isPlayBadStatusVoice": false,
+      "releaseDamageType": "None"
+    },
+    {
+      "statusCondition": "GoodLuck",
+      "isBadStatus": false,
+      "isDebuff": false,
+      "negateStatusCondition": "None",
+      "isEsunaToOut": false,
+      "isDispelToOut": false,
+      "isDispellingEvilToOut": false,
+      "isAngelicFeatherToOut": false,
+      "isExtendLifeTurn": true,
+      "isAllowDuplicate": true,
+      "shouldOverwrite": false,
+      "isRemoveAdditionalTurn": false,
+      "isControlDisabled": false,
+      "isActionDisabled": false,
+      "isBuffTurnExtensionTarget": false,
+      "canPlayVoice": true,
+      "isPlayBadStatusVoice": false,
+      "releaseDamageType": "None"
+    },
+    {
+      "statusCondition": "OverClock",
+      "isBadStatus": false,
+      "isDebuff": false,
+      "negateStatusCondition": "None",
+      "isEsunaToOut": false,
+      "isDispelToOut": false,
+      "isDispellingEvilToOut": false,
+      "isAngelicFeatherToOut": false,
+      "isExtendLifeTurn": false,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false,
+      "isRemoveAdditionalTurn": false,
+      "isControlDisabled": false,
+      "isActionDisabled": false,
+      "isBuffTurnExtensionTarget": false,
+      "canPlayVoice": true,
+      "isPlayBadStatusVoice": false,
+      "releaseDamageType": "None"
+    },
+    {
+      "statusCondition": "OverClockZero",
+      "isBadStatus": false,
+      "isDebuff": false,
+      "negateStatusCondition": "None",
+      "isEsunaToOut": false,
+      "isDispelToOut": false,
+      "isDispellingEvilToOut": false,
+      "isAngelicFeatherToOut": false,
+      "isExtendLifeTurn": false,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false,
+      "isRemoveAdditionalTurn": false,
+      "isControlDisabled": false,
+      "isActionDisabled": false,
+      "isBuffTurnExtensionTarget": false,
+      "canPlayVoice": true,
+      "isPlayBadStatusVoice": false,
+      "releaseDamageType": "None"
+    }
+  ],
+  "cases": [
+    {
+      "name": "fresh battle without opening luck effects",
+      "before": {},
+      "luck": 0
+    },
+    {
+      "name": "first Gale Strike gains before its damage",
+      "luckBefore": 0,
+      "skillId": 406080,
+      "luckAtDamage": 1,
+      "criticalRateAdded": 3
+    },
+    {
+      "name": "Gale Strike caps at ten",
+      "luckBefore": 10,
+      "skillId": 406080,
+      "luckAtDamage": 10,
+      "criticalRateAdded": 30
+    },
+    {
+      "name": "Demolisher Rush threshold differs from consumption",
+      "luckBefore": 8,
+      "skillId": 406050,
+      "allowed": true,
+      "consumed": 5,
+      "luckAtDamage": 3
+    },
+    {
+      "name": "Demolisher Rush remains unavailable at seven",
+      "luckBefore": 7,
+      "skillId": 406050,
+      "allowed": false
+    },
+    {
+      "name": "Blitzstrahl uses post-payment luck",
+      "luckBefore": 8,
+      "skillId": 406070,
+      "consumed": 3,
+      "luckAtDamage": 5,
+      "breakPercentAdded": 50
+    },
+    {
+      "name": "critical Gale additive coefficient",
+      "mag": 16,
+      "critical": true,
+      "rawCoefficientAdd": 7
+    },
+    {
+      "name": "luck LB adds after level coefficient scaling",
+      "mag": 33,
+      "level": 30,
+      "luckAtDamage": 8,
+      "scale": 3,
+      "rawCoefficientAdd": 24,
+      "coefficient": 123,
+      "luckAfter": 0
+    },
+    {
+      "name": "Overclock third supported activation still boosted",
+      "chargesBefore": 1,
+      "baseScaleAtDamage": 2.5,
+      "chargesAfter": 0,
+      "overheatAfter": 2
+    },
+    {
+      "name": "fourth already queued Mechabo attack executes after clock expires",
+      "queuedBeforeOverheat": true,
+      "chargesBefore": 0,
+      "overheatBefore": 2,
+      "skillId": 404080,
+      "runtimeActionFlags": { "costRecheck32A": false, "attributeRecheck379": false },
+      "executes": true,
+      "baseScaleAtDamage": 1,
+      "freshSelectionAllowed": false
+    },
+    {
+      "name": "global turn does not consume Overclock",
+      "chargesBefore": 3,
+      "event": "BeginTurn",
+      "chargesAfter": 3
+    },
+    {
+      "name": "Zero upgrade replaces I without overheat",
+      "before": [
+        19003
+      ],
+      "skillId": 404140,
+      "after": [
+        19004
+      ],
+      "chargesAfter": 3,
+      "overheatAfter": 0
+    },
+    {
+      "name": "normal after Zero coexists additively",
+      "before": [
+        19004
+      ],
+      "skillId": 404130,
+      "after": [
+        19004,
+        19003
+      ],
+      "baseScaleAtDamage": 5.5
+    },
+    {
+      "name": "same normal recast does not refresh",
+      "before": [
+        19003
+      ],
+      "chargesBefore": 1,
+      "skillId": 404130,
+      "chargesAfter": 1
+    }
+  ],
+  "nativeLocations": {
+    "luckGetter": "14523AC20 / virtual4D0",
+    "luckMutation": "145230120 ->145136A60",
+    "zeroCtor": "144DC7440",
+    "luckCost": "14513C0FA-14513C10B",
+    "luckThreshold": "144F59E44-144F59E4F",
+    "luckCrit": "145145690 / virtual4F8 ->145232A85",
+    "criticalAdd": "14511E900 / virtual598",
+    "luckCoefficientAdd": "14511E940 / virtual598",
+    "luckBP": "145144550 / virtual540",
+    "physicalGoodLuckCalc": "14523812C[15-1] ->145237D2C",
+    "overclockInit": "14514C680-14514C855",
+    "overclockCharges": "144F42781-144F4280C",
+    "overclockEnd": "145141C00-145141CEE",
+    "overclockExpired": "144DC3360",
+    "skillScales": "1451133B0-145113409 / virtual5A8 or5B0",
+    "ordinaryQueueFlags": "144F40F69 /144F40F9C-144F40FB0",
+    "optionalRuntimeChecks": "144F4658C-144F465FE",
+    "actionConstructorFlags": "144D96E57 /144D96EF0"
+  },
+  "boundaries": [
+    "Gamble Shot CritOrMiss and post-miss luck require stochastic event simulation.",
+    "Energized Assault is a sequential selected physical child, not guaranteed free extra standalone damage.",
+    "Overheat expires after two applicable BeginTurn lifetime events; do not add two extra skipped whole future turns.",
+    "Starting luck does not come from GoodLuck effect param3: that is its per-stack critical-rate bonus.",
+    "Cumulative menu preview accounting for repeated luck-cost selections remains unproven; do not exploit skipped runtime threshold checks."
+  ]
+}

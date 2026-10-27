@@ -49,3 +49,5 @@ Normal nested Magic Boost expiry and duplicate action-queue preservation are now
 Next Step: trace the remaining event and action handlers when those mechanics affect a recommendation. Recorded battles can provide a separate end-to-end check; they are not a prerequisite for recovering formulas.
 
 Known Blockers: no recorded battle damage was used in this verification. The executable hash limits these conclusions to the inspected version.
+
+Follow-up state audit: [HP costs and received-damage LB](hp-cost-verification.md), [Good Luck and Overclock](resource-state-verification.md), and [forms, Focus and reactions](state-action-verification.md) distinguish native evidence, implemented transitions and still-unverified special paths. Counter forecasts use explicit incoming-hit scenarios rather than inferred enemy AI.

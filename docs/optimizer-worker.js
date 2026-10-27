@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=21', 'damage.js?v=3', 'stats.js', 'battle.js?v=30', 'search.js?v=25');
+importScripts('core.js', 'passives.js?v=22', 'damage.js?v=4', 'stats.js?v=22', 'battle.js?v=31', 'search.js?v=25');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -53,10 +53,18 @@ self.onmessage = async event => {
     result.scenario=model.scenario;
     result.modelEvidence=model.evidence;
     for(const party of result.results || []){
-      party.members=party.members.map(member=>({...member,abilityReasons:model.explainAbilities(member),explanationEvaluation:member.evaluation,evaluation:{...member.evaluation,...party.evaluation?.actionOverrides?.[member.characterId],
-        limitUses:party.evaluation?.limitUses?.[member.characterId] || [],
-        mpExhaustedRounds:party.evaluation?.mpExhaustedRounds?.[member.characterId] ?? member.evaluation?.mpExhaustedRounds,
-        remainingMp:party.evaluation?.remainingMp?.[member.characterId] ?? member.evaluation?.remainingMp}}));
+      party.members=party.members.map(member=>{
+        const state={};
+        for(const key of ['remainingHp','hpSpent','resourceSkips','stateLeafResults','resourceEvents','remainingGoodLuck','overclockCharges','overclockStates','overheat','demonForm','remainingMp','mpExhaustedRounds']){
+          const values=party.evaluation?.[key];
+          if(values && Object.hasOwn(values,member.characterId))state[key]=values[member.characterId];
+        }
+        if(state.stateLeafResults?.length)state.leafResults=state.stateLeafResults;
+        state.limitUses=party.evaluation?.limitUses?.[member.characterId] || [];
+        return {...member,abilityReasons:model.explainAbilities(member),
+          explanationEvaluation:{...member.evaluation,...state},
+          evaluation:{...member.evaluation,...party.evaluation?.actionOverrides?.[member.characterId],...state}};
+      });
     }
     self.postMessage({id,type:'result',result});
   } catch(error) {

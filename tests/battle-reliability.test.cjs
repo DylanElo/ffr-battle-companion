@@ -256,3 +256,20 @@ test('native Group support reaches all compatible later allies, with random orde
   caster.stats.Agility=1;one.stats.Agility=999;two.stats.Agility=999;
   assert.equal(model.evaluateParty(members).supportUsed,null,'a slower support caster cannot buff earlier attacks');
 });
+
+test('a support caster still receives incoming damage and LB fill after replacing its attack', () => {
+  const {catalog,snapshot,enemy,input}=fixture([]);
+  catalog.skills=[{...catalog.skills[0],dmgType:'Magic',calcType:'Magic'},native.skills.find(s=>s.id===230110)];
+  catalog.characters=catalog.characters.map(c=>c.id===1002?{...c,stats:{...c.stats,Agility:999}}:c);
+  snapshot.characters.push({...snapshot.characters[0],id:1002});
+  const model=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1,incomingDamage:10});
+  const receiver=model.evaluate(input),own=model.evaluate({...input,characterId:1002});
+  const caster={...own,damage:0,brokenDamage:0,breakDamage:0,hits:[],stats:{...own.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:1000,mpCost:6,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]};
+  caster.limit={max:100,initial:0,mult:1,fillOnStagger:0,recuperate:0,options:[]};
+  const party=model.evaluateParty([{characterId:1002,equipment:input.equipment,evaluation:caster},{characterId:1001,equipment:input.equipment,evaluation:receiver}]);
+  assert.ok(party.supportUsed);
+  assert.equal(party.remainingHp[1002],own.stats.MaxHitPoint-10);
+  assert.ok(party.resourceEvents[1002].some(event=>event.kind==='incoming' && event.damage===10));
+  const expected=require('../docs/damage.js').damageTakenLb(10,own.stats.MaxHitPoint,own.stats.MaxHitPoint,50);
+  assert.equal(party.gauge[1002],expected);
+});

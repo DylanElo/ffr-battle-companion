@@ -1,0 +1,100 @@
+{
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "method": "Copied native received-HP-damage LB arithmetic; explicit post-mitigation damage, pre-hit HP and maximum HP inputs. No battle recording.",
+  "sources": [
+    "0x144F7AB8D-0x144F7ABAD",
+    "0x144F7ABB5-0x144F7ABCC"
+  ],
+  "fixtures": [
+    {
+      "input": {
+        "damage": 0,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 0
+    },
+    {
+      "input": {
+        "damage": 1,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 0
+    },
+    {
+      "input": {
+        "damage": 50,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 2
+    },
+    {
+      "input": {
+        "damage": 99,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 4
+    },
+    {
+      "input": {
+        "damage": 100,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 5
+    },
+    {
+      "input": {
+        "damage": 1000,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 50
+    },
+    {
+      "input": {
+        "damage": 2000,
+        "preHp": 1000,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 50
+    },
+    {
+      "input": {
+        "damage": 500,
+        "preHp": 100,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 5
+    },
+    {
+      "input": {
+        "damage": 500,
+        "preHp": 0,
+        "maxHp": 1000,
+        "baseGain": 50
+      },
+      "expected": 0
+    },
+    {
+      "input": {
+        "damage": 999,
+        "preHp": 9999,
+        "maxHp": 9999,
+        "baseGain": 50
+      },
+      "expected": 4
+    }
+  ]
+}

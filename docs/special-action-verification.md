@@ -49,3 +49,7 @@ These assume normal targeted commands, sufficient resources, no interruptions an
 - **Exceptional initiative:** Rearguard, Gentleman’s Gambit, extra actions and changing agility/wait offsets need their specific scheduler branches. Preemptive Strike depends on a target's scheduled-action counter, not merely whether it dealt damage. The ordinary random-priority arithmetic is documented separately.
 
 Next Step: add resource and encounter-state simulation before enabling HP payments, luck engines, reactive turns or form-changing sequences. No executable, source save or live game process was modified for this audit.
+
+## Resource-state implementation follow-up
+
+The dedicated live-state evaluator now supports paid HP costs, Good Luck generation/spending, Overclock expiry, form transitions, Focus lifetime and controlled incoming reactions. Earlier notes identifying these as implementation requirements describe the preceding audit. Current evidence and remaining limits are in [resource states](resource-state-verification.md), [HP costs](hp-cost-verification.md) and [state actions](state-action-verification.md).

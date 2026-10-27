@@ -44,6 +44,10 @@
       if(!parameters[p[1]] || ![0,1,2,3].includes(p[2]) || !p.slice(3,6).every(n=>Number(n)===0) || !allDefault(6))return reject('Unrecognized continuous parameter layout.');
       term.kind=[0,1].includes(p[2])?'statFlat':'statPercent';term.parameter=parameters[p[1]];term.value=Number(p[0])*([1,3].includes(p[2])?-1:1);return term;
     }
+    if(type==='AllParamUp'){
+      if(!Number.isFinite(Number(p[0])) || Number(p[0])<0 || !allDefault(1))return reject('Unrecognized primary-stat scale layout.');
+      return {...term,kind:'primaryStatScale',value:Number(p[0])};
+    }
     if(type==='DamageMultiplier'){
       if(![0,1,2].includes(p[5]) || !attributes[p[3]] || ![-1,0].includes(p[8]) || Number(p[11])!==-1)return reject('Unmodeled damage multiplier filter.');
       if(Number(p[1])>0)requireValue('lbPercent',Number(p[1]),'min');
@@ -128,6 +132,19 @@
       if(!allDefault(0))return reject('Unrecognized higher-defense condition.');
       return {...term,kind:'dominantDefence',value:true};
     }
+    if(type==='GoodLuck' || type==='AddSkillBaseMagGoodLuck' || type==='DmgMulGoodLuckNum'){
+      if(!Number.isFinite(Number(p[0])) || !allDefault(1))return reject('Unrecognized luck-scaled modifier layout.');
+      return {...term,kind:type==='GoodLuck'?'critRatePerLuck':type==='AddSkillBaseMagGoodLuck'?'coefficientPerLuck':'breakPerLuck',value:Number(p[0])};
+    }
+    if(type==='AddSkillBaseMag'){
+      if(!Number.isFinite(Number(p[0])) || ![-1,1].includes(Number(p[1])) || !allDefault(2))return reject('Unrecognized additive coefficient layout.');
+      if(Number(p[1])!==-1)requireValue('critical',true);
+      return {...term,kind:'coefficientAdd',value:Number(p[0])};
+    }
+    if(type==='MulBaseSkillBySkill' || type==='MulBaseBreakBySkill'){
+      if(!Number.isFinite(Number(p[0])) || !p.slice(1).every(id=>Number(id)===-1 || Number.isInteger(Number(id)) && Number(id)>0))return reject('Unrecognized skill-specific coefficient scale layout.');
+      return {...term,kind:type==='MulBaseSkillBySkill'?'coefficientScalePercent':'baseBreakScalePercent',value:Number(p[0]),skillIds:p.slice(1).filter(id=>Number(id)>0).map(Number)};
+    }
     // Limit Burst / finisher / summon power: native vtable+0x5A8 adds trunc(level) * 100/p0 to the coefficient scale (base 1).
     if(type==='MulBaseSkillByLevel'){
       if(!(Number(p[0])>0) || !allDefault(1))return reject('Unrecognized level-scaled power layout.');
@@ -145,7 +162,7 @@
     let indexes=catalogCache.get(catalog);
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
-    const modifiers={statFlat:{},statPercent:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0};
+    const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0};
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     for(const id of passiveIds || []){
@@ -221,6 +238,19 @@
       const gate=filters(term,context);
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
+      if(['critRatePerLuck','coefficientPerLuck','breakPerLuck'].includes(term.kind)){
+        if(!Number.isFinite(context.goodLuck) || context.goodLuck<0 || context.goodLuck>10){result.deferred.push({...term,reason:'Requires current native Good Luck level (0–10).'});continue;}
+        const kind={critRatePerLuck:'critRatePercent',coefficientPerLuck:'coefficientAdd',breakPerLuck:'breakPercent'}[term.kind],value=term.value*context.goodLuck;
+        modifiers[kind]+=value;result.applied.push({...term,kind,value});result.terms.push({...term,kind,value});continue;
+      }
+      if(term.kind==='primaryStatScale'){
+        for(const parameter of parameters.slice(5,10)){
+          const expanded={...term,kind:'statScale',parameter};
+          add(modifiers.statScale,parameter,term.value);result.terms.push(expanded);
+        }
+        result.applied.push(term);
+        continue;
+      }
       if(term.kind==='damagePerTarget' || term.kind==='damagePerBuff'){
         if(term.kind==='damagePerTarget' && !['Group','All'].includes(clean(context.skill?.target))){result.inactive.push({...term,reason:'Only when attacking all enemies.'});continue;}
         const count=context[term.kind==='damagePerTarget'?'targetCount':'buffCount'];
@@ -312,7 +342,8 @@
     for(const check of (general.costCheckData || []).filter(row=>Number(row.SkillId)===id)){
       result.resourceChecks.push(check);
       const amount=context.resources?.[clean(check.costType)];
-      if(!known(amount) || Number(check.Cost)===0){if(!validated)defer(`Native ${clean(check.costType)} resource check requires validated state.`);}
+      if(clean(check.costType)==='OverClock' && Number(check.Cost)===0){if(!known(amount)){if(!validated)defer('Native Overclock effect presence is required.');}else if(!(Number(amount)>0))deny('An active Overclock effect is required.');}
+      else if(!known(amount) || Number(check.Cost)===0){if(!validated)defer(`Native ${clean(check.costType)} resource check requires validated state.`);}
       else if(Number(amount)<Number(check.Cost))deny(`Insufficient ${clean(check.costType)} for native cost check.`);
     }
     result.additionalCosts=(general.additionalCostData || []).filter(row=>Number(row.SkillId)===id);

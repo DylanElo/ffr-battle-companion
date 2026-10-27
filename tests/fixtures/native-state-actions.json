@@ -1,0 +1,638 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Static native control-flow, native enum tables and current effect rows; derived state vectors, not live battle measurements",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "sourceCatalogSha256": "2fb4e5e197a4c988bb1b79bcfdcce0ad0fc3c01861bcdd9d60f4805f058d7a29",
+  "timingEnum": {
+    "ActionBegin": 2,
+    "ActionBeginWithEx": 3,
+    "BeginTurn": 7,
+    "SkillBegin": 17,
+    "SkillEnd": 18
+  },
+  "effects": [
+    {
+      "id": 1165,
+      "row": "リジェネ",
+      "type": "ParameterVariation",
+      "params": [
+        10,
+        1,
+        2,
+        -1,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "Regene",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 3,
+      "applyTiming": "ActionBegin",
+      "proceedTiming": "ActionEnd",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 1382,
+      "row": "素早さ減少　アクティブ",
+      "type": "ParameterContinuousVariation",
+      "params": [
+        -40,
+        9,
+        2,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 2,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 12907,
+      "row": "物理・魔法攻撃+100%(ためる)",
+      "type": "DamageMultiplier",
+      "params": [
+        100,
+        0,
+        -1,
+        0,
+        -1,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 2,
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "ActionBegin",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 16143,
+      "row": "閃影双返鏡中のダメージカット",
+      "type": "Deffence",
+      "params": [
+        0,
+        50,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 16603,
+      "row": "全ステ1.5倍(魔人の本領)",
+      "type": "AllParamUp",
+      "params": [
+        150,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 19015,
+      "row": "魔人の本領",
+      "type": "DemonForm",
+      "params": [
+        16603,
+        1165,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "DemonForm",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 19016,
+      "row": "魔人の本領解除",
+      "type": "CancelDemonForm",
+      "params": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "AddEffect",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 30022,
+      "row": "閃影双返鏡カウンター物理",
+      "type": "Counter",
+      "params": [
+        20,
+        -1,
+        -1,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 30023,
+      "row": "閃影双返鏡カウンター魔法",
+      "type": "Counter",
+      "params": [
+        20,
+        -1,
+        -1,
+        1,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "focus": {
+    "skillId": 400460,
+    "mp": 0,
+    "equipCost": 10,
+    "damageEffectId": 12907,
+    "damagePercentAdded": 100,
+    "damageProceedTiming": "ActionBegin",
+    "damageDuration": 2,
+    "speedEffectId": 1382,
+    "speedPercent": -40,
+    "speedProceedTiming": "BeginTurn",
+    "speedDuration": 2,
+    "damageRecast": "replace same effect from same source",
+    "speedRecast": "add another independently expiring instance"
+  },
+  "focusCases": [
+    {
+      "name": "Focus then four nested attacks in one ordinary actor action",
+      "events": [
+        "ordinary ActionBegin",
+        "Focus adds damage lifetime2 and speed lifetime2",
+        "SkillEnd Focus",
+        "attack1",
+        "attack2",
+        "attack3",
+        "attack4"
+      ],
+      "damageEffectActiveForAttacks": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "damageLifeAfter": 2
+    },
+    {
+      "name": "Focus without recast",
+      "rounds": [
+        {
+          "round": 1,
+          "afterFocusDamageLife": 2,
+          "afterFocusSpeedLife": 2
+        },
+        {
+          "round": 2,
+          "afterBeginTurnSpeedLife": 1,
+          "afterActionBeginDamageLife": 1,
+          "damageActive": true,
+          "speedCopiesAtPriority": 1
+        },
+        {
+          "round": 3,
+          "afterBeginTurnSpeedLife": 0,
+          "afterActionBeginDamageLife": 0,
+          "damageActive": false,
+          "speedCopiesAtPriority": 0
+        }
+      ]
+    },
+    {
+      "name": "Focus recast next ordinary action",
+      "rounds": [
+        {
+          "round": 1,
+          "afterFocusDamageLife": 2,
+          "speedLivesAfterFocus": [
+            2
+          ]
+        },
+        {
+          "round": 2,
+          "speedLivesAtPriority": [
+            1
+          ],
+          "afterFocusDamageLife": 2,
+          "speedLivesAfterFocus": [
+            1,
+            2
+          ]
+        },
+        {
+          "round": 3,
+          "speedLivesAtPriority": [
+            1
+          ]
+        }
+      ],
+      "damagePotencyStacks": false,
+      "temporarySpeedDeltasPercentAfterSecondFocus": [
+        -40,
+        -40
+      ]
+    },
+    {
+      "name": "extra action path skips ordinary ActionBegin",
+      "runtimeOwnerFlagAB": true,
+      "events": [
+        3
+      ],
+      "ordinaryFocusLifetimeAdvances": false
+    }
+  ],
+  "demonForm": {
+    "activateSkillId": 408090,
+    "activateMp": 8,
+    "cancelSkillId": 408150,
+    "cancelMp": 0,
+    "parentEffectId": 19015,
+    "effectTypeEnum": 144,
+    "statusId": 50,
+    "addedChildEffectId": 16603,
+    "childLifetime": -1,
+    "primaryParameters": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "scaleParameter": 150,
+    "doesNotDirectlyScale": [
+      "HP",
+      "MP",
+      "Divine",
+      "AP"
+    ],
+    "blockedWhiteMagicSkillIds": [
+      210010,
+      210020,
+      210030,
+      215000,
+      215010,
+      215020,
+      220410,
+      220480,
+      220490,
+      220500,
+      240010,
+      240020,
+      240030,
+      24500,
+      245010,
+      245020
+    ],
+    "blockedEffectId": 1165,
+    "autoAddsRegen": false,
+    "cancelRemovesParentAndChild": true
+  },
+  "formCases": [
+    {
+      "name": "fresh normal form",
+      "demonForm": false,
+      "activateAllowed": true,
+      "cancelAllowed": false
+    },
+    {
+      "name": "active Witching Hour",
+      "demonForm": true,
+      "activateAllowed": false,
+      "cancelAllowed": true
+    },
+    {
+      "name": "cancel Witching Hour",
+      "beforeEffects": [
+        19015,
+        16603
+      ],
+      "afterEffects": [],
+      "demonForm": false
+    }
+  ],
+  "reaction": {
+    "skillId": 400790,
+    "name": "Moiety’s Mirror",
+    "wrapperMp": 0,
+    "counterEffectIds": [
+      30022,
+      30023
+    ],
+    "defenseEffectId": 16143,
+    "incomingDamageReductionPercent": 50,
+    "lifetime": 1,
+    "proceedTiming": "BeginTurn",
+    "conditionEnum": 20,
+    "conditionName": "ReceiveDamage",
+    "counterSelectionIndices": [
+      1,
+      2
+    ],
+    "selectedSkillsRetainOwnResourceCosts": true,
+    "automaticUnconditionalAttacks": false,
+    "incomingKoBlocksOrdinaryCounter": true,
+    "conditionalSource": "Only an explicit incoming-damage scenario, not a forecast of enemy AI or targeting.",
+    "selectedCounterSelfKoBlocksLaterResponse": true,
+    "selection": {
+      "physicalDamageType": "Physic",
+      "magicalDamageType": "Magic",
+      "excludedSkillAttribute": 5,
+      "excludedSkillAttributeName": "LimitBurst",
+      "physicalExcludedSkillIds": [
+        400240
+      ],
+      "initialCombinedMpReservation": "Not certified by this static audit"
+    }
+  },
+  "reactionCases": [
+    {
+      "name": "no incoming event",
+      "incomingResultPresent": false,
+      "reactionGuaranteed": false
+    },
+    {
+      "name": "damaging record for another subject",
+      "matchesSubject": false,
+      "reactionGuaranteed": false
+    },
+    {
+      "name": "matching damage record",
+      "matchesSubject": true,
+      "resultByte19": 1,
+      "conditionMatches": true,
+      "otherNativeGatesStillRequired": true
+    },
+    {
+      "name": "incoming reaction",
+      "incomingAction379": true,
+      "ordinaryCounterChainAllowed": false
+    },
+    {
+      "name": "incoming damage knocks caster out",
+      "sourceDead": true,
+      "hadDeadException": false,
+      "conditionMatches": false
+    },
+    {
+      "name": "first counter cost knocks caster out",
+      "sourceDeadBeforeSecondResponse": true,
+      "action37A": false,
+      "secondResponseAllowed": false
+    }
+  ],
+  "evidence": {
+    "runtimeActionBegin": [
+      "144FB6643 ->144FA8010",
+      "144FA819C-144FA81C5 ordinary ActionBegin2 apply/proceed when owner+AB=false",
+      "144FA81CB-144FA81DB ActionBeginWithEx3 apply",
+      "144FA82BA-144FA82CD ActionBeginWithEx3 proceed"
+    ],
+    "previewNotRuntime": [
+      "144FB40A1 previews order",
+      "144FB436C-144FB4382 restores counters",
+      "144FB438F restores effect state via145235F00"
+    ],
+    "sameIdDuplicatePolicy": [
+      "145249DBD-145249DD4 same ID/source match",
+      "145249E23-145249E7B both effect type and apply timing must be permitted",
+      "145249EA1-145249EBF removes nonduplicate same-ID effect"
+    ],
+    "formAddRemove": [
+      "14513EE28 factory DemonForm",
+      "1451388F0 adds param0 child and stores pointer+B8",
+      "145141A80 removes stored child",
+      "1451384E0 removes effects of type144 via145249500"
+    ],
+    "allParamArithmetic": [
+      "1451450A0 parameters5..9 only",
+      "14514510F-145145126 native float32 percent+EPS multiply and subtract basis",
+      "14523E1A3-14523E1AA truncate each effect contribution separately before integer addition"
+    ],
+    "healing": [
+      "14514FEF0 checks General.whiteMagicSkills",
+      "1452347EA-1452347FF target effect getter zeroes healing",
+      "14514EAF0 compares blocked effectID1165"
+    ],
+    "formEligibility": [
+      "144F45E94 native lock jump table:4->144F45DA5,5->144F45DB9",
+      "144F45DB5/144F45DC9 tests DemonForm status50; NormalForm branch inverts result"
+    ],
+    "reactions": [
+      "145122DD0 incoming context/suppression gates",
+      "14514FE27-14514FE62 ReceiveDamage requires subject-matching damage record",
+      "145107D73-145107E1E chooses stored counter skill index",
+      "145107FDA sets reaction action+379",
+      "1451080B1 queues reaction action",
+      "145122E7A-145122E8A incoming reaction-chain gate",
+      "14510808B-1451080A2 ordinary PC reaction leaves payment suppression+329 false",
+      "144F4748A-144F47491 payment skips only when+329 true",
+      "14514F74E-14514F77C rejects dead reaction source unless HadDead exception; Moiety activation condition20 has no such exception",
+      "145107FC2-145107FCA counter action+37A copies effect+B9 HadDead exception",
+      "144F4661E-144F4662F dead-source action precheck rejects when+37A false"
+    ],
+    "counterSelectionAssets": [
+      {
+        "name": "BP_BtlCmdList_PhysicalAttak_TwinCounter.uasset",
+        "sha256": "3bd0efb259b9efcc30e4f46bf906d058639f2ef4cc0fd784591e3196533a6a1b"
+      },
+      {
+        "name": "BP_BtlCmdList_PhysicalAttak_TwinCounter.uexp",
+        "sha256": "930bebd7f9915bbd41f1e2331a89cd45b5d293e015c74cdc6591bfd2761b3cba"
+      },
+      {
+        "name": "BP_BtlCmdList_MagicalAttak_TwinCounter.uasset",
+        "sha256": "75d53d28cc762f5bd0f0839390b256d9a47ea540c38f5bb2ca6e0ded686152f7"
+      },
+      {
+        "name": "BP_BtlCmdList_MagicalAttak_TwinCounter.uexp",
+        "sha256": "3cea137f29bbbd884dc63bb6aa46b13e70fc59d655ddba4e2f6ca1cf708871c1"
+      }
+    ]
+  },
+  "limits": [
+    "Normal untargeted encounter scenario has no incoming enemy damage event; do not award unconditional reactive damage.",
+    "Focus changes future action priority; apply BeginTurn speed expiry before selecting priority and ordinary ActionBegin expiry after actor selection.",
+    "Focus duplicate speed instances may affect explicit extra-action situations differently; ordinary one-action-per-unit rounds have the listed priority timeline.",
+    "Demon Form requires derived stat recomputation and white-magic healing prohibition; it does not grant Regen merely because param1 names1165.",
+    "Reactive target counts, stochastic enemy targeting, multi-hit trigger multiplicity and bespoke interruption states require their event context."
+  ]
+}

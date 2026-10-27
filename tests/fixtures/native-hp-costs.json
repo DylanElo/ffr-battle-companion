@@ -1,0 +1,187 @@
+{
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "method": "Copied native integer/float32 cost and affordability blocks executed in isolated allocations with explicit inputs; no observed battle measurements.",
+  "affordabilityScope": "Ratio arithmetic only: fresh selection and action packets with +32A=1 (including party counters). Ordinary committed +32A=0 queue packets skip the optional checker and consume with HP/MP clamped to zero; packet control flow was inspected, not executed by these scalar fixtures.",
+  "locations": {
+    "cost": [
+      "0x14513C0BA-0x14513C0D8"
+    ],
+    "affordability": [
+      "0x144F50C14-0x144F50C3F",
+      "0x144F59E2C-0x144F59E42"
+    ]
+  },
+  "fixtures": [
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 1,
+        "percent": 5
+      },
+      "expected": 0
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 19,
+        "percent": 5
+      },
+      "expected": 0
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 20,
+        "percent": 5
+      },
+      "expected": 1
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 99,
+        "percent": 5
+      },
+      "expected": 4
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 100,
+        "percent": 5
+      },
+      "expected": 5
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 101,
+        "percent": 5
+      },
+      "expected": 5
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 9999,
+        "percent": 5
+      },
+      "expected": 499
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 10001,
+        "percent": 10
+      },
+      "expected": 1000
+    },
+    {
+      "kind": "cost",
+      "input": {
+        "maxHp": 1677721,
+        "percent": 10
+      },
+      "expected": 167772
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 4,
+        "maxHp": 100,
+        "percent": 5
+      },
+      "expected": false
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 5,
+        "maxHp": 100,
+        "percent": 5
+      },
+      "expected": true
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 6,
+        "maxHp": 100,
+        "percent": 5
+      },
+      "expected": true
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 0,
+        "maxHp": 19,
+        "percent": 5
+      },
+      "expected": false
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 1,
+        "maxHp": 19,
+        "percent": 5
+      },
+      "expected": true
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 4,
+        "maxHp": 99,
+        "percent": 5
+      },
+      "expected": false
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 5,
+        "maxHp": 99,
+        "percent": 5
+      },
+      "expected": true
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 9,
+        "maxHp": 99,
+        "percent": 10
+      },
+      "expected": false
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 10,
+        "maxHp": 99,
+        "percent": 10
+      },
+      "expected": true
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 500,
+        "maxHp": 10001,
+        "percent": 5
+      },
+      "expected": false
+    },
+    {
+      "kind": "affordable",
+      "input": {
+        "currentHp": 501,
+        "maxHp": 10001,
+        "percent": 5
+      },
+      "expected": true
+    }
+  ]
+}

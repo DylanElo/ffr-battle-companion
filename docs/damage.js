@@ -43,6 +43,23 @@
     for(const percent of percentFactors){finite('MP cost percentage',percent,0);factor=f(factor*nativePercent(percent));}
     return cost===0?0:Math.trunc(Math.max(1,f(f(cost)*factor)));
   }
+  function skillHpCost(maxHp,percent) {
+    finite('maximum HP',maxHp,1,0x7fffffff);finite('HP cost percentage',percent,0,100);
+    if(!Number.isInteger(maxHp) || !Number.isInteger(percent) || maxHp*percent>0x7fffffff)throw new RangeError('HP cost inputs must be integers with a signed 32-bit product.');
+    return Math.trunc(f(f(Math.imul(maxHp,percent))*f(.01)));
+  }
+  function canPayHpCost(currentHp,maxHp,percent) {
+    skillHpCost(maxHp,percent);finite('current HP',currentHp,0);
+    if(!Number.isInteger(currentHp))throw new RangeError('Current HP must be an integer.');
+    // Native usability compares ratios, not the rounded integer payment; equality is allowed.
+    return f(f(currentHp)/f(maxHp))>=f(f(percent)*f(.01));
+  }
+  function damageTakenLb(damage,preHp,maxHp,baseGain=50) {
+    finite('received damage',damage,0,0x7fffffff);finite('pre-hit HP',preHp,0,0x7fffffff);
+    finite('maximum HP',maxHp,1,0x7fffffff);finite('received-damage LB factor',baseGain,0);
+    if(![damage,preHp,maxHp].every(Number.isInteger))throw new RangeError('Received damage and HP inputs must be integers.');
+    return Math.trunc(f(f(f(Math.min(damage,preHp))/f(maxHp))*f(baseGain)));
+  }
   function initiativeJitter(rng,amplitude){
     finite('initiative RNG',rng,0,32767);finite('initiative amplitude',amplitude,0);
     if(!Number.isInteger(rng) || !Number.isInteger(amplitude))throw new RangeError('Initiative RNG and amplitude must be integers.');
@@ -57,7 +74,7 @@
   function damage(input) {
     const skill=input.skill || {};
     const calcType=clean(skill.calcType ?? skill.damageCalcType);
-    if(!['Physic','Magic','EscapeNum','SameLevel'].includes(calcType))return {supported:false,calcType,amount:null,min:null,max:null,reason:`Native calculation ${calcType || 'unknown'} is not implemented.`,warnings:['This action is excluded from numeric rankings.']};
+    if(!['Physic','Magic','EscapeNum','SameLevel','GoodLuck'].includes(calcType))return {supported:false,calcType,amount:null,min:null,max:null,reason:`Native calculation ${calcType || 'unknown'} is not implemented.`,warnings:['This action is excluded from numeric rankings.']};
     const mag=Number(skill.mag ?? skill.magnification);
     const elementFactor=input.elementFactor??1;
     finite('skill coefficient',mag,0);finite('element factor',elementFactor,-Infinity,Infinity);
@@ -124,6 +141,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,initiativeJitter,initiativePriority,damage,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

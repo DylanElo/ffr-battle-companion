@@ -13,6 +13,7 @@
   }
   function add(target,key,value){key=normalize(clean(key));target[key]=(target[key]||0)+(Number(value)||0);}
   function effectDelta(clampedBasis,term){
+    if(term.kind==='statScale')return Math.trunc(f(f(f(clampedBasis)*f(f(f(Number(term.value))*f(.01))+EPS))-f(clampedBasis)));
     if(term.kind!=='statPercent')return Math.trunc(f(Number(term.value)));
     // Native handler 0x145145150 uses float epsilon before the final per-effect integer conversion.
     const ratio=f(f(Math.abs(Number(term.value)))*f(.01));
@@ -98,7 +99,7 @@
     }
     const additive={...context.additive};
     for(const [key,value] of Object.entries(equipmentStats))add(additive,key,value);
-    const effects=terms.filter(t=>t.kind==='statFlat'||t.kind==='statPercent');
+    const effects=terms.filter(t=>t.kind==='statFlat'||t.kind==='statPercent'||t.kind==='statScale');
     const effectsByParameter=new Map();
     for(const term of effects){const key=normalize(term.parameter);if(!effectsByParameter.has(key))effectsByParameter.set(key,[]);effectsByParameter.get(key).push(term);}
     const stats={},beforeEffects={},computing=new Set();
