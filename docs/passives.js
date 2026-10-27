@@ -132,6 +132,14 @@
       if(!allDefault(0))return reject('Unrecognized higher-defense condition.');
       return {...term,kind:'dominantDefence',value:true};
     }
+    if(type==='AccuracyVariation'){
+      if(!Number.isInteger(Number(p[0])) || !allDefault(1))return reject('Unverified accuracy modifier layout.');
+      return {...term,kind:'accuracyBonus',value:Number(p[0])};
+    }
+    if(type==='CritOrMiss'){
+      if(Number(p[0])!==50 || Number(p[1])!==1 || Number(p[2])!==10 || !allDefault(3))return reject('Unverified critical-or-miss layout.');
+      return {...term,kind:'gambleShot',value:true};
+    }
     if(type==='GoodLuck' || type==='AddSkillBaseMagGoodLuck' || type==='DmgMulGoodLuckNum'){
       if(!Number.isFinite(Number(p[0])) || !allDefault(1))return reject('Unrecognized luck-scaled modifier layout.');
       return {...term,kind:type==='GoodLuck'?'critRatePerLuck':type==='AddSkillBaseMagGoodLuck'?'coefficientPerLuck':'breakPerLuck',value:Number(p[0])};
@@ -162,7 +170,7 @@
     let indexes=catalogCache.get(catalog);
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
-    const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0};
+    const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0,gambleShot:false,accuracyBonus:0};
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     for(const id of passiveIds || []){
@@ -238,6 +246,12 @@
       const gate=filters(term,context);
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
+      if(term.kind==='accuracyBonus' && Number(context.skill?.id)!==406060){
+        result.deferred.push({...term,reason:'Accuracy changes are currently scored only for Gamble Shot.'});continue;
+      }
+      if(term.kind==='gambleShot'){
+        modifiers.gambleShot=true;result.applied.push(term);result.terms.push(term);continue;
+      }
       if(['critRatePerLuck','coefficientPerLuck','breakPerLuck'].includes(term.kind)){
         if(!Number.isFinite(context.goodLuck) || context.goodLuck<0 || context.goodLuck>10){result.deferred.push({...term,reason:'Requires current native Good Luck level (0–10).'});continue;}
         const kind={critRatePerLuck:'critRatePercent',coefficientPerLuck:'coefficientAdd',breakPerLuck:'breakPercent'}[term.kind],value=term.value*context.goodLuck;

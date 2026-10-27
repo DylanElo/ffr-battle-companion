@@ -1,0 +1,624 @@
+{
+  "evidence": "Static executable trace plus isolated copied-instruction execution; not live battle observations.",
+  "executableSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "copiedRange": [
+    "145109C71",
+    "145109C9A"
+  ],
+  "rngScaleFloat32Bits": "9001483b",
+  "isolatedChecksPassed": 1081344,
+  "vectors": [
+    {
+      "luck": 0,
+      "accuracyBonus": -20,
+      "threshold": 30,
+      "successSamples": 9831,
+      "totalSamples": 32768,
+      "probability": 0.300018310546875
+    },
+    {
+      "luck": 1,
+      "accuracyBonus": -20,
+      "threshold": 40,
+      "successSamples": 13107,
+      "totalSamples": 32768,
+      "probability": 0.399993896484375
+    },
+    {
+      "luck": 2,
+      "accuracyBonus": -20,
+      "threshold": 50,
+      "successSamples": 16384,
+      "totalSamples": 32768,
+      "probability": 0.5
+    },
+    {
+      "luck": 3,
+      "accuracyBonus": -20,
+      "threshold": 60,
+      "successSamples": 19661,
+      "totalSamples": 32768,
+      "probability": 0.600006103515625
+    },
+    {
+      "luck": 4,
+      "accuracyBonus": -20,
+      "threshold": 70,
+      "successSamples": 22937,
+      "totalSamples": 32768,
+      "probability": 0.699981689453125
+    },
+    {
+      "luck": 5,
+      "accuracyBonus": -20,
+      "threshold": 80,
+      "successSamples": 26214,
+      "totalSamples": 32768,
+      "probability": 0.79998779296875
+    },
+    {
+      "luck": 6,
+      "accuracyBonus": -20,
+      "threshold": 90,
+      "successSamples": 29491,
+      "totalSamples": 32768,
+      "probability": 0.899993896484375
+    },
+    {
+      "luck": 7,
+      "accuracyBonus": -20,
+      "threshold": 100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 8,
+      "accuracyBonus": -20,
+      "threshold": 110,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 9,
+      "accuracyBonus": -20,
+      "threshold": 120,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 10,
+      "accuracyBonus": -20,
+      "threshold": 130,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 0,
+      "accuracyBonus": 0,
+      "threshold": 50,
+      "successSamples": 16384,
+      "totalSamples": 32768,
+      "probability": 0.5
+    },
+    {
+      "luck": 1,
+      "accuracyBonus": 0,
+      "threshold": 60,
+      "successSamples": 19661,
+      "totalSamples": 32768,
+      "probability": 0.600006103515625
+    },
+    {
+      "luck": 2,
+      "accuracyBonus": 0,
+      "threshold": 70,
+      "successSamples": 22937,
+      "totalSamples": 32768,
+      "probability": 0.699981689453125
+    },
+    {
+      "luck": 3,
+      "accuracyBonus": 0,
+      "threshold": 80,
+      "successSamples": 26214,
+      "totalSamples": 32768,
+      "probability": 0.79998779296875
+    },
+    {
+      "luck": 4,
+      "accuracyBonus": 0,
+      "threshold": 90,
+      "successSamples": 29491,
+      "totalSamples": 32768,
+      "probability": 0.899993896484375
+    },
+    {
+      "luck": 5,
+      "accuracyBonus": 0,
+      "threshold": 100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 6,
+      "accuracyBonus": 0,
+      "threshold": 110,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 7,
+      "accuracyBonus": 0,
+      "threshold": 120,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 8,
+      "accuracyBonus": 0,
+      "threshold": 130,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 9,
+      "accuracyBonus": 0,
+      "threshold": 140,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 10,
+      "accuracyBonus": 0,
+      "threshold": 150,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 0,
+      "accuracyBonus": 10000,
+      "threshold": 10050,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 1,
+      "accuracyBonus": 10000,
+      "threshold": 10060,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 2,
+      "accuracyBonus": 10000,
+      "threshold": 10070,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 3,
+      "accuracyBonus": 10000,
+      "threshold": 10080,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 4,
+      "accuracyBonus": 10000,
+      "threshold": 10090,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 5,
+      "accuracyBonus": 10000,
+      "threshold": 10100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 6,
+      "accuracyBonus": 10000,
+      "threshold": 10110,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 7,
+      "accuracyBonus": 10000,
+      "threshold": 10120,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 8,
+      "accuracyBonus": 10000,
+      "threshold": 10130,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 9,
+      "accuracyBonus": 10000,
+      "threshold": 10140,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "luck": 10,
+      "accuracyBonus": 10000,
+      "threshold": 10150,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    }
+  ],
+  "ordinaryHitVectors": [
+    {
+      "accuracyBonus": 0,
+      "targetEvasion": 0,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 1.0,
+      "atLeastOneHitAmongEight": 1.0
+    },
+    {
+      "accuracyBonus": -20,
+      "targetEvasion": 0,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 80,
+      "successSamples": 26214,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.79998779296875,
+      "atLeastOneHitAmongEight": 0.9999974387497329
+    },
+    {
+      "accuracyBonus": 0,
+      "targetEvasion": 25,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 75,
+      "successSamples": 24576,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.75,
+      "atLeastOneHitAmongEight": 0.9999847412109375
+    },
+    {
+      "accuracyBonus": 0,
+      "targetEvasion": 100,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 25,
+      "successSamples": 8192,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.25,
+      "atLeastOneHitAmongEight": 0.8998870849609375
+    },
+    {
+      "accuracyBonus": -20,
+      "targetEvasion": 25,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 55,
+      "successSamples": 18022,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.54998779296875,
+      "atLeastOneHitAmongEight": 0.9983181225147143
+    },
+    {
+      "accuracyBonus": 0,
+      "targetEvasion": 0,
+      "targetStatusResistance": 50,
+      "ordinaryHitThreshold": 50,
+      "successSamples": 16384,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.5,
+      "atLeastOneHitAmongEight": 0.99609375
+    },
+    {
+      "accuracyBonus": 10000,
+      "targetEvasion": 75,
+      "targetStatusResistance": 0,
+      "ordinaryHitThreshold": 100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 1.0,
+      "atLeastOneHitAmongEight": 1.0
+    },
+    {
+      "accuracyBonus": 0,
+      "targetEvasion": 0,
+      "targetStatusResistance": 100,
+      "ordinaryHitThreshold": 0,
+      "successSamples": 0,
+      "totalSamples": 32768,
+      "perRatioHitProbability": 0.0,
+      "atLeastOneHitAmongEight": 0.0
+    }
+  ],
+  "eventScope": {
+    "gambleDrawsPerFreshUnbrokenSelection": 1,
+    "ordinaryHitChecksPerSingleTargetSelection": 8,
+    "luckGainOnAtLeastOneHit": 5,
+    "luckGainApplicationsPerSelectionMaximum": 1
+  },
+  "skill": {
+    "id": 406060,
+    "row": "ジェイク_AB中　ギャンブルショット",
+    "name": "Gamble Shot",
+    "desc": "Deal physical damage with a guaranteed critical hit. Hit chance scales with luck level.\nLuck level raised by 5 on hit.",
+    "attr": "Ability",
+    "effectType": "DamageAndRecovery",
+    "dmgType": "Physic",
+    "calcType": "Physic",
+    "element": "None",
+    "target": "Single",
+    "relation": "Enemies",
+    "cost": 18,
+    "mag": 30,
+    "breakDmg": 27,
+    "accuracy": 100,
+    "hits": 8,
+    "ratios": [
+      0.125,
+      0.125,
+      0.125,
+      0.125,
+      0.125,
+      0.125,
+      0.125,
+      0.125,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "icon": "UI.Skill.Action.Icon.Attack",
+    "effects": [
+      13201,
+      65006
+    ],
+    "seq": [],
+    "seqPath": null,
+    "hit": true,
+    "hasUnit": "Jake",
+    "effectBundles": [
+      {
+        "effectId": 13201,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "BeforeDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": 65006,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "effectId": -1,
+        "TargetType": "Self",
+        "targetRelation": "Friendlies",
+        "activeSkillAddTiming": "AfterDamageCalculation",
+        "passiveSkillAddTiming": "None",
+        "conditionData": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      }
+    ],
+    "equipCost": 10,
+    "mimicableUnitId": 1007,
+    "isMimicEnabled": true,
+    "commandIds": [
+      1
+    ],
+    "availableLocation": "BattleOnly",
+    "isApplyAllMag": false,
+    "criticalHitRate": 0,
+    "parameterVariationType": "Decrease",
+    "parameterType": "HitPoint",
+    "statusCondition": "None",
+    "defaultTargetState": "Alive",
+    "isReverseDamageToUndead": false,
+    "isReflectPenetration": false,
+    "isAliveOnly": true,
+    "isRemovable": true,
+    "unusableInCannotEscapeBattle": false
+  },
+  "effects": [
+    {
+      "id": 13201,
+      "row": "ギャンブルショット",
+      "type": "CritOrMiss",
+      "params": [
+        50,
+        1,
+        10,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "BeginDmgCalc",
+      "proceedTiming": "DamageCalcEnd",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 65006,
+      "row": "強運上昇+5",
+      "type": "AddGoodLuck",
+      "params": [
+        5,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "AddEffect",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "limitations": [
+    "The 32768-sample probabilities assume uniformly distributed low 15-bit RNG outputs.",
+    "Ordinary accuracy, evasion and target resistance are separate subsequent checks.",
+    "A staggered target bypasses the Gamble roll; a nonzero battle-phase byte also bypasses it, without identifying that phase here.",
+    "Post-damage luck gain is hit-gated; a successful Gamble roll alone does not guarantee a hit."
+  ]
+}

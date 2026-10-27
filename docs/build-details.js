@@ -25,21 +25,36 @@ export function commandPlan(ev, indexes) {
   const repeat = luck ? `generate Good Luck to ${n(Math.max(number(luck.requiredLuck),number(luck.requiredTurnLuck)))} with ${phaseName(luck.generatorTurn,indexes)}; then spend with ${phaseName(luck.spenderTurn,indexes)}` : list(turn.rotationTurns).length ? turn.rotationTurns.map(phase => phaseName(phase, indexes)).join(' → ') : ev.recipeLabel || phaseName(turn, indexes);
   return `${turn.openingTurn ? `Open with ${phaseName(turn.openingTurn, indexes)}; then ` : ''}${turn.rotationTurns?.length && !luck ? 'repeat ' : ''}${repeat}`;
 }
+function handlesGamble(ev) {
+  if(!ev.actionPlan || !(number(ev.gambleSamples)>0) || ev.sampleKind!=='native-initiative-and-gamble')return false;
+  const turn=ev.actionPlan.turn || ev.turn || {}, policy=turn.luckPolicy;
+  const phases=[turn,ev.actionPlan.openingTurn,turn.openingTurn,...list(ev.actionPlan.rotationTurns),...list(turn.rotationTurns),policy?.generatorTurn,policy?.spenderTurn];
+  return phases.some(phase=>phaseSkills(phase).includes(406060)) || list(ev.resourceEvents).some(event=>Number(event.skillId)===406060);
+}
+function gambleEventText(event) {
+  const context=event.context || {}, outcomes=context.gambleHitOutcomes;
+  const outcome=context.gambleOutcome ?? event.gambleOutcome;
+  if(typeof outcome !== 'boolean')return '';
+  const landed=Array.isArray(outcomes)?outcomes.filter(Boolean).length:null;
+  const chance=Number.isFinite(event.hitProbability)?`; per-part hit chance ${n(event.hitProbability*100)}% at this state`:
+    Number.isFinite(context.gambleProbability)?`; shared Gamble roll chance ${n(context.gambleProbability*100)}% at this state`:'';
+  return `; sampled Gamble ${outcome?'critical hit':'miss'}${landed!==null?` (${landed}/${outcomes.length} parts landed)`:''}${chance}`;
+}
 function resourceEventText(event, indexes) {
   const round = `Round ${n(event.round)}`;
   if (event.kind === 'incoming') return `${round} · ${clean(event.damageType) === 'Magic' ? 'Magic' : 'Physical'} incoming hit: ${n(event.damage)} HP damage (${n(event.hpBefore)} → ${n(event.hpAfter)})${event.mirrorReduction ? '; Mirror reduction applied' : ''}.`;
   const skill = Number(event.skillId) > 0 ? ability(indexes,event.skillId)?.name || `Skill #${event.skillId}` : 'State event';
   if (event.kind === 'limit') return `${round} · Limit Burst: ${skill} — ${n(event.damage)} damage; HP remaining ${n(event.hpAfter)}, MP remaining ${n(event.mpAfter)}${event.goodLuckAfter !== undefined ? `; luck ${n(event.goodLuckAfter)}` : ''}.`;
-  return `${round} · ${skill}${event.mpCost !== undefined ? `: ${n(event.mpCost)} MP` : ''}${number(event.hpCost) ? `, ${n(event.hpCost)} HP (${n(event.hpBefore)} → ${n(event.hpAfter)})` : ''}${event.goodLuckAfter !== undefined ? `; luck ${n(event.goodLuckAfter)}` : ''}${event.overclockStates?.length ? `; clock charges ${event.overclockStates.map(clock => n(clock.charges)).join(' / ')}` : ''}${event.overheat ? '; Overheat' : ''}${event.demonForm ? '; Witching Hour' : ''}.`;
+  return `${round} · ${skill}${event.mpCost !== undefined ? `: ${n(event.mpCost)} MP` : ''}${number(event.hpCost) ? `, ${n(event.hpCost)} HP (${n(event.hpBefore)} → ${n(event.hpAfter)})` : ''}${event.goodLuckAfter !== undefined ? `; luck ${n(event.goodLuckAfter)}` : ''}${event.overclockStates?.length ? `; clock charges ${event.overclockStates.map(clock => n(clock.charges)).join(' / ')}` : ''}${event.overheat ? '; Overheat' : ''}${event.demonForm ? '; Witching Hour' : ''}${gambleEventText(event)}.`;
 }
 function stateExplanation(ev, indexes) {
   if (!ev.actionPlan) return '';
   const events = list(ev.resourceEvents), skips = list(ev.resourceSkips);
-  const hasLuck = number(ev.remainingGoodLuck) > 0 || events.some(event => number(event.goodLuckBefore) > 0 || number(event.goodLuckAfter) > 0);
+  const hasLuck = handlesGamble(ev) || number(ev.remainingGoodLuck) > 0 || events.some(event => number(event.goodLuckBefore) > 0 || number(event.goodLuckAfter) > 0);
   const clocks = list(ev.overclockStates);
   const luck=ev.turn?.luckPolicy;
   const phases = [...(ev.turn?.openingTurn ? [{turn:ev.turn.openingTurn,label:'Opening'}] : []), ...(luck ? [{turn:luck.generatorTurn,label:`Generate to ${n(Math.max(number(luck.requiredLuck),number(luck.requiredTurnLuck)))} luck`},{turn:luck.spenderTurn,label:'Spend when available'}] : list(ev.turn?.rotationTurns).map((turn,i)=>({turn,label:`Rotation ${i+1}`})))];
-  return `${phases.length ? `<h5>Action phases</h5><ol class="notes">${phases.map(({turn,label})=>`<li>${label}: ${h(phaseName(turn,indexes))} — ${n(turn.mp)} MP.</li>`).join('')}</ol>` : ''}<h5>Resource forecast</h5><p class="small">HP remaining ${n(ev.remainingHp)} / ${n(ev.actionPlan.maxHp)}; HP paid ${n(ev.hpSpent)}; MP remaining ${n(ev.remainingMp)}.${hasLuck ? ` Good Luck remaining ${n(ev.remainingGoodLuck)} / 10.` : ''}${clocks.length ? ` Overclock charges: ${clocks.map(clock => `${clock.effectId === 19004 ? 'Zero' : 'I'} ${n(clock.charges)}`).join(', ')}.` : ''}${ev.overheat ? ' Overheat is active at the end of the forecast.' : ''}${ev.demonForm ? ' Witching Hour is active at the end of the forecast.' : ''}</p>
+  return `${ev.gambleSamples ? `<p class="model-notice small">Damage and HP/MP totals are sampled averages across ${n(ev.gambleSamples)} reproducible native initiative and Gamble paths. Luck, skipped actions and the event trace show one representative path; those outcomes are not guaranteed.</p>` : ''}${phases.length ? `<h5>Action phases</h5><ol class="notes">${phases.map(({turn,label})=>`<li>${label}: ${h(phaseName(turn,indexes))} — ${n(turn.mp)} MP.</li>`).join('')}</ol>` : ''}<h5>Resource forecast</h5><p class="small">HP remaining ${n(ev.remainingHp)} / ${n(ev.actionPlan.maxHp)}; HP paid ${n(ev.hpSpent)}; MP remaining ${n(ev.remainingMp)}.${hasLuck ? ` Good Luck remaining ${n(ev.remainingGoodLuck)} / 10.` : ''}${clocks.length ? ` Overclock charges: ${clocks.map(clock => `${clock.effectId === 19004 ? 'Zero' : 'I'} ${n(clock.charges)}`).join(', ')}.` : ''}${ev.overheat ? ' Overheat is active at the end of the forecast.' : ''}${ev.demonForm ? ' Witching Hour is active at the end of the forecast.' : ''}</p>
     ${number(ev.remainingHp) <= 0 ? '<p class="bad small">The forecast ends at zero HP. A paid HP-cost attack can finish at zero HP; subsequent actions are blocked.</p>' : ''}
     ${skips.length ? `<h5>Actions skipped</h5><ul class="notes">${skips.map(skip => `<li>Round ${n(skip.round)} · ${h(ability(indexes, skip.skillId)?.name || `Skill #${skip.skillId}`)}: ${h(skip.reason)}</li>`).join('')}</ul>` : ''}
     ${events.length ? `<details><summary>Resource trace <span class="dim">· representative forecast</span></summary><ol class="notes">${events.slice(0,50).map(event => `<li>${h(resourceEventText(event,indexes))}</li>`).join('')}</ol>${events.length > 50 ? '<p class="dim small">First 50 events shown.</p>' : ''}</details>` : ''}`;
@@ -108,6 +123,8 @@ function effectText(t) {
   const names = { damagePercent: 'damage', elementDamagePercent: `${t.element || 'elemental'} damage`, breakPercent: 'stagger',
     elementBreakPercent: `${t.element || 'elemental'} stagger`, critRatePercent: 'critical chance', critDamagePercent: 'critical damage',
     physicalReductionPercent: 'physical damage reduction', magicReductionPercent: 'magic damage reduction' };
+  if (t.kind === 'gambleShot') return 'Gamble Shot: one shared critical-or-miss roll, followed by the eight parts’ accuracy checks. A successful part is critical; +5 luck is gained once when at least one part lands.';
+  if (t.kind === 'accuracyBonus') return `accuracy +${value} points; modifies Gamble Shot’s native hit checks`;
   if (t.kind === 'primaryStatScale') return `STR / STA / INT / SPR / SPD scale ${value}%; native per-effect rounding. HP, MP and AP have no direct scale.`;
   if (t.kind === 'statFlat') return `${parameter} ${number(t.value) >= 0 ? '+' : ''}${value}`;
   if (t.kind === 'statPercent') return `${parameter} ${number(t.value) >= 0 ? '+' : ''}${value}%`;
@@ -124,8 +141,9 @@ export function buildExplanation(member, indexes) {
   const ev = member.explanationEvaluation || member.evaluation || {}, skill = lookup(indexes, 'skills', ev.skillId), common = ev.common || {};
   const ids = list(ev.equippedSkillIds), reasons = list(member.abilityReasons), analysis = ev.passiveAnalysis || {};
   const magical = clean(skill?.calcType) === 'Magic';
+  const gamble=handlesGamble(ev), gambleChance=Number.isFinite(ev.hitProbability)?ev.hitProbability:number(ev.criticalChance);
   const counted = list(analysis.applied), omitted = [...list(analysis.deferred), ...list(analysis.unsupported)]
-    .filter(t=>!list(ev.limit?.effectIds).includes(Number(t.effectId)) && !(ev.actionPlan && list(ev.actionPlan.passiveIds).includes(Number(t.effectId) === 65004 ? 1499 : Number(t.effectId) === 65005 ? 1511 : -1)));
+    .filter(t=>!list(ev.limit?.effectIds).includes(Number(t.effectId)) && !(ev.actionPlan && list(ev.actionPlan.passiveIds).includes(Number(t.effectId) === 65004 ? 1499 : Number(t.effectId) === 65005 ? 1511 : -1)) && !(Number(t.effectId)===65006 && handlesGamble(ev)));
   return `<details class="build-explanation" data-keep="why-${member.characterId}"><summary>Why this build <span class="dim">· ${n(ev.skillCost)} / ${n(ev.skillBudget)} AP · ${ids.length} / ${n(ev.maxSkillSlots)} slots</span></summary>
     <p class="small">Removal checks keep the other equipment and equipped abilities fixed, then choose the best supported attack from what remains. They are individual estimates, not additive bonuses or a proof of the best possible build.</p>
     ${member.evaluation?.actionDescription ? `<p class="small"><b>Party action:</b> ${h(member.evaluation.actionDescription)} The checks below describe the character’s own attack before party support.</p>` : ''}
@@ -150,8 +168,8 @@ export function buildExplanation(member, indexes) {
     ${stateExplanation(ev, indexes)}
     <h5>${ev.actionPlan ? 'Reference damage inputs' : 'Damage inputs'}</h5>
     <p class="small">${h(skill?.name || 'Selected attack')} uses this character’s ${h(common.attackSource || (magical ? 'MAG' : 'ATK'))} (${n(common.attack)}) against ${h(common.defenseSource || (magical ? 'magic' : 'physical'))} defense (${n(common.defense)}). Level ${n(common.level)}; skill coefficient ${n(skill?.mag)}; ${n(ev.actionCount || 1)} action(s), ${n(ev.turnMp)} MP ${ev.actionPlan ? 'for the reference attack' : 'per turn'}, from ${n(ev.availableMp)} starting MP.</p>
-    <p class="small">Element ${h(ev.element || 'None')} (${h(ev.resistance || 'None')}); elemental multiplier ×${n(common.elementFactor ?? 1)}; first attack’s outgoing multiplier ×${n(common.outgoingFactor ?? 1)}; critical chance ${n(number(ev.criticalChance) * 100)}%; cap ${n(common.damageCap)} per hit.</p>
-    <p class="dim small">These are inputs to the recovered damage formula. HP damage is truncated and capped per hit; stagger rounds to the nearest integer. Expected damage blends normal and critical outcomes. Hits and stagger/LB events follow the recovered order; randomized ordering is sampled rather than predicted; starting state and unmodeled enemy actions remain scenario limits.</p>
+    <p class="small">Element ${h(ev.element || 'None')} (${h(ev.resistance || 'None')}); elemental multiplier ×${n(common.elementFactor ?? 1)}; first attack’s outgoing multiplier ×${n(common.outgoingFactor ?? 1)}; ${gamble ? `every landed Gamble hit is critical; reference per-part hit chance ${n(gambleChance*100)}%` : `critical chance ${n(number(ev.criticalChance) * 100)}%`}; cap ${n(common.damageCap)} per hit.</p>
+    <p class="dim small">These are inputs to the recovered damage formula. HP damage is truncated and capped per hit; stagger rounds to the nearest integer. ${handlesGamble(ev) ? 'Expected damage includes sampled Gamble hits and misses, plus the normal critical calculation for other actions.' : 'Expected damage blends normal and critical outcomes.'} Hits and stagger/LB events follow the recovered order; randomized ordering is sampled rather than predicted; starting state and unmodeled enemy actions remain scenario limits.</p>
     ${list(ev.warnings).length ? `<h5>Limits of this result</h5><ul class="notes">${ev.warnings.map(w => `<li>${h(w)}</li>`).join('')}</ul>` : ''}
   </details>`;
 }

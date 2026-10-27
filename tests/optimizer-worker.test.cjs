@@ -52,7 +52,7 @@ test('worker compares all valid saved members and keeps party MP results includi
 
 
 test('party resource outputs update both displayed and explanation state while preserving reference formula inputs',async()=>{
- const partyState={remainingHp:{1:0},hpSpent:{1:100},resourceSkips:{1:[{round:4,reason:'HP'}]},stateLeafResults:{1:[{skillId:2,damage:7}]},
+ const partyState={gambleSamples:32,sampleKind:'native-initiative-and-gamble',initiativeSamples:32,remainingHp:{1:0},hpSpent:{1:100},resourceSkips:{1:[{round:4,reason:'HP'}]},stateLeafResults:{1:[{skillId:2,damage:7}]},
  resourceEvents:{1:[{round:2,kind:'incoming',damage:100}]},remainingGoodLuck:{1:0},overclockCharges:{1:0},overclockStates:{1:[]},overheat:{1:false},demonForm:{1:false},
  actionOverrides:{1:{damage:5}},limitUses:{1:[{round:3,skillId:9}]}};
  const {result}=await run({partyState}),member=result.results[0].members[0];
@@ -60,6 +60,7 @@ test('party resource outputs update both displayed and explanation state while p
   assert.equal(JSON.stringify(member.evaluation[key]),JSON.stringify(partyState[key][1]),key);
   assert.equal(JSON.stringify(member.explanationEvaluation[key]),JSON.stringify(partyState[key][1]),key);
  }
+ for(const key of ['gambleSamples','sampleKind','initiativeSamples']){assert.equal(member.evaluation[key],partyState[key]);assert.equal(member.explanationEvaluation[key],partyState[key]);}
  assert.equal(member.explanationEvaluation.remainingMp,0);
  assert.equal(member.evaluation.damage,5);assert.equal(member.explanationEvaluation.damage,10);
  assert.equal(member.evaluation.common.attack,77);assert.equal(member.explanationEvaluation.common.attack,77);

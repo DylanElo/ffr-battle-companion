@@ -37,6 +37,32 @@
     while(lo<hi){const mid=(lo+hi)>>>1;if(f(f(mid)*step+1)<=f(rate))lo=mid+1;else hi=mid;}
     return lo/32768;
   }
+  function gambleSuccess(goodLuck,rng,accuracyBonus=0) {
+    finite('Good Luck',goodLuck,0,10);finite('Gamble RNG',rng,0,32767);finite('accuracy bonus',accuracyBonus);
+    if(!Number.isInteger(goodLuck) || !Number.isInteger(rng))throw new RangeError('Gamble luck and RNG must be native integers.');
+    const roll=1+Math.min(99,Math.trunc(f(f(rng)*f(100/32767))));
+    const threshold=f(f(50+f(accuracyBonus))+f(10*goodLuck));
+    return roll<=threshold;
+  }
+  function gambleHitProbability(goodLuck,accuracyBonus=0) {
+    let lo=0,hi=32768;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(gambleSuccess(goodLuck,mid,accuracyBonus))lo=mid+1;else hi=mid;}
+    return lo/32768;
+  }
+  function skillHitSuccess(accuracy,rng,{accuracyBonus=0,evasion=0,maxEvasion=75,statusResistance=0}={}) {
+    finite('accuracy',accuracy);finite('hit RNG',rng,0,32767);finite('accuracy bonus',accuracyBonus);
+    finite('evasion',evasion);finite('maximum evasion',maxEvasion,0);finite('status resistance',statusResistance);
+    if(!Number.isInteger(rng))throw new RangeError('Hit RNG must be a native integer.');
+    const chance=Math.max(0,Math.min(100,accuracy+accuracyBonus-Math.min(maxEvasion,evasion)));
+    const threshold=Math.trunc(f(f(chance)*f(f(f(100-statusResistance)*f(.01))+EPS)));
+    const roll=1+Math.min(99,Math.trunc(f(f(rng)*f(100/32767))));
+    return roll<=threshold;
+  }
+  function skillHitProbability(accuracy,options={}) {
+    let lo=0,hi=32768;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(skillHitSuccess(accuracy,mid,options))lo=mid+1;else hi=mid;}
+    return lo/32768;
+  }
   function skillMpCost(cost,percentFactors=[]) {
     finite('MP cost',cost,0);
     let factor=1;
@@ -141,6 +167,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,gambleSuccess,gambleHitProbability,skillHitSuccess,skillHitProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

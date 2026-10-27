@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=22', 'damage.js?v=4', 'stats.js?v=22', 'battle.js?v=31', 'search.js?v=25');
+importScripts('core.js', 'passives.js?v=23', 'damage.js?v=5', 'stats.js?v=22', 'battle.js?v=32', 'search.js?v=25');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -59,6 +59,7 @@ self.onmessage = async event => {
           const values=party.evaluation?.[key];
           if(values && Object.hasOwn(values,member.characterId))state[key]=values[member.characterId];
         }
+        for(const key of ['gambleSamples','sampleKind','initiativeSamples'])if(Object.hasOwn(party.evaluation || {},key))state[key]=party.evaluation[key];
         if(state.stateLeafResults?.length)state.leafResults=state.stateLeafResults;
         state.limitUses=party.evaluation?.limitUses?.[member.characterId] || [];
         return {...member,abilityReasons:model.explainAbilities(member),

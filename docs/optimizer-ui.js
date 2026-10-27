@@ -1,5 +1,5 @@
 // The party builder shared by Next fight and Fight.
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=6';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=7';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -61,7 +61,7 @@ function partyView(party, index, indexes, canEquip, current) {
       <div class="party">${members.map(m => face(`unit${m.characterId}`, 'md')).join('')}</div>
       <div class="party-total"><strong>${num(finite(evaluated.damage) ? evaluated.damage : summed)}</strong><span>estimated damage per round over ${num(evaluated.rounds || 5)} rounds${finite(evaluated.breakDamage) ? `, stagger ${num(evaluated.breakDamage)} per round` : ''}${evaluated.firstStagger ? `, staggers in round ${evaluated.firstStagger}` : ''}</span></div>
     </div>
-    ${evaluated.initiativeSamples ? `<p class="dim small">Averages ${num(evaluated.initiativeSamples)} native-priority samples. Stagger and LB round labels show one representative sample; they are not guaranteed timings.</p>` : ''}
+    ${evaluated.gambleSamples ? `<p class="dim small">Averages ${num(evaluated.gambleSamples)} reproducible native initiative and Gamble paths. Luck, event traces, stagger and LB round labels show one representative path; they are not guaranteed.</p>` : evaluated.initiativeSamples ? `<p class="dim small">Averages ${num(evaluated.initiativeSamples)} native-priority samples. Stagger and LB round labels show one representative sample; they are not guaranteed timings.</p>` : ''}
     ${current !== undefined ? comparison(current && { damage: current.damage, firstStagger: current.firstStagger }, { damage: finite(evaluated.damage) ? evaluated.damage : summed, firstStagger: evaluated.firstStagger }) : ''}
     <p class="dim small">Current setup uses the abilities recorded in your save. Mastery that the save does not record is excluded, so the comparison may understate your current build.</p>
     ${evaluated.supportDescription ? `<p class="good small">${h(evaluated.supportDescription)}</p>` : ''}

@@ -67,7 +67,7 @@ The same optional-check distinction applies to Good Luck thresholds: runtime pay
 
 ## Supported boundaries
 
-Gale Strike provides a deterministic luck engine. Gamble Shot 406060 instead installs `CritOrMiss` effect 13201 and adds five luck after calculation; its random damage branch and post-miss gain require a stochastic event model. It must not be silently scored as an always-hit ordinary attack or a guaranteed generator.
+Gale Strike provides a deterministic luck engine. Gamble Shot 406060 now uses the native shared critical-or-miss roll, separate ordinary accuracy checks and hit-gated five-point luck gain in reproducible discrete state samples. It is not an always-hit ordinary attack or a guaranteed generator. See [Gamble verification](gamble-verification.md).
 
 Luck and Overclock still obey ownership, AP, slots, MP, status and ancestry restrictions. Model payments and gains at each child, distinguish fresh-selection eligibility from queued execution, and retain the unproven cumulative-preview boundary above.
 
