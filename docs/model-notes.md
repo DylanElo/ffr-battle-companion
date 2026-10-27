@@ -40,7 +40,7 @@ Arithmetic and major native kernels were recovered statically from the installed
 
 Percentage-stat effects use the verified native pre-effect additive parameter as their basis, float32 epsilon and per-effect truncation. This includes the native rounding quirk where a 30% decrease on baseline 100 yields 71. Spirit packages derive their active/passive bundles from the source mastery rows and localized description; exact runtime expansion still needs confirmation.
 
-Different attack-skill pairs, exceptional action restrictions, state-specific ultimate actions, enemy turn scripts, encounter overrides, probabilistic reactions, identical-effect multi-copy stacking, unknown active artifacts and unsupported calculation types are not fabricated. Their absence can change the real best build. Fully automated battle strategy, multi-turn MP regeneration, summoned Espers and simultaneous finishers are outside this model.
+Exceptional action restrictions, state-specific ultimate actions, enemy turn scripts, encounter overrides, probabilistic reactions, identical-effect multi-copy stacking, unknown active artifacts and unsupported calculation types are not fabricated. Their absence can change the real best build. Fully automated battle strategy, multi-turn MP regeneration, summoned Espers and simultaneous finishers are outside this model.
 
 ## Validation and handoff
 
@@ -53,6 +53,9 @@ Next Step: runtime Spirit expansion, special initiative/queue overrides and reco
 Known Blockers: no recorded battle measurements; encounter overrides and the specific unverified mechanics above prevent a claim of an exact global best party.
 
 
-Command and initiative evidence: [nested commands](command-verification.md), [native priority](initiative-verification.md). Fixed samples estimate order-dependent outcomes; they are not a prediction of the game RNG seed. Mixed attack skills, interruptions, duration extensions, enemy action scripts and exceptional initiative effects remain outside this search.
+Command and initiative evidence: [nested commands](command-verification.md), [native priority](initiative-verification.md). Fixed samples estimate order-dependent outcomes; they are not a prediction of the game RNG seed. Mixed attacks use up to four shortlisted skills and four successfully evaluated candidate recipes per loadout; setup-first Bravery/Faith/Deprotect/Deshell recipes are also considered. Interruptions, unknown duration extensions, enemy action scripts and exceptional initiative effects remain outside this search.
 
 Search preserves each character’s saved setup before spending the time budget on alternative Resonances and gear. It does not run an unbounded all-Resonance sweep before the timed search.
+
+
+Mixed command evidence: [mixed skills and status refresh](mixed-command-verification.md), [special actions](special-action-verification.md). Each leaf uses its own skill and native damage inputs. Bravery/Faith target the caster; Deprotect/Deshell affect its chosen enemy. Setup benefits to other party members are not projected by these nested recipes. An active setup effect also affects the character’s later LB while its native lifetime remains. Recasting these statuses refreshes duration without stacking potency. Magic Barrage pays the spell cost once per four-copy branch, with additive damage/stagger penalties; random target allocation limits numeric Barrage plans to one enemy.

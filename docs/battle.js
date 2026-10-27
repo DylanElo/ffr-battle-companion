@@ -56,12 +56,12 @@
     const scenario={enemyId:enemy.id,enemyName:enemy.name,difficulty:difficultyName,difficultyGiven,difficultyTaken,
       broken:!!options.broken,critical:!!options.critical,mpPercent:Math.max(0,Math.min(100,number(options.mpPercent,100))),
       enemyCount:Math.max(1,number(options.enemyCount,1)),rounds:Math.max(1,Math.round(number(options.rounds,5))),
-      horizon:'Global-turn planning estimate from full HP, native opening LB effects and the selected MP percentage. Only the listed members contribute stagger. Chosen actions spend MP; no MP recovery, enemy attacks or replacement action is assumed after exhaustion. Compatible nested wrappers repeat the selected attack; mixed attack skills are not searched. Initiative uses reproducible samples of native random priority, not guaranteed Agility order.'};
+      horizon:'Global-turn planning estimate from full HP, native opening LB effects and the selected MP percentage. Only the listed members contribute stagger. Chosen actions spend MP; no MP recovery, enemy attacks or replacement action is assumed after exhaustion. Compatible nested wrappers and mixed attack skills use a bounded shortlist. Supported setup effects refresh without stacking; only the listed character’s benefit is scored. Initiative uses reproducible samples of native random priority, not guaranteed Agility order.'};
     const evidence={formula:'Native executable damage helpers; see docs/damage-research.md.',stats:'Native XP/growth/seed/sync/equipment derivation; cross-save HP checks.',
       passives:'Native effect IDs, timing, conditions and additive damage bucket.',
       search:'Bounded joint search; passive packages use a knapsack surrogate and are then evaluated with native math.',
       calibration:'Damage arithmetic matches independently executed native instruction samples; see docs/combat-verification.md. Battle sequencing remains a model.'};
-    const prepCache=new Map(),analysisCache=new Map(),packageCache=new Map(),valueCache=new Map();
+    const prepCache=new Map(),analysisCache=new Map(),packageCache=new Map(),valueCache=new Map(),referenceRollCache=new Map(),targetCache=new Map();
     const unknownArtifacts=(snapshot.artifactOverrides || []).filter(a=>a.active && !(catalog.artifacts || []).some(row=>row.id===a.id));
     const activeNativeArtifacts=(catalog.artifacts || []).filter(a=>snapshot.inventory.some(i=>i.id===a.id && i.quantity>0) && ((snapshot.artifactOverrides||[]).find(o=>o.id===a.id)?.active ?? a.initialActive));
     const globalWarnings=[];
@@ -121,7 +121,9 @@
       const attackFor=(values,modifiers)=>modifiers.dominantPower?Math.max(number(values.PhysicalAttack),number(values.MagicalAttack)):number(values[magical?'MagicalAttack':'PhysicalAttack']);
       const attack=attackFor(stats,passiveAnalysis.modifiers);
       const element=passiveAnalysis.modifiers.element || clean(skill.element);
-      const targetAnalysis=P.analyze(catalog,enemy.passiveIds || [],{skill,element,hpPercent:100,mpPercent:100,lbPercent:0,broken:scenario.broken,extraPhase:false,critical:scenario.critical,statusIds:[],targetStatusIds:[]});
+      const targetKey=`${skill.id}:${element}`;
+      if(!targetCache.has(targetKey))targetCache.set(targetKey,P.analyze(catalog,enemy.passiveIds || [],{skill,element,hpPercent:100,mpPercent:100,lbPercent:0,broken:scenario.broken,extraPhase:false,critical:scenario.critical,statusIds:[],targetStatusIds:[]}));
+      const targetAnalysis=targetCache.get(targetKey);
       function enemyParameter(key){
         const base=number(enemy.stats?.[key]);
         const terms=targetAnalysis.terms.filter(t=>t.parameter===key && ['statFlat','statPercent'].includes(t.kind));
@@ -196,9 +198,9 @@
       const reservedCost=equipCostOf(turn.reservedIds);
       const totalBudget=number(stats0.skillBudget,prepared.learn.skillBudget)-reservedCost,totalSlots=number(stats0.maxSkillSlots,8)-turn.reservedIds.length;
       const effectiveElement=analysis(freeIds,skill).modifiers.element;
-      const leafContexts=turn.leaves?.map(leaf=>leaf.context) || [turn.context];
+      const leafContexts=turn.leaves?.map(leaf=>({skillId:leaf.skillId,context:leaf.context})) || [{skillId:skill.id,context:turn.context}];
       const contextCounts=new Map();
-      for(const context of leafContexts){const key=JSON.stringify(context),entry=contextCounts.get(key);if(entry)entry.count++;else contextCounts.set(key,{context,count:1});}
+      for(const leaf of leafContexts){const key=JSON.stringify(leaf),entry=contextCounts.get(key);if(entry)entry.count++;else contextCounts.set(key,{...leaf,count:1});}
       const gcd=(a,b)=>b?gcd(b,a%b):a;
       const divisor=[...contextCounts.values()].reduce((factor,entry)=>gcd(factor,entry.count),0);
       // Surrogate values average the leaves: repetition count and sibling order do not change that average.
@@ -208,12 +210,22 @@
       const reference=prepared.saved.equipment;
       const baseIds=unique(prepared.borrowed),baseAnalysis=analysis(baseIds,skill,turn.context);
       const baseFinal=S.characterStats(catalog,snapshot,prepared.saved.id,reference,baseAnalysis.terms);
-      baseFinal.stats.level=baseFinal.level;
+      // One roll per (leaf skill, context, passive set) on the saved gear; recipes and Resonances reuse it.
+      function referenceRoll(ids,leafSkill,context){
+        const rollKey=`${prepared.saved.id}:${leafSkill.id}:${JSON.stringify(context)}:${ids.slice().sort((a,b)=>a-b).join(',')}`;
+        if(referenceRollCache.has(rollKey))return referenceRollCache.get(rollKey);
+        const effects=analysis(ids,leafSkill,context);
+        const state=S.characterStats(catalog,snapshot,prepared.saved.id,reference,effects.terms);
+        const roll=rollDamage({...state.stats,level:state.level},leafSkill,effects,{level:state.level});
+        const result={damage:roll.damage,breakDamage:roll.breakDamage};
+        if(referenceRollCache.size<200000)referenceRollCache.set(rollKey,result);
+        return result;
+      }
       function referenceDamage(ids){
-        const rolls=[...contextCounts.values()].map(({context,count})=>{
-          const effects=analysis(ids,skill,{element:effectiveElement,...context});
-          const state=S.characterStats(catalog,snapshot,prepared.saved.id,reference,effects.terms);
-          const roll=rollDamage({...state.stats,level:state.level},skill,effects,{level:state.level});
+        const rolls=[...contextCounts.values()].map(({skillId,context,count})=>{
+          const leafSkill=indexes.skills.get(skillId);
+          if(turn.leaves?.find(leaf=>leaf.skillId===skillId && leaf.kind==='support'))return {damage:0,breakDamage:0};
+          const roll=referenceRoll(ids,leafSkill,context);
           return {damage:roll.damage*count,breakDamage:roll.breakDamage*count};
         });
         return {damage:rolls.reduce((sum,roll)=>sum+roll.damage,0)/leafContexts.length,breakDamage:rolls.reduce((sum,roll)=>sum+roll.breakDamage,0)/leafContexts.length};
@@ -228,7 +240,7 @@
       }
       function computeValue(ids){
         const candidateAnalysis=analysis(unique([...baseIds,...ids]),skill,{element:effectiveElement,...turn.context});
-        const final=S.characterStats(catalog,snapshot,prepared.saved.id,reference,candidateAnalysis.terms);final.stats.level=final.level;
+        const final=S.characterStats(catalog,snapshot,prepared.saved.id,reference,candidateAnalysis.terms);
         const calculated=referenceDamage(unique([...baseIds,...ids]));
         const value=goalScore({damage:Math.max(0,calculated.damage-baseline.damage),breakDamage:Math.max(0,calculated.breakDamage-baseline.breakDamage),
           durability:Math.max(0,number(final.stats.MaxHitPoint)-number(baseFinal.stats.MaxHitPoint))*.05+
@@ -241,13 +253,15 @@
       const source=id=>indexes.passives.get(id) || indexes.masterSkills.get(id);
       const expanded=ids=>unique(ids.flatMap(id=>indexes.masterSkills.get(id)?.grants?.passiveIds || [id]));
       const freeSkills=ids=>new Set([...prepared.free,...ids.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || [])]);
-      const forced=[null,...masters.filter(m=>(m.grants.activeIds || []).includes(skill.id))];
+      const requiredIds=unique([skill.id,...turn.reservedIds]);
+      const forced=[null,...masters.filter(m=>(m.grants.activeIds || []).some(id=>requiredIds.includes(id)))];
       let result=null,bestValue=-Infinity;
       for(const fixed of forced){
         const fixedIds=fixed?[fixed.id]:[],fixedPassives=expanded(fixedIds),activeFree=freeSkills(fixedIds).has(skill.id);
+        const reservedIds=turn.reservedIds.filter(id=>!freeSkills(fixedIds).has(id));
         const activeCost=activeFree?0:number(skill.equipCost),activeSlots=activeFree?0:1;
         const fixedCost=fixed?number(fixed.equipCost):0;
-        const budget=totalBudget-activeCost-fixedCost,slots=totalSlots-activeSlots-fixedIds.length;
+        const budget=number(stats0.skillBudget)-equipCostOf(reservedIds)-activeCost-fixedCost,slots=number(stats0.maxSkillSlots,8)-reservedIds.length-activeSlots-fixedIds.length;
         if(budget<0 || slots<0)continue;
         const fixedValue=valueOf(fixedPassives),entries=[];
         for(const id of unique([...prepared.learned,...masters.map(m=>m.id)])){
@@ -265,11 +279,12 @@
         const finalFree=freeSkills(masterIds),finalActiveFree=finalFree.has(skill.id);
         const cost=equippedIds.reduce((sum,id)=>sum+number(source(id)?.equipCost),0)+(finalActiveFree?0:number(skill.equipCost));
         const count=equippedIds.length+(finalActiveFree?0:1);
-        if(cost>totalBudget || count>totalSlots)continue;
+        const finalReservedIds=turn.reservedIds.filter(id=>!finalFree.has(id));
+        if(cost+equipCostOf(finalReservedIds)>number(stats0.skillBudget) || count+finalReservedIds.length>number(stats0.maxSkillSlots,8))continue;
         const value=valueOf(allPassiveIds);
         if(value>bestValue || value===bestValue && (!result || cost<result.cost)){
           bestValue=value;result={ids,passiveIds:allPassiveIds,masterIds,equippedIds,freeActiveIds:[...finalFree],cost,
-            activeCost:finalActiveFree?0:number(skill.equipCost),activeSlots:finalActiveFree?0:1};
+            activeCost:finalActiveFree?0:number(skill.equipCost),activeSlots:finalActiveFree?0:1,reservedIds:finalReservedIds};
         }
       }
       if(!result)result={ids:[],passiveIds:[],masterIds:[],equippedIds:[],freeActiveIds:[...prepared.free],cost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeCost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeSlots:prepared.free.has(skill.id)?0:1};
@@ -298,18 +313,19 @@
       return traits;
     }
     const limitCache=new Map();
-    function limitInfo(prepared,equipment,passiveIds){
-      const key=`${prepared.saved.id}:${C.equipmentIds(equipment).join(',')}:${passiveIds.slice().sort((a,b)=>a-b).join(',')}`;
-      if(!limitCache.has(key))limitCache.set(key,computeLimitInfo(prepared,equipment,passiveIds));
+    function limitInfo(prepared,equipment,passiveIds,context={}){
+      const key=`${prepared.saved.id}:${C.equipmentIds(equipment).join(',')}:${passiveIds.slice().sort((a,b)=>a-b).join(',')}:${JSON.stringify(context)}`;
+      if(!limitCache.has(key))limitCache.set(key,computeLimitInfo(prepared,equipment,passiveIds,context));
       return limitCache.get(key);
     }
-    function computeLimitInfo(prepared,equipment,passiveIds){
+    function computeLimitInfo(prepared,equipment,passiveIds,context={}){
       const traits=limitTraits(passiveIds),max=prepared.limitMax;
       const options=prepared.limits.map(skill=>{
         const selfEffects=(skill.effectBundles || []).filter(b=>Number(b.effectId)>0 && clean(b.TargetType)==='Self').map(b=>Number(b.effectId));
-        const r=rollState(passiveIds,skill,prepared.saved.id,equipment,{activeEffectIds:selfEffects});
+        const activeEffectIds=unique([...(context.activeEffectIds || []),...selfEffects]);
+        const r=rollState(passiveIds,skill,prepared.saved.id,equipment,{...context,activeEffectIds});
         if(!r.supported)return null;
-        const b=scenario.broken?r:rollState(passiveIds,skill,prepared.saved.id,equipment,{activeEffectIds:selfEffects,broken:true});
+        const b=scenario.broken?r:rollState(passiveIds,skill,prepared.saved.id,equipment,{...context,activeEffectIds,broken:true});
         return {skillId:skill.id,cost:number(skill.cost),damage:r.damage,brokenDamage:b.damage,breakDamage:number(r.breakDamage),hits:combatHits(r,b)};
       }).filter(Boolean);
       return {...traits,max,baseStaggerGain:number(scenario.enemyCount===1?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,scenario.enemyCount===1?50:25),options};
@@ -355,7 +371,7 @@
             randomFlat:D.initiativeJitter(draw(sample,round,s.m.id,0x68bc21eb),flatAmplitude),waitOffset:round===1?s.firstStrike:0})}))
             .sort((a,b)=>b.priority-a.priority || b.s.tieOrder-a.s.tieOrder || b.s.index-a.s.index).map(o=>o.s);
           for(const s of order){
-            const staggered=scenario.broken || round<recoverAt,lb=s.m.limit;
+        const staggered=scenario.broken || round<recoverAt,lb=s.m.setupLimit && round<s.setupUntil?s.m.setupLimit:s.m.limit;
             const turn=s.m.supportedTurn && acted.has(s.m.supportSourceId)?s.m.supportedTurn:
               {damage:s.m.damage,brokenDamage:s.m.brokenDamage,breakDamage:s.m.breakDamage,hits:s.m.hits};
             // With the Limit Burst goal ticked it fires as soon as it is ready; otherwise only when it beats the normal turn.
@@ -364,7 +380,7 @@
             let act=burst || turn,paidSupport=false;
             if(!burst){
               if(number(s.m.turnMp)>s.mp){s.mpExhaustedRounds.push(round);act={damage:0,brokenDamage:0,breakDamage:0,hits:[]};}
-              else{s.mp-=number(s.m.turnMp);paidSupport=true;}
+          else{s.mp-=number(s.m.turnMp);paidSupport=true;if(s.m.setupDuration)s.setupUntil=round+s.m.setupDuration;}
             }
             let causedStagger=false,actionIndex=0;
             const finishAction=()=>{if(causedStagger && lb)fill(s,lb.fillOnStagger*lb.mult);causedStagger=false;};
@@ -399,40 +415,86 @@
         initiativeSamples:samples,representativeSample:representative.sample,usesAreRepresentative:samples>1,
         expectedLimitUses:Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o.uses[m.id].length,0)/samples]))};
     }
-    // Native recipes flatten depth first. Arms has two Root children; the other wrappers have damage/attribute-filtered leaves.
-    // The search repeats one attack skill, but Arms children may use different valid wrappers around it.
-    function turnsFor(prepared,skill){
+    function setupTurnsFor(prepared,skill){
+      const turns=[];
+      // These native statuses refresh without stacking; friendly selections target the caster.
+      for(const id of [230100,230110,230080,230090]){
+        if(!prepared.legal.has(id))continue;
+        const setup=indexes.skills.get(id),bundle=setup?.effectBundles?.find(b=>number(b.effectId)>0),effect=indexes.effects.get(Number(bundle?.effectId));
+        if(!effect || clean(bundle.activeSkillAddTiming)!=='AfterDamageCalculation' || number(effect.prob,100)!==100 ||
+          number(effect.activationProbability,100)!==100 || number(effect.duration)!==5 || clean(effect.proceedTiming)!=='BeginTurn' ||
+          clean(effect.condition?.Condition)!=='None' || clean(bundle.conditionData?.Condition)!=='None')continue;
+        const term=P.decode(effect);
+        let context;
+        if(setup.relation==='Friendlies' && term.kind==='damagePercent')context={activeEffectIds:[effect.id],buffCount:1};
+        else if(setup.relation==='Enemies' && term.kind==='statPercent' && ['Defence','Mind'].includes(term.parameter)){
+          if(number(enemy.statusResistances?.[clean(effect.status)])>0)continue;
+          context={targetStatPercent:{parameter:term.parameter,value:term.value}};
+        }else continue;
+        for(const wrapper of [DUALCAST,ARMS_AKIMBO]){
+          if(!prepared.legal.has(wrapper) || !indexes.skills.has(wrapper))continue;
+          if(wrapper===DUALCAST && [setup,skill].some(s=>clean(s.attr)!=='Magic'))continue;
+          if(catalog.skillRules && [setup,skill].some(s=>!P.skillEligibility(s,{...prepared.stateContext,hierarchySkills:[wrapper],selectorId:wrapper},catalog.skillRules).eligible))continue;
+          const reservedIds=unique([wrapper,id]).filter(id=>!prepared.free.has(id));
+          const leaves=[{skillId:id,kind:'support',context:{},actionIndex:0},{skillId:skill.id,kind:'attack',context,actionIndex:1}];
+          turns.push({reservedIds,reservedCost:equipCostOf(reservedIds),wrapperIds:[wrapper],leaves,
+            steps:[{skillId:wrapper,kind:'wrapper',depth:0},...leaves.map(leaf=>({...leaf,depth:1}))],
+            recipeLabel:`${indexes.skills.get(wrapper).name} → ${setup.name} (${setup.relation==='Friendlies'?'self':'enemy'}) + ${skill.name}`,
+            actions:2,multi:wrapper,boost:false,mp:number(indexes.skills.get(wrapper).cost)+D.skillMpCost(number(setup.cost))+D.skillMpCost(number(skill.cost)),
+            context,setupContext:context,setupDuration:5,mixed:true});
+        }
+      }
+      return turns;
+    }
+    // Native recipes preserve independent child choices; mixed search uses a bounded shortlist.
+    function turnsFor(prepared,skill,otherSkill=null){
       const DOUBLE_ACTION=400710;
       const eligible=(action,parents)=>!catalog.skillRules || P.skillEligibility(action,{...prepared.stateContext,
         hierarchySkills:parents,selectorId:parents.at(-1)},catalog.skillRules).eligible;
       const has=(id,parents)=>prepared.legal.has(id) && indexes.skills.has(id) && eligible(indexes.skills.get(id),parents);
-      const leaf=(boost=false)=>({skillId:skill.id,boost,context:boost?{activeEffectIds:[MAGIC_BOOST_EFFECT]}:{}});
-      const attack=(boost=false)=>({wrapper:null,leaves:[leaf(boost)],steps:[{skillId:skill.id,kind:'attack',boost,context:leaf(boost).context,depth:0}],
-        wrapperIds:[],mp:D.skillMpCost(number(skill.cost),boost?[150]:[]),label:skill.name});
+      const attack=(action,boost=false,reckless=false)=>{const context=boost?{activeEffectIds:[MAGIC_BOOST_EFFECT]}:reckless?{activeEffectIds:[15112]}:{};
+        return {wrapper:null,leaves:[{skillId:action.id,boost,reckless,context}],steps:[{skillId:action.id,kind:'attack',boost,reckless,context,depth:0}],
+          wrapperIds:[],mp:D.skillMpCost(number(action.cost),boost || reckless?[150]:[]),label:action.name};};
       const wrap=(id,children)=>({wrapper:id,leaves:children.flatMap(child=>child.leaves),
         steps:[{skillId:id,kind:'wrapper',depth:0},...children.flatMap(child=>child.steps.map(step=>({...step,depth:step.depth+1})))],
         wrapperIds:unique([id,...children.flatMap(child=>child.wrapperIds)]),
         mp:number(indexes.skills.get(id)?.cost)+children.reduce((sum,child)=>sum+child.mp,0),
         label:`${indexes.skills.get(id)?.name || id} → ${children.map(child=>child.wrapper?`[${child.label}]`:child.label).join(' + ')}`});
-      function branches(parents=[]){
+      const pair=(id,left,right,parents)=>has(id,parents) && eligible(left,[...parents,id]) && eligible(right,[...parents,id]) &&
+        (id!==DUALCAST || [left,right].every(action=>clean(action.attr)==='Magic')) &&
+        (id!==DOUBLE_ACTION || [left,right].every(action=>clean(action.attr)!=='Magic'));
+      function branches(action,parents=[]){
         const choices=[];
-        if(eligible(skill,parents))choices.push(attack());
-        if(has(MAGIC_BOOST,parents) && clean(skill.dmgType)==='Magic' && eligible(skill,[...parents,MAGIC_BOOST]))choices.push(wrap(MAGIC_BOOST,[attack(true)]));
-        if(has(DUALCAST,parents) && clean(skill.attr)==='Magic' && eligible(skill,[...parents,DUALCAST]))choices.push(wrap(DUALCAST,[attack(),attack()]));
-        if(has(DOUBLE_ACTION,parents) && clean(skill.attr)!=='Magic' && eligible(skill,[...parents,DOUBLE_ACTION]))choices.push(wrap(DOUBLE_ACTION,[attack(),attack()]));
+        if(eligible(action,parents))choices.push(attack(action));
+        if(has(MAGIC_BOOST,parents) && clean(action.dmgType)==='Magic' && eligible(action,[...parents,MAGIC_BOOST]))choices.push(wrap(MAGIC_BOOST,[attack(action,true)]));
+        if(has(400700,parents) && clean(action.dmgType)==='Physic' && eligible(action,[...parents,400700]))choices.push(wrap(400700,[attack(action,false,true)]));
+        if(scenario.enemyCount===1 && has(400360,parents) && clean(action.attr)==='Magic' && eligible(action,[...parents,400360])){
+          const children=Array.from({length:4},(_,index)=>{
+            const child=attack(action),context={activeEffectIds:[12945,15128]};
+            const payment={mpCost:index===0?D.skillMpCost(number(action.cost),[]):0,paymentSuppressed:index>0};
+            child.leaves=child.leaves.map(leaf=>({...leaf,...payment,context}));
+            child.steps=child.steps.map(step=>({...step,...payment,context}));
+            return child;
+          });
+          // Native Magic Barrage reruns one chosen spell four times; only its first child pays.
+          choices.push({...wrap(400360,children),mp:number(indexes.skills.get(400360)?.cost)+D.skillMpCost(number(action.cost),[])});
+        }
+        for(const id of [DUALCAST,DOUBLE_ACTION])if(pair(id,action,action,parents))choices.push(wrap(id,[attack(action),attack(action)]));
         return choices;
       }
-      const recipes=branches();
+      let recipes=otherSkill?[]:branches(skill);
+      if(otherSkill){
+        for(const id of [DUALCAST,DOUBLE_ACTION])if(pair(id,skill,otherSkill,[]))recipes.push(wrap(id,[attack(skill),attack(otherSkill)]));
+      }
       if(has(ARMS_AKIMBO,[])){
-        const children=branches([ARMS_AKIMBO]);
-        for(const left of children)for(const right of children)recipes.push(wrap(ARMS_AKIMBO,[left,right]));
+        for(const left of branches(skill,[ARMS_AKIMBO]))for(const right of branches(otherSkill || skill,[ARMS_AKIMBO]))recipes.push(wrap(ARMS_AKIMBO,[left,right]));
       }
       return recipes.map(recipe=>{
-        const reservedIds=recipe.wrapperIds.filter(id=>!prepared.free.has(id));
+        const reservedIds=unique([...recipe.wrapperIds,...recipe.leaves.map(leaf=>leaf.skillId).filter(id=>id!==skill.id)]).filter(id=>!prepared.free.has(id));
         const leaves=recipe.leaves.map((action,actionIndex)=>({...action,actionIndex}));
         return {reservedIds,reservedCost:equipCostOf(reservedIds),wrapperIds:recipe.wrapperIds,leaves,steps:recipe.steps,
           recipeLabel:recipe.label,actions:leaves.length,multi:leaves.length>1?recipe.wrapper:null,boost:leaves.some(action=>action.boost),
-          mp:recipe.mp,context:leaves[0]?.context || {}};
+          mp:recipe.mp,context:leaves[0]?.context || {},mixed:!!otherSkill,reckless:leaves.some(action=>action.reckless)};
       });
     }
     function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds}){
@@ -452,23 +514,29 @@
         const criticalAnalysis=analysis(allPassives,skill,{critical:true,...turn.context});
         const criticalStats=S.characterStats(catalog,snapshot,characterId,equipment,criticalAnalysis.terms).stats;
         const availableMp=Math.floor(number(stats.MaxMagicPoint ?? stats.MagicPoint)*scenario.mpPercent/100);
-        if(turn.mp>availableMp || packageInfo.cost+turn.reservedCost>calculated.skillBudget || packageInfo.equippedIds.length+packageInfo.activeSlots+turn.reservedIds.length>calculated.maxSkillSlots)return;
+        const reservedIds=packageInfo.reservedIds || turn.reservedIds,reservedCost=equipCostOf(reservedIds);
+        if(turn.mp>availableMp || packageInfo.cost+reservedCost>calculated.skillBudget || packageInfo.equippedIds.length+packageInfo.activeSlots+reservedIds.length>calculated.maxSkillSlots)return;
         const leafRolls=turn.leaves.map(leaf=>{
-          const key=`${skill.id}:${allPassives.slice().sort((a,b)=>a-b).join(',')}:${JSON.stringify(leaf.context)}`;
+          const leafSkill=indexes.skills.get(leaf.skillId);
+          if(leaf.kind==='support'){
+            const empty={supported:true,damage:0,damageMin:0,damageMax:0,breakDamage:0,breakVerified:true,hits:[]};
+            return {normal:empty,broken:empty,actionIndex:leaf.actionIndex,skillId:leaf.skillId,kind:leaf.kind,context:leaf.context};
+          }
+          const key=`${leaf.skillId}:${allPassives.slice().sort((a,b)=>a-b).join(',')}:${JSON.stringify(leaf.context)}`;
           if(!rollByContext.has(key)){
-            const normal=rollState(allPassives,skill,characterId,equipment,leaf.context);
-            const broken=scenario.broken?normal:rollState(allPassives,skill,characterId,equipment,{...leaf.context,broken:true});
+            const normal=rollState(allPassives,leafSkill,characterId,equipment,leaf.context);
+            const broken=scenario.broken?normal:rollState(allPassives,leafSkill,characterId,equipment,{...leaf.context,broken:true});
             rollByContext.set(key,{normal,broken});
           }
-          return {...rollByContext.get(key),actionIndex:leaf.actionIndex};
+          return {...rollByContext.get(key),actionIndex:leaf.actionIndex,skillId:leaf.skillId,kind:leaf.kind || 'attack',context:leaf.context,mpCost:leaf.mpCost,paymentSuppressed:leaf.paymentSuppressed};
         });
         if(leafRolls.some(leaf=>!leaf.normal.supported))return;
-        const single=leafRolls[0].normal;
+        const single=leafRolls.find(leaf=>leaf.kind!=='support')?.normal || leafRolls[0].normal;
         const damage={...single,damage:leafRolls.reduce((sum,leaf)=>sum+leaf.normal.damage,0),
           damageMin:leafRolls.reduce((sum,leaf)=>sum+leaf.normal.damageMin,0),damageMax:leafRolls.reduce((sum,leaf)=>sum+leaf.normal.damageMax,0),
           hits:leafRolls.flatMap(leaf=>combatHits(leaf.normal,leaf.broken).map(hit=>({...hit,actionIndex:leaf.actionIndex}))),
           brokenDamage:leafRolls.reduce((sum,leaf)=>sum+leaf.broken.damage,0),breakDamage:leafRolls.reduce((sum,leaf)=>sum+leaf.normal.breakDamage,0)};
-        const cost=packageInfo.cost+turn.reservedCost,selected=[...packageInfo.equippedIds,...turn.reservedIds],packageFree=new Set(packageInfo.freeActiveIds),activeSelected=packageFree.has(skill.id)?[]:[skill.id];
+        const cost=packageInfo.cost+reservedCost,selected=[...packageInfo.equippedIds,...reservedIds],packageFree=new Set(packageInfo.freeActiveIds),activeSelected=packageFree.has(skill.id)?[]:[skill.id];
         const supports=[];
         let supportCost=cost,slotsUsed=selected.length+activeSelected.length;
         function ensureSupport(candidates,role){
@@ -489,24 +557,76 @@
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
         const survivability=number(stats.MaxHitPoint)*.02+defenseSum(stats,passiveAnalysis.modifiers);
         const limit=prepared.limitMax>0?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
-        const fight=simulateFight([{id:characterId,agility:stats.Agility,passiveIds:allPassives,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,availableMp,turnMp:turn.mp}]);
+        const setupLimit=limit && turn.setupContext?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds]),turn.setupContext):null;
+        const fight=simulateFight([{id:characterId,agility:stats.Agility,passiveIds:allPassives,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp}]);
         const score=goalScore({damage:fight.damage,breakDamage:damage.breakVerified?fight.breakDamage:0,gauge:fight.gauge[characterId],durability:survivability*.5});
         const warnings=[...(calculated.warnings || []),...(prepared.learn.warnings || [])];
         if(packageInfo.masterIds.length)warnings.push('Spirit bundles use native mastery grants and their descriptions; exact runtime expansion has not been traced.');
         if(prepared.excludedActions.length)warnings.push(`Actions excluded by native state/resource rules: ${prepared.excludedActions.join(' | ')}`);
         if(!catalog.skillRules)warnings.push('Action-state rules were not loaded; this is an arithmetic-only check.');
         if(!damage.breakVerified && goals.has('stagger'))warnings.push('Stagger damage formula is not implemented; this objective is unavailable.');
-        if(turn.multi)warnings.push(`${turn.recipeLabel}. Native child filters, hierarchy restrictions and queue order are enforced. Mixed attack skill choices are not searched.`);
+        if(turn.multi)warnings.push(`${turn.recipeLabel}. Native child filters, hierarchy restrictions and queue order are enforced.`);
         if(turn.boost)warnings.push('Each Magic Boost applies to its own following magic attack; its native MP factor uses truncation.');
         if(fight.mpExhaustedRounds[characterId].length)warnings.push(`Not enough MP for the chosen action in rounds ${fight.mpExhaustedRounds[characterId].join(', ')}; those turns contribute no damage. MP recovery and replacement actions are not modeled.`);
-        results.push({valid:true,score,...damage,turn,limit,fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
-          recipeLabel:turn.recipeLabel,recipeSteps:turn.steps,initiativeSamples:fight.initiativeSamples,expectedLimitUses:fight.expectedLimitUses,representativeSample:fight.representativeSample,
+        results.push({valid:true,score,...damage,turn,limit,setupLimit,fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
+          leafResults:leafRolls.map(leaf=>({skillId:leaf.skillId,kind:leaf.kind,context:leaf.context,mpCost:leaf.mpCost,paymentSuppressed:leaf.paymentSuppressed,damage:leaf.normal.damage,breakDamage:leaf.normal.breakDamage,common:leaf.normal.common})),
+          recipeLabel:turn.recipeLabel,recipeSteps:turn.steps,skillIds:unique(turn.leaves.map(leaf=>leaf.skillId)),recklessAbandonment:!!turn.reckless,mixedSearchApproximate:true,initiativeSamples:fight.initiativeSamples,expectedLimitUses:fight.expectedLimitUses,representativeSample:fight.representativeSample,
           passiveIds:packageInfo.passiveIds,equippedSkillIds:unique([...selected,...activeSelected]),alwaysPassiveIds:freeIds,stats,level:calculated.level,
           canHeal,canProtect,supportTags:supports.map(s=>s.role),supportSkillIds:supports.map(s=>s.skillId),supportActions,
           appliedSynergies:passiveAnalysis.applied.map(t=>({name:t.passiveName || t.type,reason:`${t.passiveName || t.type}: ${t.kind} ${t.value ?? t.element} ${t.parameter || ''}`})),
           passiveAnalysis,criticalAnalysis,criticalStats,coverage:passiveAnalysis.coverage,warnings,availableMp});
       };
       for(const skill of prepared.active)for(const turn of turnsFor(prepared,skill))consider(skill,turn);
+      // Preserve repeated baselines, then test at most four mixed recipes from damage/stagger/MP leaders.
+      const bestBySkill=new Map();
+      for(const result of results){const current=bestBySkill.get(result.skillId);if(!current || result.score>current.score)bestBySkill.set(result.skillId,result);}
+      const baseline=[...bestBySkill.values()];
+      const shortlist=unique([
+        ...baseline.slice().sort((a,b)=>b.score-a.score).slice(0,1).map(r=>r.skillId),
+        ...baseline.slice().sort((a,b)=>b.damage/b.actionCount-a.damage/a.actionCount).slice(0,1).map(r=>r.skillId),
+        ...baseline.slice().sort((a,b)=>b.breakDamage/b.actionCount-a.breakDamage/a.actionCount).slice(0,1).map(r=>r.skillId),
+        ...baseline.slice().sort((a,b)=>number(indexes.skills.get(a.skillId)?.cost)-number(indexes.skills.get(b.skillId)?.cost)).slice(0,1).map(r=>r.skillId),
+        ...baseline.slice().sort((a,b)=>b.score-a.score).map(r=>r.skillId)
+      ]).slice(0,4);
+      const leafProxy=new Map();
+      for(const result of results)for(const [index,leaf] of result.turn.leaves.entries()){
+        const key=`${leaf.skillId}:${JSON.stringify(leaf.context)}`;
+        const hits=result.hits.filter(hit=>number(hit.actionIndex)===index);
+        const score=goalScore({damage:hits.reduce((sum,hit)=>sum+hit.damage,0),breakDamage:hits.reduce((sum,hit)=>sum+hit.breakDamage,0)});
+        if(!leafProxy.has(key) || score>leafProxy.get(key).score)leafProxy.set(key,{hits,score});
+      }
+      const mixed=[];
+      for(const first of shortlist)for(const second of shortlist){
+        if(first===second)continue;
+        const skill=indexes.skills.get(first),base=bestBySkill.get(first);
+        for(const turn of turnsFor(prepared,skill,indexes.skills.get(second))){
+          if(turn.mp>base.availableMp)continue;
+          const hits=turn.leaves.flatMap((leaf,index)=>{
+            const sample=leafProxy.get(`${leaf.skillId}:${JSON.stringify(leaf.context)}`);
+            return (sample?.hits || []).map(hit=>({...hit,actionIndex:index}));
+          });
+          if(!hits.length)continue;
+          const proxy=simulateFight([{id:characterId,agility:base.stats.Agility,damage:hits.reduce((sum,hit)=>sum+hit.damage,0),
+            brokenDamage:hits.reduce((sum,hit)=>sum+hit.brokenDamage,0),breakDamage:hits.reduce((sum,hit)=>sum+hit.breakDamage,0),
+            hits,limit:base.limit,availableMp:base.availableMp,turnMp:turn.mp}]);
+          const approx=goalScore({damage:proxy.damage,breakDamage:proxy.breakDamage,gauge:proxy.gauge[characterId]});
+          mixed.push({skill,turn,approx});
+        }
+      }
+      const chosen=new Set();
+      let successfulMixed=0;
+      // Reuse already calculated hit records; invalid AP/slot mixtures do not spend a successful candidate slot.
+      for(const entry of mixed.sort((a,b)=>b.approx-a.approx || a.turn.mp-b.turn.mp)){
+        if(successfulMixed>=4)break;
+        const key=entry.turn.steps.map(step=>step.skillId).join(',');
+        if(chosen.has(key))continue;
+        chosen.add(key);
+        const before=results.length;
+        consider(entry.skill,entry.turn);
+        if(results.length>before)successfulMixed++;
+      }
+      for(const id of shortlist){const skill=indexes.skills.get(id);for(const turn of setupTurnsFor(prepared,skill))consider(skill,turn);}
+
       // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
       // Only the strongest learned fill-rate passive is tried (Triple over Double), on the best turn.
       const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)).slice(-1),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
@@ -532,7 +652,7 @@
       const simulate=overrides=>simulateFight(members.map(m=>{
         const override=overrides[m.characterId];
         const e=override?.supportedTurn?{...m.evaluation,supportSourceId:override.supportSourceId,supportedTurn:override.supportedTurn}:{...m.evaluation,...override};
-        return {id:m.characterId,agility:e.stats.Agility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,
+        return {id:m.characterId,agility:e.stats.Agility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,setupLimit:e.setupLimit,setupDuration:e.turn?.setupDuration,
           passiveIds:unique([...(e.alwaysPassiveIds || []),...(e.passiveIds || [])]),supportSourceId:e.supportSourceId,supportedTurn:e.supportedTurn};
       }));
       let fight=simulate({});
@@ -555,19 +675,26 @@
           for(const targets of groups){
             let next=baseline-caster.evaluation.damage;
             let nextBreak=baselineBreak-number(caster.evaluation.breakDamage);
-            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:null,actionDescription:'Recasts a support action each round instead of attacking.'}};
+            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:null,setupLimit:null,turn:null,recipeLabel:action.name,actionDescription:'Recasts a support action each round instead of attacking.'}};
             for(const target of targets){
               const evaluation=target.evaluation,skill=indexes.skills.get(evaluation.skillId);
-              if(action.tests?.some(test=>test.key==='skill.dmgType' && clean(skill.dmgType)!==clean(test.value)))continue;
               if((action.tests || []).some(test=>test.key!=='skill.dmgType'))continue;
-              if(action.kind==='statPercent' && action.parameter!==(clean(skill.calcType)==='Magic'?'Mind':'Defence'))continue;
               const context=action.kind==='damagePercent'?{additionalDamagePercent:action.value}:
                 {targetStatPercent:{parameter:action.parameter,value:action.value}};
               const passiveIds=unique([...(evaluation.alwaysPassiveIds || []),...(evaluation.passiveIds || [])]);
               const equipment=target.equipment || savedById.get(target.characterId)?.equipment;
-              const leaves=evaluation.turn?.leaves || Array.from({length:number(evaluation.actionCount,1)},()=>({context:evaluation.turn?.context || {}}));
-              const revised=leaves.map(leaf=>rollState(passiveIds,skill,target.characterId,equipment,{...leaf.context,...context}));
-              const broken=leaves.map(leaf=>rollState(passiveIds,skill,target.characterId,equipment,{...leaf.context,...context,broken:true}));
+              const leaves=evaluation.turn?.leaves || Array.from({length:number(evaluation.actionCount,1)},()=>({skillId:skill.id,context:evaluation.turn?.context || {}}));
+              const revise=(leaf,isBroken)=>{
+                if(leaf.kind==='support')return {damage:0,damageMin:0,damageMax:0,breakDamage:0,hits:[]};
+                const selected=indexes.skills.get(leaf.skillId ?? skill.id);
+                const existingIds=leaf.context?.activeEffectIds || [];
+                const duplicate=existingIds.some(id=>id===action.effectId || (clean(indexes.effects.get(id)?.status)!=='None' && clean(indexes.effects.get(id)?.status)===clean(indexes.effects.get(action.effectId)?.status))) || (action.kind==='statPercent' && leaf.context?.targetStatPercent?.parameter===action.parameter);
+                const matches=!duplicate && !(action.tests || []).some(test=>test.key==='skill.dmgType' && clean(selected.dmgType)!==clean(test.value)) &&
+                  (action.kind!=='statPercent' || action.parameter===(clean(selected.calcType)==='Magic'?'Mind':'Defence'));
+                return rollState(passiveIds,selected,target.characterId,equipment,{...leaf.context,...(matches?context:{}),...(isBroken?{broken:true}:{})});
+              };
+              const revised=leaves.map(leaf=>revise(leaf,false));
+              const broken=leaves.map(leaf=>revise(leaf,true));
               const sum=key=>revised.reduce((total,r)=>total+number(r[key]),0);
               const supportedTurn={damage:sum('damage'),damageMin:sum('damageMin'),damageMax:sum('damageMax'),brokenDamage:broken.reduce((total,r)=>total+r.damage,0),
                 breakDamage:sum('breakDamage'),hits:revised.flatMap((r,i)=>combatHits(r,broken[i]).map(hit=>({...hit,actionIndex:i})))};

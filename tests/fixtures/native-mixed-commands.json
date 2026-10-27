@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Derived from executable control flow and current cooked rows; not observed battle measurements",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "provenance": {
+    "statusAsset": "/Game/Datatable/Unit/DT_StatusConditionDetailData",
+    "uassetSha256": "03b357698258baf5ebad132c25234ecf1d457b0f3173626e3346e529626f7688",
+    "uexpSha256": "3ca30c432807be1070de1dbe143d34ebdb7077cd8576629aa09447c278a231ed"
+  },
+  "selectorRules": {
+    "arms": {
+      "id": 400650,
+      "childFilter": "Root: independent eligible active/vision action",
+      "canMixDamageTypes": true
+    },
+    "dualcast": {
+      "id": 400730,
+      "childFilter": "Magic attribute; does not require damage",
+      "canMixElements": true,
+      "canSelectSupportMagic": true
+    },
+    "doubleAction": {
+      "id": 400710,
+      "childFilter": "Damage skill AND non-Magic attribute",
+      "canSelectSupportMagic": false
+    },
+    "magicBoost": {
+      "id": 400660,
+      "childFilter": "Damage skill AND Magic damage type",
+      "canSelectSupportMagic": false
+    }
+  },
+  "setupSkills": [
+    {
+      "id": 230080,
+      "name": "Deprotect",
+      "cost": 6,
+      "attribute": "Magic",
+      "target": "Single",
+      "relation": "Enemies",
+      "effectId": 19054,
+      "addTiming": "AfterDamageCalculation",
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "duration": 5,
+      "status": "DeffenceDown",
+      "probability": 100,
+      "activationProbability": 100,
+      "params": [
+        30,
+        6,
+        3,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "id": 230090,
+      "name": "Deshell",
+      "cost": 6,
+      "attribute": "Magic",
+      "target": "Single",
+      "relation": "Enemies",
+      "effectId": 19055,
+      "addTiming": "AfterDamageCalculation",
+      "applyTiming": "None",
+      "proceedTiming": "BeginTurn",
+      "duration": 5,
+      "status": "MindDown",
+      "probability": 100,
+      "activationProbability": 100,
+      "params": [
+        30,
+        8,
+        3,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "id": 230100,
+      "name": "Bravery",
+      "cost": 6,
+      "attribute": "Magic",
+      "target": "Single",
+      "relation": "Friendlies",
+      "effectId": 19049,
+      "addTiming": "AfterDamageCalculation",
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "BeginTurn",
+      "duration": 5,
+      "status": "AttackUp",
+      "probability": 100,
+      "activationProbability": 100,
+      "params": [
+        50,
+        0,
+        -1,
+        0,
+        -1,
+        1,
+        -1,
+        -1,
+        -1,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "id": 230110,
+      "name": "Faith",
+      "cost": 6,
+      "attribute": "Magic",
+      "target": "Single",
+      "relation": "Friendlies",
+      "effectId": 19050,
+      "addTiming": "AfterDamageCalculation",
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "BeginTurn",
+      "duration": 5,
+      "status": "IntelligenceUp",
+      "probability": 100,
+      "activationProbability": 100,
+      "params": [
+        50,
+        0,
+        -1,
+        0,
+        -1,
+        2,
+        -1,
+        -1,
+        -1,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    }
+  ],
+  "statusPolicies": [
+    {
+      "status": "DeffenceDown",
+      "negates": "DeffenceUp",
+      "isExtendLifeTurn": true,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false
+    },
+    {
+      "status": "MindDown",
+      "negates": "MindUp",
+      "isExtendLifeTurn": true,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false
+    },
+    {
+      "status": "AttackUp",
+      "negates": "AttackDown",
+      "isExtendLifeTurn": true,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false
+    },
+    {
+      "status": "IntelligenceUp",
+      "negates": "IntelligenceDown",
+      "isExtendLifeTurn": true,
+      "isAllowDuplicate": false,
+      "shouldOverwrite": false
+    }
+  ],
+  "cases": [
+    {
+      "name": "Arms mixes physical Attack and Fire",
+      "wrapper": 400650,
+      "leafSkillIds": [
+        401010,
+        220010
+      ],
+      "valid": true,
+      "mp": 45
+    },
+    {
+      "name": "Dualcast mixes Fire and Thundara",
+      "wrapper": 400730,
+      "leafSkillIds": [
+        220010,
+        220100
+      ],
+      "valid": true,
+      "mp": 20
+    },
+    {
+      "name": "Dualcast rejects physical Attack",
+      "wrapper": 400730,
+      "leafSkillIds": [
+        401010,
+        220010
+      ],
+      "valid": false
+    },
+    {
+      "name": "Double Action rejects support Faith",
+      "wrapper": 400710,
+      "leafSkillIds": [
+        230110,
+        401010
+      ],
+      "valid": false
+    },
+    {
+      "name": "Dualcast Faith on self before Fire",
+      "wrapper": 400730,
+      "leafSkillIds": [
+        230110,
+        220010
+      ],
+      "valid": true,
+      "mp": 11,
+      "attackContext": {
+        "19050": "active before Fire"
+      },
+      "effectRecipients": {
+        "19050": "caster"
+      }
+    },
+    {
+      "name": "Dualcast Fire before Faith on self",
+      "wrapper": 400730,
+      "leafSkillIds": [
+        220010,
+        230110
+      ],
+      "valid": true,
+      "mp": 11,
+      "attackContext": {
+        "19050": "not active before Fire in a fresh fight"
+      }
+    },
+    {
+      "name": "Dualcast Deshell before Fire",
+      "wrapper": 400730,
+      "leafSkillIds": [
+        230090,
+        220010
+      ],
+      "valid": true,
+      "mp": 11,
+      "attackContext": {
+        "19055": "active on chosen target before Fire"
+      }
+    },
+    {
+      "name": "Arms Boost Fire then Thunder",
+      "wrapper": 400650,
+      "childRecipes": [
+        {
+          "wrapper": 400660,
+          "leafSkillIds": [
+            220010
+          ]
+        },
+        220090
+      ],
+      "valid": true,
+      "mp": 52,
+      "boostedLeafIds": [
+        220010
+      ]
+    }
+  ],
+  "refreshCases": [
+    {
+      "name": "same Faith refreshes without potency stacking",
+      "effectId": 19050,
+      "existingRemaining": 4,
+      "incomingDuration": 5,
+      "extension": 0,
+      "expectedRemaining": 5,
+      "expectedEffectCount": 1,
+      "expectedDamagePercent": 50
+    },
+    {
+      "name": "shorter refresh does not reduce remaining duration",
+      "effectId": 19050,
+      "existingRemaining": 5,
+      "incomingDuration": 3,
+      "extension": 0,
+      "expectedRemaining": 5,
+      "expectedEffectCount": 1,
+      "expectedDamagePercent": 50
+    },
+    {
+      "name": "recast duration is capped by native maximum",
+      "effectId": 19050,
+      "existingRemaining": 4,
+      "incomingDuration": 5,
+      "extension": 8,
+      "expectedRemaining": 10,
+      "expectedEffectCount": 1,
+      "expectedDamagePercent": 50
+    },
+    {
+      "name": "indefinite existing status stays indefinite",
+      "effectId": 19050,
+      "existingRemaining": -1,
+      "incomingDuration": 5,
+      "extension": 0,
+      "expectedRemaining": -1,
+      "expectedEffectCount": 1,
+      "expectedDamagePercent": 50
+    }
+  ],
+  "evidence": {
+    "queueOrder": "14515AB30 /145165310 /144F5CD60",
+    "postDamageApply": "144F7FA6E-144F7FA73 ->144F7E590; timing comparison144F7E5D7",
+    "targetRouting": "144F7E6A7-144F7E6E7 Self;144F7E6F3-144F7E751 SkillTarget",
+    "statusDispatch": "14522FD13-14522FD42 ->145249EF0 for status!=None",
+    "statusPolicyOffsets": "UE bool setters1445794E0(+10),144D2B4D0(+11),144D2B4E0(+12)",
+    "statusRefresh": "14524A0ED,14524A146-14524A154,14524A1B0-14524A1F2",
+    "durationCap": "145154FA0-145154FA5"
+  },
+  "limits": [
+    "Each skill must be learned/equipped or free, fit AP and command slots, pass all hierarchy/state/resource gates, and have legal live targets.",
+    "Enemy status resistance, active opposing statuses, interruptions, dispels and reactive actions can change setup success.",
+    "Different effect IDs sharing a status follow the native existing-status policy; this fixture does not authorize arbitrary potency stacking.",
+    "Focus has ActionBegin lifetime and is not inferred from SkillBegin/SkillEnd."
+  ]
+}

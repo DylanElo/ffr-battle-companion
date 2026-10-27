@@ -61,9 +61,11 @@ export function gearExplanation(member, indexes) {
 
 function roleText(id, ev, indexes) {
   const reasons = [];
-  if (id === Number(ev.skillId)) reasons.push('The attack selected for this build.');
+  if (list(ev.skillIds || [ev.skillId]).includes(id)) reasons.push('Used in the selected command sequence; its own stats, cost and effects are evaluated.');
   if (list(ev.turn?.wrapperIds).includes(id) || id === Number(ev.multiActionId)) reasons.push('Runs the command branch shown below. Selected child order and repeated skills are preserved by the native queue.');
   if (id === 400660 && ev.magicBoost) reasons.push('Boosts only its selected spell. Each separate Boost pays the native modified spell cost; its effects expire before a plain sibling.');
+  if (id === 400700 && ev.recklessAbandonment) reasons.push('Doubles the selected physical attack’s stagger contribution in the additive bonus bucket, at 1.5× its MP cost. The next plain sibling receives no bonus.');
+  if (id === 400360) reasons.push('Casts one chosen spell four times, with -50 percentage points in the damage and stagger bonus buckets. Pays 20 MP plus that spell’s cost once per Barrage branch.');
   if (list(ev.supportSkillIds).includes(id)) {
     const role = ev.supportTags?.[ev.supportSkillIds.indexOf(id)];
     reasons.push(`Keeps ${role === 'healer' ? 'a healing' : role === 'protector' ? 'a protection' : 'a support'} action available. Using it takes a turn.`);
@@ -111,7 +113,11 @@ export function buildExplanation(member, indexes) {
     ${counted.length ? `<h5>Counted for the normal attack</h5><ul class="notes">${counted.map(t => `<li>${h(t.passiveName ? `${t.passiveName}: ` : '')}${h(effectText(t))}</li>`).join('')}</ul>` : ''}
     ${ev.limit ? `<h5>LB model</h5><p class="small">Opening gauge ${n(Math.min(ev.limit.max,ev.limit.initial || 0))}; capacity ${n(ev.limit.max)}, including known support LBs. This character receives ${n(ev.limit.baseStaggerGain)} base gauge when its hit staggers the target, plus ${n(ev.limit.fillOnStagger)} at action end; ${n(ev.limit.recuperate)} is refunded after LB damage and stagger effects. Fill rate ×${n(ev.limit.mult)} applies to each earned gain before truncation and the capacity limit, but does not multiply opening gauge. Other party members receive no base reward from this character’s stagger.</p>` : ''}
     ${omitted.length ? `<h5>Not counted in the normal attack</h5><ul class="notes">${omitted.map(t => `<li>${h(t.passiveName || `Effect ${t.effectId}`)}: ${h(t.reason)}</li>`).join('')}</ul>` : ''}
-    ${ev.recipeLabel ? `<h5>Command sequence</h5><p class="small">${h(ev.recipeLabel)}</p><p class="dim small">Wrapper abilities occupy one AP slot each, even when used by both branches. MP is charged per executed command. The search repeats one selected attack; different attack pairs are not enumerated.</p>` : ''}
+    ${ev.recipeLabel ? `<h5>Command sequence</h5><p class="small">${h(ev.recipeLabel)}</p><p class="dim small">Each equipped ability occupies one slot even when selected more than once. MP is charged per executed command. Mixed sequences use a bounded shortlist; the search is not exhaustive.</p>` : ''}
+    ${list(ev.leafResults).length > 1 ? `<h5>Each selection</h5><ol class="notes">${ev.leafResults.map(leaf => {
+      const action = lookup(indexes, 'skills', leaf.skillId), inputs = leaf.common || {};
+      return `<li><b>${h(action?.name || `Skill #${leaf.skillId}`)}</b>${leaf.kind === 'support' ? ' — setup effect; no direct damage.' : ` — ${h(inputs.attackSource || 'ATK/MAG')} ${n(inputs.attack)}, ${h(inputs.defenseSource || 'target')} defense ${n(inputs.defense)}; ${n(leaf.damage)} damage, ${n(leaf.breakDamage)} stagger before the simulated break state.`}${leaf.mpCost !== undefined ? ` ${n(leaf.mpCost)} MP${leaf.paymentSuppressed ? ' (Barrage repeat)' : ''}.` : ''}</li>`;
+    }).join('')}</ol>` : ''}
     <h5>Damage inputs</h5>
     <p class="small">${h(skill?.name || 'Selected attack')} uses this character’s ${h(common.attackSource || (magical ? 'MAG' : 'ATK'))} (${n(common.attack)}) against ${h(common.defenseSource || (magical ? 'magic' : 'physical'))} defense (${n(common.defense)}). Level ${n(common.level)}; skill coefficient ${n(skill?.mag)}; ${n(ev.actionCount || 1)} action(s), ${n(ev.turnMp)} MP per turn, from ${n(ev.availableMp)} starting MP.</p>
     <p class="small">Element ${h(ev.element || 'None')} (${h(ev.resistance || 'None')}); elemental multiplier ×${n(common.elementFactor ?? 1)}; first attack’s outgoing multiplier ×${n(common.outgoingFactor ?? 1)}; critical chance ${n(number(ev.criticalChance) * 100)}%; cap ${n(common.damageCap)} per hit.</p>

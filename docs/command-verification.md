@@ -69,3 +69,6 @@ The sanitized [event fixture](../tests/fixtures/native-command-lifetime.json) us
 | Arms(Boost(spell), spell) | 87 | 2, 1 |
 
 These vectors derive from native control flow and source parameters. They do not establish that every skill animation, interruption, duration modifier or enemy interaction has been tested in a live battle.
+
+
+Follow-up: [mixed skill selections and setup effects](mixed-command-verification.md), and [Reckless Abandonment / Magic Barrage](special-action-verification.md), are now supported under the documented conditions. Each child keeps its own damage inputs; status refresh does not accumulate potency.

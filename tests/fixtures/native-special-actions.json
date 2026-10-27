@@ -1,0 +1,494 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Read-only native executable control-flow and current cooked Blueprint data; not recorded battle measurements",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "provenance": [
+    {
+      "asset": "/Game/UI/Battle/Command/Data/DT_BtlCmdUniqueActionBehavior",
+      "sha256": {
+        "uasset": "5d4d677646e955354e30ab27e1184317ed8be40a31d246afbf7548c4d113bce3",
+        "uexp": "1ab8fceed316a8b8cbd418565645c19e3c8cba92957ff3d6bd28c97b48a73046"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/List/Object/BP_BtlCmdList_PhysicalAttak",
+      "sha256": {
+        "uasset": "27cd868fc207af2e33ef1c93072479474dada17fa3508c11902390b525405a20",
+        "uexp": "d1fdce1ad1783a5aac172a18e80ef1201e34d79840e95a9f8b2568d6412c5136"
+      }
+    },
+    {
+      "asset": "/Game/UI/Battle/Command/List/Object/BP_BtlCmdList_Magic",
+      "sha256": {
+        "uasset": "97e83c35d581e930eabb251c03bf2aa573f0ab094f04256a3da9b24e1d26dc57",
+        "uexp": "e7397a64d0244adfc171d005652511196d1a97d91f487501e388d67b4d3c41a8"
+      }
+    }
+  ],
+  "wrappers": [
+    {
+      "id": 400700,
+      "name": "Reckless Abandonment",
+      "cost": 0,
+      "equipCost": 15,
+      "execution": "Sequential",
+      "steps": [
+        "UI.Battle.Command.Behavior.Node.SelfCast",
+        "UI.Battle.Command.Behavior.List.PhysicalAttak"
+      ],
+      "effects": [
+        {
+          "bundle": {
+            "effectId": 15112,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "BeforeDamageCalculation",
+            "passiveSkillAddTiming": "None",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          "effect": {
+            "id": 15112,
+            "row": "体崩し用ブレイクダメージ+100%",
+            "type": "BreakDamageVariation",
+            "params": [
+              100,
+              -1,
+              -1,
+              0,
+              -1,
+              -1,
+              0,
+              1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "status": "None",
+            "prob": 100,
+            "activationProbability": 100,
+            "duration": 2,
+            "applyTiming": "BreakDmgCalculation",
+            "proceedTiming": "SkillEnd",
+            "condition": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        },
+        {
+          "bundle": {
+            "effectId": 61003,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "BeforeDamageCalculation",
+            "passiveSkillAddTiming": "None",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          "effect": {
+            "id": 61003,
+            "row": "体崩し用消費MP1.5倍",
+            "type": "CostVariation",
+            "params": [
+              2,
+              150,
+              0,
+              0,
+              -1,
+              -1,
+              1,
+              -1,
+              0,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "status": "None",
+            "prob": 100,
+            "activationProbability": 100,
+            "duration": 1,
+            "applyTiming": "None",
+            "proceedTiming": "SkillBegin",
+            "condition": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 400360,
+      "name": "Magic Barrage",
+      "cost": 20,
+      "equipCost": 40,
+      "execution": "Batch",
+      "steps": [
+        "UI.Battle.Command.Behavior.List.Magic"
+      ],
+      "effects": [
+        {
+          "bundle": {
+            "effectId": 12945,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "None",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          "effect": {
+            "id": 12945,
+            "row": "ダメージ倍率-50%(まほうみだれうち)",
+            "type": "DamageMultiplier",
+            "params": [
+              -50,
+              0,
+              -1,
+              0,
+              -1,
+              0,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "status": "None",
+            "prob": 100,
+            "activationProbability": 100,
+            "duration": 5,
+            "applyTiming": "DamageCalculation",
+            "proceedTiming": "SkillEnd",
+            "condition": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        },
+        {
+          "bundle": {
+            "effectId": 15128,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "None",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          "effect": {
+            "id": 15128,
+            "row": "ブレイクダメージ-50%(まほうみだれうち)",
+            "type": "BreakDamageVariation",
+            "params": [
+              -50,
+              -1,
+              -1,
+              0,
+              -1,
+              -1,
+              0,
+              0,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "status": "None",
+            "prob": 100,
+            "activationProbability": 100,
+            "duration": 5,
+            "applyTiming": "BreakDmgCalculation",
+            "proceedTiming": "SkillEnd",
+            "condition": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        },
+        {
+          "bundle": {
+            "effectId": 19073,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "None",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          "effect": {
+            "id": 19073,
+            "row": "回復倍率-50%(まほうみだれうち)",
+            "type": "RecoveryVariation",
+            "params": [
+              50,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "status": "None",
+            "prob": 100,
+            "activationProbability": 100,
+            "duration": 5,
+            "applyTiming": "None",
+            "proceedTiming": "SkillEnd",
+            "condition": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "filters": {
+    "reckless": {
+      "requiresDamageSkill": true,
+      "damageType": "Physic",
+      "enumValue": 1
+    },
+    "magicBarrage": {
+      "attribute": "Magic",
+      "enumValue": 4,
+      "selectedSkills": 1,
+      "casts": 4,
+      "targetSelection": "Native random target is selected again for each cast; single-target numeric forecast assumes one enemy."
+    }
+  },
+  "nativeLocations": {
+    "barrageDispatch": "144F3EF37 compares General+188, then144F3EF4D calls144F4C420",
+    "barrageWrapper": "144F4C51E invokes parent action once",
+    "barrageLoop": "144F4C56B and144F4C632 compare General+160=4; each child created at144F4C605 after target selection144F4C59D",
+    "barrageNoCost": "144F4C5A6-144F4C5B6 sets no-consume after first child; factory144F40F92/144F40FB0 stores action+329;144F4748A-144F47491 skips payment when that byte is true",
+    "effectLifetime": "144F429AA-144F42A12; matching finite lifetime145152CD1-145152D75",
+    "costBeforeBegin": "144F6519B payment precedes144F65594 task initialization and144F82843-144F82863 SkillBegin",
+    "hpCost": "14513C0B2-14513C0DA: derived max HP14523C250 times raw percent, float32*.01 then truncation before subtraction"
+  },
+  "cases": [
+    {
+      "name": "Reckless(physical19)",
+      "wrapperIds": [
+        400700
+      ],
+      "damageSkillIds": [
+        900001
+      ],
+      "startingChildMp": 19,
+      "mp": 28,
+      "childCostPaid": [
+        true
+      ],
+      "leafActiveEffectIds": [
+        [
+          15112
+        ]
+      ],
+      "breakPercentAdded": [
+        100
+      ]
+    },
+    {
+      "name": "Arms(Reckless(physical19),physical19)",
+      "wrapperIds": [
+        400650,
+        400700
+      ],
+      "startingChildMp": 19,
+      "mp": 87,
+      "childCostPaid": [
+        true,
+        true
+      ],
+      "leafActiveEffectIds": [
+        [
+          15112
+        ],
+        []
+      ],
+      "breakPercentAdded": [
+        100,
+        0
+      ]
+    },
+    {
+      "name": "MagicBarrage(spell19)",
+      "wrapperIds": [
+        400360
+      ],
+      "startingChildMp": 19,
+      "mp": 39,
+      "childCostPaid": [
+        true,
+        false,
+        false,
+        false
+      ],
+      "leafActiveEffectIds": [
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ]
+      ],
+      "damagePercentAdded": [
+        -50,
+        -50,
+        -50,
+        -50
+      ],
+      "breakPercentAdded": [
+        -50,
+        -50,
+        -50,
+        -50
+      ]
+    },
+    {
+      "name": "Arms(MagicBarrage(spell19),MagicBarrage(spell19))",
+      "wrapperIds": [
+        400650,
+        400360
+      ],
+      "startingChildMp": 19,
+      "mp": 118,
+      "childCostPaid": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "leafActiveEffectIds": [
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ],
+        [
+          12945,
+          15128
+        ]
+      ],
+      "damagePercentAdded": [
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50
+      ],
+      "breakPercentAdded": [
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50,
+        -50
+      ]
+    }
+  ],
+  "boundaries": [
+    "Magic Barrage picks one spell for its four casts; Arms can pick separate Barrage branches. It is not four independent spell selections.",
+    "Damage and break effects enter their native additive percentage buckets; do not multiply final damage or break by0.5 after other modifiers.",
+    "Normal targeted UI events only; interruptions, reaction suppression and a changing set of live random targets are not represented by these vectors.",
+    "HP-ratio payments need changing-HP passive/state evaluation before they are safe to rank. Good Luck, Overclock, form/flag gates, finishers and reactive wrappers need their own state models.",
+    "nonRepeatSkillsIds is not certified here as a same-turn duplicate-selection prohibition."
+  ]
+}
