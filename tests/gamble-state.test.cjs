@@ -79,9 +79,10 @@ test('native target evasion lowers sampled damage while keeping actual luck inte
  assert.ok(evaded.resourceEvents[1].every(event=>!event.context || event.context.gambleHitOutcomes.every(value=>typeof value==='boolean')));
 });
 
-test('a stagger from the first part makes the seven following parts hit and grants luck once',()=>{
+test('a first-part stagger makes later parts hit and grants luck once per normal and additional selection',()=>{
  const original=D.skillHitSuccess;let calls=0;D.skillHitSuccess=()=>++calls%8===1;
  try{const {value}=force(true,()=>fixture({enemyBreak:1}).result());const event=value.resourceEvents[1][0];
-  assert.equal(calls,32*8);assert.equal(event.context.gambleHitOutcomes.filter(Boolean).length,8);assert.equal(event.goodLuckAfter,5);assert.equal(value.remainingGoodLuck[1],5);
+  assert.equal(calls,32*8);assert.equal(event.context.gambleHitOutcomes.filter(Boolean).length,8);assert.equal(event.goodLuckAfter,5);assert.equal(value.remainingGoodLuck[1],10);
+  const bonus=value.resourceEvents[1].filter(event=>event.phase==='additional');assert.equal(bonus.length,1);assert.equal(bonus[0].goodLuckAfter,10);assert.equal(bonus[0].mpCost,18);assert.equal(value.remainingMp[1],964);
  }finally{D.skillHitSuccess=original;}
 });

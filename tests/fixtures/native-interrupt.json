@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "Static executable control flow and installed data; derived vectors, not live gameplay",
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "sourceRows": {
+    "effects": [
+      {
+        "id": 12943,
+        "row": "\u6a5f\u5148\u3092\u5236\u3059",
+        "type": "TakeInitiative",
+        "params": [
+          30,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "status": "None",
+        "prob": 100,
+        "activationProbability": 100,
+        "duration": -1,
+        "applyTiming": "DamageCalculation",
+        "proceedTiming": "None",
+        "condition": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "id": 15150,
+        "row": "LB\u6e80\u30bf\u30f3\u6642\u30d6\u30ec\u30a4\u30af\u30c0\u30e1\u30fc\u30b8\u500d\u7387+50%(\u30af\u30e9\u30c3\u30b7\u30e3\u30fc)",
+        "type": "Crusher",
+        "params": [
+          50,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "status": "None",
+        "prob": 100,
+        "activationProbability": 100,
+        "duration": -1,
+        "applyTiming": "BreakDmgCalculation",
+        "proceedTiming": "None",
+        "condition": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      },
+      {
+        "id": 19034,
+        "row": "\u30d2\u30c3\u30c8&\u30a6\u30a7\u30a4",
+        "type": "HitAndWay",
+        "params": [
+          35,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "status": "None",
+        "prob": 100,
+        "activationProbability": 100,
+        "duration": -1,
+        "applyTiming": "BeginDmgCalcWhenTargeted",
+        "proceedTiming": "None",
+        "condition": {
+          "Condition": "None",
+          "param1": -1,
+          "param2": -1,
+          "param3": -1
+        }
+      }
+    ],
+    "passives": [
+      {
+        "id": 1334,
+        "row": "\u30d2\u30c3\u30c8\uff06\u30a6\u30a7\u30a4",
+        "name": "Hit and Run",
+        "desc": "Adds a {Effect1Param1}% chance to nullify damage taken from physical attacks if an attack has been performed by self that round.",
+        "equipCost": 40,
+        "effects": [
+          19034
+        ],
+        "effectBundles": [
+          {
+            "effectId": 19034,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        ]
+      },
+      {
+        "id": 1394,
+        "row": "\u6a5f\u5148\u3092\u5236\u3059",
+        "name": "Preemptive Strike",
+        "desc": "Increases damage dealt by {Effect1Param1}% when attacking an enemy that has not yet acted that round.",
+        "equipCost": 20,
+        "effects": [
+          12943
+        ],
+        "effectBundles": [
+          {
+            "effectId": 12943,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        ]
+      },
+      {
+        "id": 1404,
+        "row": "\u30af\u30e9\u30c3\u30b7\u30e3\u30fc",
+        "name": "Pilebunker",
+        "desc": "When the LB gauge is full, increases the stagger power of single-target physical attacks (excluding limit bursts).",
+        "equipCost": 40,
+        "effects": [
+          15150
+        ],
+        "effectBundles": [
+          {
+            "effectId": 15150,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          },
+          {
+            "effectId": -1,
+            "TargetType": "Self",
+            "targetRelation": "Friendlies",
+            "activeSkillAddTiming": "AfterDamageCalculation",
+            "passiveSkillAddTiming": "SpawnUnit",
+            "conditionData": {
+              "Condition": "None",
+              "param1": -1,
+              "param2": -1,
+              "param3": -1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "crusherCases": [
+    {
+      "gauge": 99,
+      "capacity": 100,
+      "target": "Single",
+      "damageType": "Physic",
+      "bonus": 0
+    },
+    {
+      "gauge": 100,
+      "capacity": 100,
+      "target": "Single",
+      "damageType": "Physic",
+      "bonusPercent": 50
+    },
+    {
+      "gauge": 100,
+      "capacity": 200,
+      "target": "Single",
+      "damageType": "Physic",
+      "bonus": 0
+    },
+    {
+      "gauge": 200,
+      "capacity": 200,
+      "target": "Single",
+      "damageType": "Physic",
+      "bonusPercent": 50
+    },
+    {
+      "gauge": 200,
+      "capacity": 200,
+      "target": "Group",
+      "damageType": "Physic",
+      "bonus": 0
+    },
+    {
+      "gauge": 200,
+      "capacity": 200,
+      "target": "Single",
+      "damageType": "Magic",
+      "bonus": 0
+    },
+    {
+      "gaugeBeforePayment": 200,
+      "lbCost": 100,
+      "capacity": 200,
+      "target": "Single",
+      "damageType": "Physic",
+      "gaugeAtCalculation": 100,
+      "bonus": 0
+    }
+  ],
+  "hitAndRunCases": [
+    {
+      "ownCommittedAttackThisTurn": false,
+      "incomingDamageType": "Physic",
+      "nullificationEligible": false
+    },
+    {
+      "ownCommittedAttackThisTurn": true,
+      "priorAttackMissed": true,
+      "incomingDamageType": "Physic",
+      "nullificationEligible": true,
+      "configuredChancePercent": 35
+    },
+    {
+      "ownCommittedAttackThisTurn": true,
+      "priorAttackDamageType": "Magic",
+      "incomingDamageType": "Physic",
+      "nullificationEligible": true,
+      "configuredChancePercent": 35
+    },
+    {
+      "ownCommittedAttackThisTurn": true,
+      "incomingDamageType": "Magic",
+      "nullificationEligible": false
+    },
+    {
+      "ownCommittedAttackThisTurn": true,
+      "incomingDamageType": "Physic",
+      "passedStoredRoll": true,
+      "incomingParts": 8,
+      "independentDefensiveRolls": 1,
+      "hpDamage": 0,
+      "queueCanceled": false
+    }
+  ],
+  "precheckCases": [
+    {
+      "sourceCount": 0,
+      "rejected": true,
+      "paymentReached": false,
+      "skillBeginReached": false
+    },
+    {
+      "targetCount": 0,
+      "rejected": true,
+      "paymentReached": false,
+      "skillBeginReached": false
+    },
+    {
+      "sourceDead": true,
+      "action37A": false,
+      "nativeDeadSourceRowException": false,
+      "rejected": true
+    },
+    {
+      "action32A": true,
+      "currentMp": 1,
+      "requiredMp": 4,
+      "rejected": true
+    },
+    {
+      "action32A": false,
+      "currentMp": 1,
+      "requiredMp": 4,
+      "affordabilityCheckInvoked": false,
+      "warning": "Other mandatory gates still apply; payment may clamp."
+    }
+  ],
+  "finalizationCases": [
+    {
+      "route": "Alternate skill-job +2E8 finalizer",
+      "job3A8": false,
+      "sharedSkillFinalizationCalled": true,
+      "setsJob3A8": true
+    },
+    {
+      "route": "Alternate skill-job +2E8 finalizer",
+      "job3A8": true,
+      "sharedSkillFinalizationCalled": false
+    },
+    {
+      "route": "Shared skill finalization",
+      "action37E": true,
+      "skillEndBlockSkipped": true
+    },
+    {
+      "route": "Shared skill finalization",
+      "action37E": false,
+      "selectiveSuppression386": false,
+      "skillEndLifetimeAdvanced": true
+    }
+  ],
+  "limits": [
+    "External interruption callers and arbitrary animation-notify cancellation paths are not established.",
+    "No enemy action frequency or targeting is inferred.",
+    "TakeInitiative needs explicit actual target action-counter context.",
+    "Zero HP damage does not imply absent incoming result or canceled queue."
+  ]
+}

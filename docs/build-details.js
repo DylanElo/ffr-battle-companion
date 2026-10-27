@@ -26,9 +26,10 @@ export function commandPlan(ev, indexes) {
   return `${turn.openingTurn ? `Open with ${phaseName(turn.openingTurn, indexes)}; then ` : ''}${turn.rotationTurns?.length && !luck ? 'repeat ' : ''}${repeat}`;
 }
 function handlesGamble(ev) {
-  if(!ev.actionPlan || !(number(ev.gambleSamples)>0) || ev.sampleKind!=='native-initiative-and-gamble')return false;
-  const turn=ev.actionPlan.turn || ev.turn || {}, policy=turn.luckPolicy;
-  const phases=[turn,ev.actionPlan.openingTurn,turn.openingTurn,...list(ev.actionPlan.rotationTurns),...list(turn.rotationTurns),policy?.generatorTurn,policy?.spenderTurn];
+  const plan=ev.actionPlan || ev.fallbackActionPlan;
+  if(!plan || !(number(ev.gambleSamples)>0 || number(ev.combatSamples)>0) || !['native-initiative-and-gamble','native-initiative-and-combat'].includes(ev.sampleKind))return false;
+  const turn=plan.turn || ev.turn || {}, policy=turn.luckPolicy;
+  const phases=[turn,plan.openingTurn,turn.openingTurn,...list(plan.rotationTurns),...list(turn.rotationTurns),policy?.generatorTurn,policy?.spenderTurn];
   return phases.some(phase=>phaseSkills(phase).includes(406060)) || list(ev.resourceEvents).some(event=>Number(event.skillId)===406060);
 }
 function gambleEventText(event) {
@@ -41,23 +42,35 @@ function gambleEventText(event) {
   return `; sampled Gamble ${outcome?'critical hit':'miss'}${landed!==null?` (${landed}/${outcomes.length} parts landed)`:''}${chance}`;
 }
 function resourceEventText(event, indexes) {
-  const round = `Round ${n(event.round)}`;
-  if (event.kind === 'incoming') return `${round} · ${clean(event.damageType) === 'Magic' ? 'Magic' : 'Physical'} incoming hit: ${n(event.damage)} HP damage (${n(event.hpBefore)} → ${n(event.hpAfter)})${event.mirrorReduction ? '; Mirror reduction applied' : ''}.`;
+  const round = `Round ${n(event.round)}${event.phase ? ` · ${event.phase === 'additional' ? 'Additional' : 'Normal'} phase` : ''}`;
+  if (event.kind === 'incoming') return `${round} · ${clean(event.damageType) === 'Magic' ? 'Magic' : 'Physical'} incoming hit: ${n(event.damage)} HP damage (${n(event.hpBefore)} → ${n(event.hpAfter)})${event.nullified ? '; Hit and Run nullified this sampled hit' : event.mirrorReduction ? '; Mirror reduction applied' : ''}.`;
   const skill = Number(event.skillId) > 0 ? ability(indexes,event.skillId)?.name || `Skill #${event.skillId}` : 'State event';
   if (event.kind === 'limit') return `${round} · Limit Burst: ${skill} — ${n(event.damage)} damage; HP remaining ${n(event.hpAfter)}, MP remaining ${n(event.mpAfter)}${event.goodLuckAfter !== undefined ? `; luck ${n(event.goodLuckAfter)}` : ''}.`;
   return `${round} · ${skill}${event.mpCost !== undefined ? `: ${n(event.mpCost)} MP` : ''}${number(event.hpCost) ? `, ${n(event.hpCost)} HP (${n(event.hpBefore)} → ${n(event.hpAfter)})` : ''}${event.goodLuckAfter !== undefined ? `; luck ${n(event.goodLuckAfter)}` : ''}${event.overclockStates?.length ? `; clock charges ${event.overclockStates.map(clock => n(clock.charges)).join(' / ')}` : ''}${event.overheat ? '; Overheat' : ''}${event.demonForm ? '; Witching Hour' : ''}${gambleEventText(event)}.`;
 }
 function stateExplanation(ev, indexes) {
-  if (!ev.actionPlan) return '';
+  const plan=ev.actionPlan || ev.fallbackActionPlan;
+  if (!ev.actionPlan && !number(ev.extraActions) && !number(ev.expectedExtraActions) && !number(ev.hpSpent) && !(plan && ev.remainingHp !== undefined && number(ev.remainingHp)<number(plan.maxHp)) && !list(ev.phaseEvents).length && !list(ev.resourceEvents).length && !list(ev.resourceSkips).length) return '';
   const events = list(ev.resourceEvents), skips = list(ev.resourceSkips);
   const hasLuck = handlesGamble(ev) || number(ev.remainingGoodLuck) > 0 || events.some(event => number(event.goodLuckBefore) > 0 || number(event.goodLuckAfter) > 0);
   const clocks = list(ev.overclockStates);
   const luck=ev.turn?.luckPolicy;
   const phases = [...(ev.turn?.openingTurn ? [{turn:ev.turn.openingTurn,label:'Opening'}] : []), ...(luck ? [{turn:luck.generatorTurn,label:`Generate to ${n(Math.max(number(luck.requiredLuck),number(luck.requiredTurnLuck)))} luck`},{turn:luck.spenderTurn,label:'Spend when available'}] : list(ev.turn?.rotationTurns).map((turn,i)=>({turn,label:`Rotation ${i+1}`})))];
-  return `${ev.gambleSamples ? `<p class="model-notice small">Damage and HP/MP totals are sampled averages across ${n(ev.gambleSamples)} reproducible native initiative and Gamble paths. Luck, skipped actions and the event trace show one representative path; those outcomes are not guaranteed.</p>` : ''}${phases.length ? `<h5>Action phases</h5><ol class="notes">${phases.map(({turn,label})=>`<li>${label}: ${h(phaseName(turn,indexes))} — ${n(turn.mp)} MP.</li>`).join('')}</ol>` : ''}<h5>Resource forecast</h5><p class="small">HP remaining ${n(ev.remainingHp)} / ${n(ev.actionPlan.maxHp)}; HP paid ${n(ev.hpSpent)}; MP remaining ${n(ev.remainingMp)}.${hasLuck ? ` Good Luck remaining ${n(ev.remainingGoodLuck)} / 10.` : ''}${clocks.length ? ` Overclock charges: ${clocks.map(clock => `${clock.effectId === 19004 ? 'Zero' : 'I'} ${n(clock.charges)}`).join(', ')}.` : ''}${ev.overheat ? ' Overheat is active at the end of the forecast.' : ''}${ev.demonForm ? ' Witching Hour is active at the end of the forecast.' : ''}</p>
+  return `${samplingNotice(ev)}${bonusActions(ev)}${phases.length ? `<h5>Action phases</h5><ol class="notes">${phases.map(({turn,label})=>`<li>${label}: ${h(phaseName(turn,indexes))} — ${n(turn.mp)} MP.</li>`).join('')}</ol>` : ''}<h5>Resource forecast</h5><p class="small">HP remaining ${n(ev.remainingHp)}${plan?.maxHp !== undefined ? ` / ${n(plan.maxHp)}` : ''}; HP paid ${n(ev.hpSpent)}; MP remaining ${n(ev.remainingMp)}.${hasLuck ? ` Good Luck remaining ${n(ev.remainingGoodLuck)} / 10.` : ''}${clocks.length ? ` Overclock charges: ${clocks.map(clock => `${clock.effectId === 19004 ? 'Zero' : 'I'} ${n(clock.charges)}`).join(', ')}.` : ''}${ev.overheat ? ' Overheat is active at the end of the forecast.' : ''}${ev.demonForm ? ' Witching Hour is active at the end of the forecast.' : ''}</p>
     ${number(ev.remainingHp) <= 0 ? '<p class="bad small">The forecast ends at zero HP. A paid HP-cost attack can finish at zero HP; subsequent actions are blocked.</p>' : ''}
-    ${skips.length ? `<h5>Actions skipped</h5><ul class="notes">${skips.map(skip => `<li>Round ${n(skip.round)} · ${h(ability(indexes, skip.skillId)?.name || `Skill #${skip.skillId}`)}: ${h(skip.reason)}</li>`).join('')}</ul>` : ''}
+    ${skips.length ? `<h5>Actions skipped</h5><ul class="notes">${skips.map(skip => `<li>Round ${n(skip.round)}${skip.phase ? ` · ${skip.phase === 'additional' ? 'Additional' : 'Normal'} phase` : ''} · ${h(ability(indexes, skip.skillId)?.name || `Skill #${skip.skillId}`)}: ${h(skip.reason)}</li>`).join('')}</ul>` : ''}
+    ${list(ev.phaseEvents).length ? `<details><summary>Phase trace <span class="dim">· representative forecast</span></summary><ol class="notes">${ev.phaseEvents.map(event=>`<li>Round ${n(event.round)} · ${event.phase === 'additional' ? 'Additional' : 'Normal'} phase: ${event.kind === 'bonus-granted' ? `bonus granted by #${h(event.sourceId)} (${h(event.reason)})` : `actor finished; ${event.paid ? 'action paid' : 'no paid action'}`}.</li>`).join('')}</ol></details>` : ''}
     ${events.length ? `<details><summary>Resource trace <span class="dim">· representative forecast</span></summary><ol class="notes">${events.slice(0,50).map(event => `<li>${h(resourceEventText(event,indexes))}</li>`).join('')}</ol>${events.length > 50 ? '<p class="dim small">First 50 events shown.</p>' : ''}</details>` : ''}`;
+}
+
+export function samplingNotice(ev) {
+  const samples=ev.combatSamples || ev.gambleSamples;
+  const kind=ev.combatSamples ? 'native initiative and combat' : 'native initiative and Gamble';
+  return samples ? `<p class="model-notice small">Damage and HP/MP totals are sampled averages across ${n(samples)} reproducible ${kind} paths. Luck, skipped actions and the event trace show one representative path; those outcomes are not guaranteed. Bonus action counts also refer to that path unless marked as an average.</p>` : '';
+}
+export function bonusActions(ev) {
+  if(!list(ev.phaseEvents).length && !number(ev.extraActions) && !number(ev.expectedExtraActions))return '';
+  return `<p class="small">Paid bonus actions: ${n(ev.extraActions)} in the representative path${ev.expectedExtraActions !== undefined ? `; ${n(ev.expectedExtraActions)} on average` : ''}. Additional phases pay their normal MP and HP costs. They do not call BeginTurn or advance Focus duration. Bonus actions follow the order participation was granted.</p>`;
 }
 
 export const estimateNotice = () => `<p class="model-notice small"><b>Model estimate</b> · Damage arithmetic checked against the installed executable; native stagger/LB event order and nested command expiry are applied. Party order is averaged across reproducible native-priority samples. Five global turns, starting at full HP, native opening LB effects and the selected MP level. Scenario limits are listed below. Search results are the strongest found within its budget. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/combat-verification.md" target="_blank" rel="noopener noreferrer">What was verified</a></p>`;
@@ -125,6 +138,9 @@ function effectText(t) {
     physicalReductionPercent: 'physical damage reduction', magicReductionPercent: 'magic damage reduction' };
   if (t.kind === 'gambleShot') return 'Gamble Shot: one shared critical-or-miss roll, followed by the eight parts’ accuracy checks. A successful part is critical; +5 luck is gained once when at least one part lands.';
   if (t.kind === 'accuracyBonus') return `accuracy +${value} points; modifies Gamble Shot’s native hit checks`;
+  if (t.kind === 'fullGaugeBreakPercent') return `outgoing stagger +${value}% while LB gauge is full, for a single-target physical attack`;
+  if (t.kind === 'incomingPhysicalNullifyChance') return `${value}% chance to nullify a physical incoming hit after this character has attacked in the current round; only the explicit incoming-hit scenario is forecast`;
+  if (t.kind === 'bonusPhaseChancePercent') return `bonus-phase chance +${value} percentage points, added to the qualifying action’s base chance when its skill and critical conditions are met`;
   if (t.kind === 'primaryStatScale') return `STR / STA / INT / SPR / SPD scale ${value}%; native per-effect rounding. HP, MP and AP have no direct scale.`;
   if (t.kind === 'statFlat') return `${parameter} ${number(t.value) >= 0 ? '+' : ''}${value}`;
   if (t.kind === 'statPercent') return `${parameter} ${number(t.value) >= 0 ? '+' : ''}${value}%`;

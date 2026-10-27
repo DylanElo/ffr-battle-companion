@@ -41,7 +41,12 @@ test('native no-consumption action flags suppress HP as well as MP payment',()=>
 
 test('a later Limit Burst uses the paid-down HP state rather than restoring full-HP passive damage',()=>{
  const plain=fixture({rounds:3,lb:true}).result,withPassive=fixture({rounds:3,lb:true,passiveIds:[1358]}).result;
- assert.equal(plain.limitUses[1][0].round,3);
+ assert.deepEqual(plain.limitUses[1],[{round:2,phase:'additional',skillId:401300}]);
+ assert.deepEqual(plain.resourceEvents[1].filter(event=>event.hpCost>0).map(event=>[event.round,event.phase,event.hpAfter]),[
+  [1,'normal',95],[1,'additional',90],[2,'normal',85],[3,'normal',80],[3,'additional',75]
+ ]);
+ assert.equal(plain.resourceEvents[1].find(event=>event.kind==='limit').hpAfter,85,'the LB observes all three preceding HP payments');
+ assert.equal(plain.hpSpent[1],25);
  assert.equal(withPassive.damage,plain.damage);
- assert.equal(withPassive.remainingHp[1],90);
+ assert.equal(withPassive.remainingHp[1],75);
 });

@@ -160,10 +160,10 @@ test('the optimizer can select LB Charge Opener when it enables an earlier damag
   catalog.skills=[{...catalog.skills[0],mag:1,breakDmg:100},native.skills.find(s=>s.id===401040)];
   catalog.passives=[native.passives.find(p=>p.id===1004)];catalog.effects=native.effects;
   enemy.stats.MaxBreakPoint=100;
-  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:2}).evaluate(input);
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1}).evaluate(input);
   assert.equal(result.valid,true);
   assert.ok(result.equippedSkillIds.includes(1004));
-  assert.equal(result.limitUses[0]?.round,2);
+  assert.deepEqual(result.limitUses[0],{round:1,phase:'additional',skillId:401040});
 });
 
 test('native higher-stat effects reach the actual attack and target defense inputs', () => {
@@ -188,7 +188,7 @@ test('party simulation uses the selected support action rather than the caster o
   const model = B.createModel(catalog,snapshot,enemy,{goals:['damage']});
   const receiver = model.evaluate(input);
   receiver.stats = {...receiver.stats,Agility:1};
-  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:10000,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:100,mpCost:6,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]};
+  const caster = {...receiver,damage:0,brokenDamage:0,breakDamage:10000,hits:undefined,stats:{...receiver.stats,Agility:999},supportActions:[{skillId:230110,name:'Faith',kind:'damagePercent',value:1000,mpCost:6,rootRelation:'Friendlies',rootTarget:'Single',tests:[{key:'skill.dmgType',value:'Magic'}]}]};
   const party = model.evaluateParty([{characterId:1002,evaluation:caster},{characterId:1001,evaluation:receiver}]);
   assert.ok(party.supportUsed);
   assert.equal(party.firstStagger,0,'support caster never performs the original stagger attack');

@@ -30,7 +30,7 @@
       const {key,value,comparison}=test;
       const actual=key.startsWith('skill.')?context.skill?.[key.slice(6)]:context[key];
       if(!known(actual))return {state:'unknown',reason:`Requires ${key}.`};
-      const passed=comparison==='min'?Number(actual)>=value:comparison==='nonempty'?actual.length>0:clean(actual)===clean(value);
+      const passed=comparison==='min'?Number(actual)>=value:comparison==='nonempty'?actual.length>0:comparison==='exact'?actual===value:clean(actual)===clean(value);
       if(!passed)return {state:'no'};
     }
     return {state:'yes'};
@@ -83,6 +83,21 @@
     if(type==='CritMul'){
       if(Number(p[1])!==0 || !allDefault(2))return reject('Unrecognized critical-damage layout.');
       term.kind='critDamagePercent';term.value=Number(p[0]);return term;
+    }
+    if(type==='IncExAddProb'){
+      if(p.length!==15 || !Number.isFinite(Number(p[0])) || !p.slice(1,4).every(id=>Number(id)===-1 || Number.isInteger(Number(id)) && Number(id)>0) || ![-1,1].includes(Number(p[4])) || !allDefault(5))return reject('Unverified bonus-phase probability layout.');
+      if(Number(p[4])===1)requireValue('anyCritical',true,'exact');
+      return {...term,kind:'bonusPhaseChancePercent',value:Number(p[0]),skillIds:p.slice(1,4).filter(id=>Number(id)>0).map(Number)};
+    }
+    if(type==='HitAndWay'){
+      if(Number(p[0])!==35 || p.length!==15 || !allDefault(1))return reject('Unverified HitAndWay parameter layout.');
+      requireValue('incomingType','Physic');requireValue('performedAttackThisRound',true,'exact');
+      return {...term,kind:'incomingPhysicalNullifyChance',value:Number(p[0])};
+    }
+    if(type==='Crusher'){
+      if(Number(p[0])!==50 || p.length!==15 || !allDefault(1))return reject('Unverified Crusher parameter layout.');
+      requireValue('skill.target','Single');requireValue('skill.dmgType','Physic');
+      return {...term,kind:'fullGaugeBreakPercent',value:Number(p[0])};
     }
     if(type==='BreakDamageVariation'){
       if(![-1,0,1].includes(p[1]) || !attributes[p[3]] || ![0,1,2].includes(p[7]) || ![-1,0].includes(p[8]) || Number(p[10])!==-1)return reject('Unmodeled break multiplier filter.');
@@ -171,6 +186,8 @@
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
     const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0,gambleShot:false,accuracyBonus:0};
+    modifiers.incomingPhysicalNullifyChance=0;
+    modifiers.bonusPhaseChancePercent=0;
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     for(const id of passiveIds || []){
@@ -246,8 +263,18 @@
       const gate=filters(term,context);
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
-      if(term.kind==='accuracyBonus' && Number(context.skill?.id)!==406060){
-        result.deferred.push({...term,reason:'Accuracy changes are currently scored only for Gamble Shot.'});continue;
+      if(term.kind==='fullGaugeBreakPercent'){
+        // Native 0x145114310 compares current raw LB points with owner+0x2A0 capacity.
+        // Costs are paid by the caller before this getter; there is no skill-attribute exclusion.
+        if(!Number.isFinite(context.lbPercent) || context.lbPercent<0 || !Number.isFinite(context.lbCapacity) || context.lbCapacity<=0){
+          result.deferred.push({...term,reason:'Requires current raw LB gauge and actual positive LB capacity.'});continue;
+        }
+        if(context.lbPercent<context.lbCapacity){result.inactive.push(term);continue;}
+        const applied={...term,kind:'breakPercent'};
+        modifiers.breakPercent+=term.value;result.applied.push(applied);result.terms.push(applied);continue;
+      }
+      if(term.kind==='accuracyBonus' && Number(context.skill?.id)!==406060 && context.accuracyModeled!==true){
+        result.deferred.push({...term,reason:'Accuracy changes require Gamble Shot or explicitly modeled native accuracy.'});continue;
       }
       if(term.kind==='gambleShot'){
         modifiers.gambleShot=true;result.applied.push(term);result.terms.push(term);continue;

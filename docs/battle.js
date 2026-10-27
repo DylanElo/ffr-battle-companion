@@ -146,7 +146,7 @@
       const factor=number(catalog.battleRules.elementResistanceValues?.[`eResistance::${resistance}`] ?? catalog.battleRules.elementResistanceValues?.[resistance],{None:1,Weakness:1.5,Halved:0.5,Invalid:0,Absorb:-1}[resistance]??1);
       const common={attack,defense,attackSource:passiveAnalysis.modifiers.dominantPower?'higher of ATK and MAG':magical?'MAG':'ATK',defenseSource:targetAnalysis.modifiers.dominantDefence?'higher of physical and magic':magical?'magic':'physical',level:stats.level || context.level,targetLevel:number(enemy.level,1),skill,elementFactor:factor,
         outgoingFactor:Math.max(0,passiveAnalysis.damageFactor+number(context.additionalDamagePercent)/100)*incomingFactor,
-        criticalBonus:number(passiveAnalysis.modifiers.critDamagePercent)/100,broken:context.broken ?? scenario.broken,exPhase:false,
+        criticalBonus:number(passiveAnalysis.modifiers.critDamagePercent)/100,broken:context.broken ?? scenario.broken,exPhase:!!context.extraPhase,
         difficultyGiven:scenario.difficultyGiven,rules:catalog.battleRules,
         coefficientScale:1+number(passiveAnalysis.modifiers.coefficientPerLevel)*Math.trunc(number(stats.level || context.level,1))+number(passiveAnalysis.modifiers.coefficientScalePercent)/100,coefficientAdd:number(passiveAnalysis.modifiers.coefficientAdd)+number(passiveAnalysis.modifiers.coefficientPerLuck)*number(context.goodLuck),damageCap:passiveAnalysis.modifiers.damageCapRaised?RAISED_DAMAGE_CAP:DAMAGE_CAP,
         successfulEscapes:number(snapshot.player?.escapeCount ?? snapshot.player?.escapeNum ?? snapshot.player?.successfulEscapes,NaN)};
@@ -156,13 +156,14 @@
       const hits=[];
       const critRate=number(skill.criticalHitRate)+number(passiveAnalysis.modifiers.critRatePercent);
       const gamble=!!passiveAnalysis.modifiers.gambleShot;
-      const gambleStageProbability=gamble?(common.broken?1:D.gambleHitProbability(number(context.goodLuck),number(passiveAnalysis.modifiers.accuracyBonus))):1;
+      const gambleStageProbability=gamble?(common.broken || context.extraPhase?1:D.gambleHitProbability(number(context.goodLuck),number(passiveAnalysis.modifiers.accuracyBonus))):1;
       const accuracyOptions={accuracyBonus:number(passiveAnalysis.modifiers.accuracyBonus),evasion:number(targetAnalysis.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
-      const accuracyProbability=gamble?(common.broken?1:D.skillHitProbability(number(skill.accuracy,100),accuracyOptions)):1;
+      const accuracyProbability=gamble?(common.broken || context.extraPhase?1:D.skillHitProbability(number(skill.accuracy,100),accuracyOptions)):1;
       const hitProbability=gambleStageProbability*accuracyProbability;
       const criticalChance=gamble?hitProbability:scenario.critical?1:D.criticalProbability(critRate);
       for(const [hitIndex,hitRatio] of useRatios.entries()){
-        const hitChance=gamble?(common.broken?1:Array.isArray(context.gambleHitOutcomes)?Number(context.gambleHitOutcomes[hitIndex]):hitProbability):criticalChance;
+        const accuracyWeight=!gamble && Array.isArray(context.attackHitOutcomes)?(common.broken || context.extraPhase?1:Number(context.attackHitOutcomes[hitIndex])):1;
+        const hitChance=gamble?(common.broken || context.extraPhase?1:Array.isArray(context.gambleHitOutcomes)?Number(context.gambleHitOutcomes[hitIndex]):hitProbability):Array.isArray(context.criticalOutcomes)?Number(context.criticalOutcomes[hitIndex]):criticalChance;
         const critAnalysis=context.criticalAnalysis || passiveAnalysis;
         const criticalInput={...common,hitRatio,critical:true,
           attack:attackFor(context.criticalStats || stats,critAnalysis.modifiers),
@@ -171,16 +172,16 @@
         const normal=D.damage({...common,hitRatio,critical:false}),critical=D.damage(criticalInput);
         if(!normal.supported)return {...normal,damage:0,damageMin:0,damageMax:0};
         if(normal.healsTarget)return {supported:true,damage:0,damageMin:0,damageMax:0,breakDamage:0,hits:[{damage:0,breakDamage:0}],breakVerified:true,absorbed:true,element,resistance,common};
-        const hitDamage=(gamble?0:normal.amount*(1-hitChance))+critical.amount*hitChance;
+        const hitDamage=accuracyWeight*((gamble?0:normal.amount*(1-hitChance))+critical.amount*hitChance);
         expected+=hitDamage;
-        min+=gamble?(hitChance===1?critical.min:0):hitChance===1?critical.min:normal.min;
-        max+=gamble?(hitChance>0?critical.max:0):hitChance>0?critical.max:normal.max;
+        min+=accuracyWeight*(gamble?(hitChance===1?critical.min:0):hitChance===1?critical.min:normal.min);
+        max+=accuracyWeight*(gamble?(hitChance>0?critical.max:0):hitChance>0?critical.max:normal.max);
         let hitBreak=0;
         if(typeof D.breakDamage==='function'){
           const breakFactor=number(catalog.battleRules.breakElementResistanceValues?.[`eResistance::${resistance}`] ?? catalog.battleRules.breakElementResistanceValues?.[resistance],{None:1,Weakness:3,Halved:.5,Invalid:0,Absorb:0}[resistance]??1);
           const input={skill:{...skill,breakDmg:Math.fround(number(skill.breakDmg)*Math.fround(1+number(passiveAnalysis.modifiers.baseBreakScalePercent)/100))},level:common.level,targetLevel:number(enemy.level,1),elementFactor:breakFactor,outgoingFactor:passiveAnalysis.breakFactor,rules:catalog.battleRules,hitRatio};
           const normalBreak=D.breakDamage({...input,critical:false}),criticalBreak=D.breakDamage({...input,skill:{...skill,breakDmg:Math.fround(number(skill.breakDmg)*Math.fround(1+number(critAnalysis.modifiers.baseBreakScalePercent)/100))},outgoingFactor:critAnalysis.breakFactor,critical:true});
-          hitBreak=(gamble?0:normalBreak.amount*(1-hitChance))+criticalBreak.amount*hitChance;
+          hitBreak=accuracyWeight*((gamble?0:normalBreak.amount*(1-hitChance))+criticalBreak.amount*hitChance);
           breakDamage+=hitBreak;
         }
         hits.push({damage:hitDamage,breakDamage:hitBreak});
@@ -375,7 +376,7 @@
         mpPercent:s.mp/Math.max(1,number(plan.maxMp,s.m.availableMp))*100,goodLuck:s.goodLuck,
         activeEffectIds:unique([...(context.activeEffectIds || []),...(s.goodLuck>0?[1195]:[]),...clock,...(s.demonForm?[16603]:[]),...(s.focusLife>0?[12907]:[]),...(s.round<s.focusSpeedUntil?[1382]:[])]),
         resources:{...(context.resources || {}),GoodLuck:s.goodLuck,OverClock:s.overclocks.length?1:0},
-        demonForm:!!s.demonForm,extraPhase:false,awakeningPower:false,hasEscaped:false,lbPercent:s.gauge,
+        demonForm:!!s.demonForm,extraPhase:s.phase==='additional',awakeningPower:false,hasEscaped:false,lbPercent:s.gauge,lbCapacity:number(s.m.limit?.max),
         statusNames:[...(context.statusNames || []),...s.overclocks.map(clock=>clock.effectId===19004?'OverClockZero':'OverClock'),...(s.round<s.overheatUntil?['OverHeat']:[])]};
     }
     function freshTurnAvailable(s,plan,round){
@@ -392,6 +393,7 @@
       let pendingHp=s.hp,pendingMp=s.mp;
       for(const step of steps){
         const skill=indexes.skills.get(Number(step.skillId));if(!skill)continue;
+        if(step.context?.friendlyTargetId!==undefined && !s.targetAlive?.(Number(step.context.friendlyTargetId)))return {skillId:skill.id,reason:'The selected friendly target is unavailable or has no HP remaining.'};
         if(round<s.overheatUntil && clean(skill.attr)==='Mechabo')return {skillId:skill.id,reason:'Overheat prevents a fresh Mechabo command.'};
         const check=P.skillEligibility(skill,liveContext(s,plan,step.context),catalog.skillRules || {});
         if(!check.eligible)return {skillId:skill.id,reason:check.reasons.concat(check.deferred).join('; ')};
@@ -410,22 +412,22 @@
     }
     function payLiveSkill(s,plan,skill,step,round){
       // Native ordinary queued children do not rerun the command-menu resource/status gates.
-      if(s.hp<=0){s.resourceSkips.push({round,skillId:skill.id,reason:'The caster has no HP remaining.'});return null;}
+      if(s.hp<=0){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:'The caster has no HP remaining.'});return null;}
       const recheck=!!(step.context?.reaction || step.context?.triggered);
       if(recheck){
         const unavailable=round<s.overheatUntil && clean(skill.attr)==='Mechabo'?'Overheat prevents the triggered Mechabo action.':null;
         const check=P.skillEligibility(skill,liveContext(s,plan,step.context),catalog.skillRules || {});
-        if(unavailable || !check.eligible){s.resourceSkips.push({round,skillId:skill.id,reason:unavailable || check.reasons.concat(check.deferred).join('; ')});return null;}
+        if(unavailable || !check.eligible){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:unavailable || check.reasons.concat(check.deferred).join('; ')});return null;}
       }
       const general=catalog.skillRules?.general || {},costs=step.paymentSuppressed?[]:hpCostsFor(skill.id);
       if(recheck && costs.some(cost=>!D.canPayHpCost(s.hp,plan.maxHp,Number(cost.Cost)))){
-        s.resourceSkips.push({round,skillId:skill.id,reason:'Insufficient HP for the native percentage check.'});return null;
+        s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:'Insufficient HP for the native percentage check.'});return null;
       }
       const luckCosts=step.paymentSuppressed?[]:(general.additionalCostData || []).filter(row=>Number(row.SkillId)===skill.id && clean(row.costType)==='GoodLuck');
       const luckCost=luckCosts.reduce((sum,cost)=>sum+Number(cost.Cost),0);
       const override=general.costOverrideData?.find(row=>Number(row.SkillId)===skill.id);
       const mp=step.paymentSuppressed?0:number(step.mpCost,clean(override?.costType)==='HPRatio'?0:D.skillMpCost(number(skill.cost),step.boost || step.reckless?[150]:[]));
-      if(recheck && mp>s.mp){s.resourceSkips.push({round,skillId:skill.id,reason:'Insufficient MP for the selected child.'});return null;}
+      if(recheck && mp>s.mp){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:'Insufficient MP for the selected child.'});return null;}
       const before={hp:s.hp,mp:s.mp,goodLuck:s.goodLuck};
       s.mp=Math.max(0,s.mp-mp);s.goodLuck=Math.max(0,s.goodLuck-luckCost);
       for(const cost of costs){const previous=s.hp;s.hp=Math.max(0,s.hp-D.skillHpCost(plan.maxHp,Number(cost.Cost)));s.hpSpent+=previous-s.hp;}
@@ -445,41 +447,65 @@
         if(!payment){if(isWrapper)blockedDepth=depth;continue;}
         skillStateEffects(s,skill,'BeforeDamageCalculation',round);
         if(isWrapper){skillStateEffects(s,skill,'AfterDamageCalculation',round);continue;}
+        s.currentActionNewStagger=false;
+        if(['Decrease','RatioDecrease'].includes(clean(skill.parameterVariationType)) && clean(skill.parameterType)==='HitPoint')s.performedAttackThisRound=true;
         const temporary=(skill.effectBundles || []).filter(bundle=>clean(bundle.TargetType)==='Self' && clean(bundle.activeSkillAddTiming)==='BeforeDamageCalculation')
           .map(bundle=>Number(bundle.effectId)).filter(id=>{const effect=indexes.effects.get(id);return effect && !P.decode(effect).unsupported;});
-        const context=liveContext(s,plan,{...leaf.context,activeEffectIds:unique([...(leaf.context?.activeEffectIds || []),...temporary])});
+        const context=liveContext(s,plan,{...leaf.context,anyCritical:false,activeEffectIds:unique([...(leaf.context?.activeEffectIds || []),...temporary])});
         if(isGambleSkill(skill)){
           const modifiers=analysis(plan.passiveIds || [],skill,context).modifiers;
           const target=P.analyze(catalog,enemy.passiveIds || [],{skill,hpPercent:100,mpPercent:100,broken:context.broken});
           const accuracyOptions={accuracyBonus:number(modifiers.accuracyBonus),evasion:number(target.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
-          context.gambleProbability=context.broken?1:D.gambleHitProbability(s.goodLuck,number(modifiers.accuracyBonus));
-          context.gambleStageOutcome=!!context.broken || D.gambleSuccess(s.goodLuck,s.gambleRng(round),number(modifiers.accuracyBonus));
-          context.gambleHitOutcomes=Array.from({length:Math.max(1,number(skill.hits,1))},()=>!!context.broken || (context.gambleStageOutcome && D.skillHitSuccess(number(skill.accuracy,100),s.gambleRng(round),accuracyOptions)));
-          context.gambleOutcome=context.gambleHitOutcomes.some(Boolean);
+          context.gambleProbability=context.broken || context.extraPhase?1:D.gambleHitProbability(s.goodLuck,number(modifiers.accuracyBonus));
+          context.gambleStageOutcome=!!context.broken || !!context.extraPhase || D.gambleSuccess(s.goodLuck,s.gambleRng(round),number(modifiers.accuracyBonus));
+          context.gambleHitOutcomes=Array.from({length:Math.max(1,number(skill.hits,1))},()=>{if(context.broken || context.extraPhase)return true;const hit=D.skillHitSuccess(number(skill.accuracy,100),s.gambleRng(round),accuracyOptions);return context.gambleStageOutcome && hit;});
+          context.gambleOutcome=context.gambleHitOutcomes.some(Boolean);context.anyCritical=context.gambleOutcome;
+        }
+        if((skill.effects || []).some(id=>[54100,54101].includes(Number(id)))){
+          context.accuracyModeled=true;
+          const modifiers=analysis(plan.passiveIds || [],skill,context).modifiers;
+          const target=P.analyze(catalog,enemy.passiveIds || [],{skill,element:clean(skill.element),hpPercent:100,mpPercent:100,broken:context.broken});
+          const accuracyOptions={accuracyBonus:number(modifiers.accuracyBonus),evasion:number(target.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
+          const probability=D.criticalProbability(number(skill.criticalHitRate)+number(modifiers.critRatePercent));
+          context.attackHitOutcomes=[];context.criticalOutcomes=[];context.criticalProbability=probability;
+          for(let i=0;i<Math.max(1,number(skill.hits,1));i++){
+            const hit=!!context.broken || !!context.extraPhase || D.skillHitSuccess(number(skill.accuracy,100),s.combatRng(round),accuracyOptions);
+            context.attackHitOutcomes.push(hit);context.criticalOutcomes.push(hit && (scenario.critical || s.combatRng(round)<probability*32768));
+          }
+          context.anyHit=context.attackHitOutcomes.some(Boolean);context.anyCritical=context.criticalOutcomes.some(Boolean);
         }
         let damageEvent={damage:0,breakDamage:0};
         if(leaf.kind==='support'){
-          if(round===s.traceTurn)s.stateLeafResults.push({skillId:skill.id,kind:'support',context,...payment,damage:0,breakDamage:0,common:{}});
+          if(round===s.traceTurn)s.stateLeafResults.push({phase:s.phase || 'normal',skillId:skill.id,kind:'support',context,...payment,damage:0,breakDamage:0,common:{}});
         }else{
           const normal=rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,context);
-          if(!normal.supported){s.resourceSkips.push({round,skillId:skill.id,reason:'The live-state damage calculation is unsupported.'});continue;}
+          if(!normal.supported){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:'The live-state damage calculation is unsupported.'});continue;}
           const broken=scenario.broken?normal:rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,{...context,broken:true});
           damageEvent={damage:normal.damage,breakDamage:normal.breakDamage,common:normal.common,context,hitProbability:normal.hitProbability,gambleOutcome:normal.gambleOutcome};
-          if(round===s.traceTurn)s.stateLeafResults.push({skillId:skill.id,kind:leaf.kind || 'attack',context,...payment,damage:normal.damage,breakDamage:normal.breakDamage,common:normal.common});
-          for(const [hitIndex,hit] of combatHits(normal,broken).entries()){
-            if(isGambleSkill(skill) && s.targetBroken?.()){context.gambleOutcome=true;context.gambleHitOutcomes[hitIndex]=true;}
-            yield {...hit,actionIndex};
+          if(round===s.traceTurn)s.stateLeafResults.push({phase:s.phase || 'normal',skillId:skill.id,kind:leaf.kind || 'attack',context,...payment,damage:normal.damage,breakDamage:normal.breakDamage,common:normal.common});
+          for(const [hitIndex,originalHit] of combatHits(normal,broken).entries()){
+            let hit=originalHit;
+            if(context.accuracyModeled && s.targetBroken?.() && !context.attackHitOutcomes[hitIndex]){
+              context.attackHitOutcomes[hitIndex]=true;context.criticalOutcomes[hitIndex]=scenario.critical || s.combatRng(round)<context.criticalProbability*32768;context.anyHit=true;context.anyCritical=context.criticalOutcomes.some(Boolean);
+              const corrected=rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,{...context,broken:true});
+              hit={...hit,brokenDamage:corrected.hits[hitIndex].damage};
+            }
+            if(isGambleSkill(skill) && s.targetBroken?.()){context.gambleOutcome=true;context.anyCritical=true;context.gambleHitOutcomes[hitIndex]=true;}
+            yield {...hit,actionIndex,skillId:skill.id};
           }
         }
         if(isGambleSkill(skill))damageEvent.gambleOutcome=context.gambleOutcome;
         skillStateEffects(s,skill,'AfterDamageCalculation',round,context);
+        context.causedStagger=!!s.currentActionNewStagger;
+        if(context.causedStagger)s.onSourceBreak?.(skill,context);
         if(skill.id===400790 && plan.turn.reactionSkills){s.reactionUntil=round+1;s.reactionSkills=plan.turn.reactionSkills;}
         if(clockTargets.has(skill.id)){
           for(const clock of s.overclocks)clock.charges--;
           if(s.overclocks.some(clock=>clock.charges===0))s.overheatUntil=round+2;
           s.overclocks=s.overclocks.filter(clock=>clock.charges>0);
         }
-        s.resourceEvents.push({round,skillId:skill.id,...payment,...damageEvent,goodLuckAfter:s.goodLuck,overclockCharges:Math.max(0,...s.overclocks.map(clock=>clock.charges)),overclockStates:s.overclocks.map(clock=>({...clock})),overheat:round<s.overheatUntil,demonForm:s.demonForm,focusLife:s.focusLife});
+        s.onSkillEnd?.(skill,context);
+        s.resourceEvents.push({round,phase:s.phase || 'normal',skillId:skill.id,...payment,...damageEvent,goodLuckAfter:s.goodLuck,overclockCharges:Math.max(0,...s.overclocks.map(clock=>clock.charges)),overclockStates:s.overclocks.map(clock=>({...clock})),overheat:round<s.overheatUntil,demonForm:s.demonForm,focusLife:s.focusLife});
       }
     }
     function liveBurst(s,plan,option,round){
@@ -500,8 +526,13 @@
       const rounds=scenario.rounds,allStaggered=scenario.enemyCount===1;
       const gain=number(allStaggered?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,allStaggered?50:25);
       const phaseHasGamble=turn=>turn && [...(turn.leaves || []).map(leaf=>leaf.skillId),...(turn.reactionSkills || [])].some(id=>isGambleSkill(indexes.skills.get(Number(id))));
-      const gamblePresent=members.some(member=>{const plan=member.actionPlan;return plan && [plan.turn,plan.openingTurn,...(plan.rotationTurns || []),plan.luckPolicy?.generatorTurn,plan.luckPolicy?.spenderTurn].some(phaseHasGamble);});
-      const samples=gamblePresent?32:members.length>1?16:1,partyOrder=new Map((snapshot.party || []).map((id,i)=>[Number(id),i]));
+      const gamblePresent=members.some(member=>{const plan=member.actionPlan || member.fallbackActionPlan;return plan && [plan.turn,plan.bonusTurn,plan.openingTurn,...(plan.rotationTurns || []),plan.luckPolicy?.generatorTurn,plan.luckPolicy?.spenderTurn].some(phaseHasGamble);});
+      const allPlanTurns=members.flatMap(member=>{const plan=member.actionPlan || member.fallbackActionPlan;return plan?[plan.turn,plan.bonusTurn,plan.openingTurn,...(plan.rotationTurns || []),plan.luckPolicy?.generatorTurn,plan.luckPolicy?.spenderTurn].filter(Boolean):[];});
+      const bonusPresent=members.some(member=>number(member.breakDamage)>0) || allPlanTurns.some(turn=>(turn.leaves || []).some(leaf=>(indexes.skills.get(leaf.skillId)?.effectBundles || []).some(bundle=>[54100,54101,54105].includes(Number(bundle.effectId)))));
+      const defenseChancePresent=scenario.incomingDamage>0 && members.some(member=>(member.actionPlan?.passiveIds || []).some(id=>(indexes.passives.get(id)?.effects || []).includes(19034)));
+      const phaseProcPresent=allPlanTurns.some(turn=>(turn.leaves || []).some(leaf=>(indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(Number(id)))));
+      const combatRandom=gamblePresent || phaseProcPresent || defenseChancePresent;
+      const samples=combatRandom?32:members.length>1?16:1,partyOrder=new Map((snapshot.party || []).map((id,i)=>[Number(id),i]));
       const rateAmplitude=number(catalog.battleRules.actionTimeCalcValueWithAgilityRatio,20),flatAmplitude=number(catalog.battleRules.actionTimeCalcValueWithFixValue,5);
       const draw=(sample,round,id,stream)=>{
         let seed=Math.imul(sample+1,0x85ebca6b)^Math.imul(round,0xc2b2ae35)^Math.imul(Number(id),0x27d4eb2d)^stream;
@@ -541,12 +572,34 @@
       const fill=(s,amount)=>{const before=s.gauge;s.gauge=Math.max(0,Math.min(s.m.limit.max,s.gauge+Math.trunc(Math.fround(amount))));s.gained+=s.gauge-before;};
       const outcomes=[];
       for(let sample=0;sample<samples;sample++){
-        const state=initial.map(s=>({...s,gauge:Math.max(0,Math.min(number(s.m.limit?.max),number(s.m.limit?.initial))),gained:0,uses:[],mp:number(s.m.availableMp),mpExhaustedRounds:[],
-          hp:number(s.m.actionPlan?.maxHp),hpSpent:0,resourceSkips:[],stateLeafResults:[],resourceEvents:[],goodLuck:s.initialLuck,overclocks:[],overheatUntil:0,openingDone:false,rotationIndex:0,demonForm:false,focusLife:0,focusSpeedUntil:0,gambleDraws:0}));
+        const state=initial.map(s=>({...s,gauge:Math.max(0,Math.min(number(s.m.limit?.max),number(s.m.limit?.initial))),gained:0,uses:[],extraActions:0,phaseEvents:[],mp:number(s.m.availableMp),mpExhaustedRounds:[],
+          hp:number((s.m.actionPlan || s.m.fallbackActionPlan)?.maxHp),hpSpent:0,resourceSkips:[],stateLeafResults:[],resourceEvents:[],goodLuck:s.initialLuck,overclocks:[],overheatUntil:0,openingDone:false,rotationIndex:0,demonForm:false,focusLife:0,focusSpeedUntil:0,gambleDraws:0,combatDraws:0}));
+        for(const s of state)s.combatRng=round=>draw(sample,round,s.m.id,0x3ac81f09^Math.imul(++s.combatDraws,0x9e3779b9));
         for(const s of state)s.gambleRng=round=>draw(sample,round,s.m.id,0x2d6a5bc1^Math.imul(++s.gambleDraws,0x9e3779b9));
         let damage=0,breakDamage=0,gauge=0,recoverAt=0,staggers=0,firstStagger=0;
         for(let round=1;round<=rounds;round++){
-          const acted=new Set();
+          const acted=new Set(),pending=new Set(),participated=new Set();
+          const grant=(source,target,reason)=>{
+            if(source.phase!=='normal' || !target || (target.m.actionPlan || target.m.fallbackActionPlan) && target.hp<=0 || participated.has(target) || pending.has(target))return;
+            pending.add(target);target.phaseEvents.push({round,phase:'normal',kind:'bonus-granted',sourceId:source.m.id,reason});
+          };
+          for(const s of state){
+            s.performedAttackThisRound=false;s.phase='normal';s.targetAlive=id=>state.some(target=>target.m.id===id && target.hp>0);
+            s.onSourceBreak=(skill,context)=>{
+              if(!(skill.effects || []).includes(54101))return;
+              const effect=indexes.effects.get(54101),eligible=state.filter(target=>target!==s && !pending.has(target) && !participated.has(target) && (!(target.m.actionPlan || target.m.fallbackActionPlan) || target.hp>0));
+              const chance=number(effect.params[0])+number(analysis(s.m.actionPlan?.passiveIds || s.m.fallbackActionPlan?.passiveIds || [],skill,context).modifiers.bonusPhaseChancePercent);
+              const proc=D.skillHitSuccess(chance,s.combatRng(round));
+              if(proc && eligible.length)grant(s,eligible[Math.min(eligible.length-1,Math.trunc(Math.fround(Math.fround(Math.fround(s.combatRng(round))*Math.fround(1/32767))*Math.fround(eligible.length))))],'random-ally-stagger');
+            };
+            s.onSkillEnd=(skill,context)=>{
+              for(const bundle of skill.effectBundles || []){
+                const id=Number(bundle.effectId),effect=indexes.effects.get(id);if(!effect)continue;
+                if(id===54100 && context.anyHit!==false){const chance=number(effect.params[0])+number(analysis(s.m.actionPlan?.passiveIds || s.m.fallbackActionPlan?.passiveIds || [],skill,{...context,anyCritical:context.anyCritical}).modifiers.bonusPhaseChancePercent);if(D.skillHitSuccess(chance,s.combatRng(round)))grant(s,s,'skill-end');}
+                if(id===54105){const proc=D.skillHitSuccess(number(effect.params[0]),s.combatRng(round)),target=state.find(other=>other.m.id===Number(context.friendlyTargetId));if(proc)grant(s,target,'call-to-action');}
+              }
+            };
+          }
           for(const s of state){s.round=round;s.targetBroken=()=>scenario.broken || round<recoverAt;}
           const liveAgility=s=>{
             if(!s.m.actionPlan)return number(s.m.agility);
@@ -558,26 +611,27 @@
             randomRate:D.initiativeJitter(draw(sample,round,s.m.id,0x51ed270b),rateAmplitude),
             randomFlat:D.initiativeJitter(draw(sample,round,s.m.id,0x68bc21eb),flatAmplitude),waitOffset:round===1?s.firstStrike:0})}))
             .sort((a,b)=>b.priority-a.priority || b.s.tieOrder-a.s.tieOrder || b.s.index-a.s.index).map(o=>o.s);
-          for(const s of order){
+          const runActor=(s,phase)=>{
+            s.phase=phase;
             s.round=round;
-        const staggered=scenario.broken || round<recoverAt,lb=s.m.setupLimit && round<s.setupUntil?s.m.setupLimit:s.m.limit;
-            const supported=acted.has(s.m.supportSourceId),basePlan=supported && s.m.supportedActionPlan?s.m.supportedActionPlan:s.m.actionPlan;
-            const opening=basePlan?.openingTurn && !s.openingDone;
+        const staggered=scenario.broken || round<recoverAt,lb=s.m.setupLimit && round<s.setupUntil?s.m.setupLimit:phase==='additional' && s.m.bonusLimit?s.m.bonusLimit:s.m.limit;
+            const supported=acted.has(s.m.supportSourceId),basePlan=supported && s.m.supportedActionPlan?s.m.supportedActionPlan:s.m.actionPlan || (phase==='additional'?s.m.fallbackActionPlan:null);
+            const opening=phase==='normal' && basePlan?.openingTurn && !s.openingDone;
             const policy=basePlan?.luckPolicy,requiredLuck=policy?Math.max(number(policy.requiredLuck),number(policy.requiredTurnLuck)):0;
-            const selectedTurn=basePlan && (opening?basePlan.openingTurn:policy?(s.goodLuck>=requiredLuck?policy.spenderTurn:policy.generatorTurn):basePlan.rotationTurns?.[s.rotationIndex%basePlan.rotationTurns.length] || basePlan.turn);
+            const selectedTurn=basePlan && (opening?basePlan.openingTurn:policy?(s.goodLuck>=requiredLuck?policy.spenderTurn:policy.generatorTurn):phase==='additional' && basePlan.bonusTurn || basePlan.rotationTurns?.[s.rotationIndex%basePlan.rotationTurns.length] || basePlan.turn);
             const plan=basePlan && {...basePlan,turn:selectedTurn};
-            if(plan && s.hp<=0){s.resourceSkips.push({round,skillId:0,reason:'The caster has no HP remaining.'});continue;}
+            if(plan && s.hp<=0){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:0,reason:'The caster has no HP remaining.'});return;}
             const selectionIssue=plan?freshTurnAvailable(s,plan,round):null;
-            s.goodLuck=Math.min(10,s.goodLuck+s.actionBeginLuck);s.focusLife=Math.max(0,s.focusLife-1);
+            if(phase==='normal'){s.goodLuck=Math.min(10,s.goodLuck+s.actionBeginLuck);s.focusLife=Math.max(0,s.focusLife-1);}
             const turn=s.m.supportedTurn && supported?s.m.supportedTurn:
               {damage:s.m.damage,brokenDamage:s.m.brokenDamage,breakDamage:s.m.breakDamage,hits:s.m.hits};
             // With the Limit Burst goal ticked it fires as soon as it is ready; otherwise only when it beats the normal turn.
             const bursts=(lb?.options || []).filter(o=>o.cost<=s.gauge).map(o=>plan?liveBurst(s,plan,o,round):o).filter(Boolean);
             const burst=bursts.filter(o=>goals.has('limit') || value(o,staggered)>value(turn,staggered)).sort((a,b)=>value(b,staggered)-value(a,staggered))[0];
-            if(burst){s.gauge-=burst.cost;s.uses.push({round,skillId:burst.skillId});}
+            if(burst){s.gauge-=burst.cost;s.uses.push({round,phase,skillId:burst.skillId});}
             let act=burst || turn,paidSupport=false;
             if(!burst){
-              if(selectionIssue){if(selectionIssue.resource==='MP')s.mpExhaustedRounds.push(round);s.resourceSkips.push({round,...selectionIssue});act={damage:0,brokenDamage:0,breakDamage:0,hits:[]};}
+              if(selectionIssue){if(selectionIssue.resource==='MP')s.mpExhaustedRounds.push(round);s.resourceSkips.push({round,phase,...selectionIssue});act={damage:0,brokenDamage:0,breakDamage:0,hits:[]};}
               else if(number(plan?.turn.mp,s.m.turnMp)>s.mp){s.mpExhaustedRounds.push(round);act={damage:0,brokenDamage:0,breakDamage:0,hits:[]};}
           else{if(plan){s.traceTurn ??= round;act={...turn,hits:liveTurnHits(s,plan,round)};if(opening)s.openingDone=true;else s.rotationIndex++;}else s.mp-=number(s.m.turnMp);paidSupport=true;if(s.m.setupDuration)s.setupUntil=round+s.m.setupDuration;}
             }
@@ -595,18 +649,26 @@
               if(gauge<enemyBreak)continue;
               gauge=0;recoverAt=round+1;staggers++;firstStagger||=round;causedStagger=true;
               if(lb)fill(s,gain*lb.mult);
+              grant(s,s,'stagger');
+              if(allStaggered)for(const target of state)grant(s,target,'all-enemies-staggered');
+              s.currentActionNewStagger=true;
             }
               finishAction();
             };
+            if(burst){const skill=indexes.skills.get(burst.skillId);if(skill && ['Decrease','RatioDecrease'].includes(clean(skill.parameterVariationType)) && clean(skill.parameterType)==='HitPoint')s.performedAttackThisRound=true;}
             consume(act.hits || [act]);
             if(burst && plan){const used=indexes.skills.get(burst.skillId);if(used)skillStateEffects(s,used,'AfterDamageCalculation',round);s.resourceEvents.push({round,kind:'limit',skillId:burst.skillId,damage:burst.damage,hpAfter:s.hp,mpAfter:s.mp,goodLuckAfter:s.goodLuck});}
             if(burst)fill(s,lb.recuperate*lb.mult);
-            if(scenario.incomingDamage>0 && plan && s.hp>0){
+            if(phase==='normal' && scenario.incomingDamage>0 && plan && s.hp>0){
               const hpBefore=s.hp,mirror=round<s.reactionUntil;
-              const received=mirror?Math.max(1,Math.trunc(Math.fround(Math.fround(scenario.incomingDamage)*Math.fround(.5+2**-23)))):scenario.incomingDamage;
+              let received=mirror?Math.max(1,Math.trunc(Math.fround(Math.fround(scenario.incomingDamage)*Math.fround(.5+2**-23)))):scenario.incomingDamage;
+              const incoming=analysis(plan.passiveIds || [],indexes.skills.get(plan.turn.leaves.find(leaf=>leaf.kind!=='support')?.skillId) || indexes.skills.get(plan.turn.leaves[0]?.skillId),liveContext(s,plan,{incomingType:scenario.incomingType,performedAttackThisRound:s.performedAttackThisRound}));
+              const nullifyChance=number(incoming.modifiers.incomingPhysicalNullifyChance);
+              const nullified=nullifyChance>0 && D.skillHitSuccess(nullifyChance,s.combatRng(round));
+              if(nullified)received=0;
               s.hp=Math.max(0,s.hp-received);
               if(lb)fill(s,D.damageTakenLb(received,hpBefore,plan.maxHp,number(catalog.battleRules.damagedLBIncrease,50))*lb.mult);
-              s.resourceEvents.push({round,kind:'incoming',damageType:scenario.incomingType,damage:received,hpBefore,hpAfter:s.hp,mirrorReduction:mirror});
+              s.resourceEvents.push({round,kind:'incoming',phase,nullified,damageType:scenario.incomingType,damage:received,hpBefore,hpAfter:s.hp,mirrorReduction:mirror});
               if(mirror && s.hp>0){
                 for(const id of s.reactionSkills || []){
                   const reactionTurn={steps:[{skillId:id,kind:'attack',context:{reaction:true,triggered:true}}],leaves:[{skillId:id,kind:'attack',context:{reaction:true,triggered:true},actionIndex:0}]};
@@ -614,10 +676,16 @@
                 }
               }
             }
-            if(paidSupport)acted.add(s.m.id);
-          }
+            if(paidSupport && phase==='normal')acted.add(s.m.id);
+            if(phase==='additional' && (paidSupport || burst))s.extraActions++;
+            s.phaseEvents.push({round,phase,kind:'actor-finished',paid:!!(paidSupport || burst)});
+          };
+          for(const s of order)runActor(s,'normal');
+          // Native Additional commands execute in unique pending-grant insertion order.
+          for(const s of pending){participated.add(s);runActor(s,'additional');}
         }
         outcomes.push({sample,damage:damage/rounds,breakDamage:breakDamage/rounds,staggers,firstStagger,
+          extraActions:Object.fromEntries(state.map(s=>[s.m.id,s.extraActions])),phaseEvents:Object.fromEntries(state.map(s=>[s.m.id,s.phaseEvents])),
           uses:Object.fromEntries(state.map(s=>[s.m.id,s.uses])),gauge:Object.fromEntries(state.map(s=>[s.m.id,s.gained/rounds])),
           mpExhaustedRounds:Object.fromEntries(state.map(s=>[s.m.id,s.mpExhaustedRounds])),remainingMp:Object.fromEntries(state.map(s=>[s.m.id,s.mp])),
           remainingHp:Object.fromEntries(state.map(s=>[s.m.id,s.hp])),hpSpent:Object.fromEntries(state.map(s=>[s.m.id,s.hpSpent])),resourceSkips:Object.fromEntries(state.map(s=>[s.m.id,s.resourceSkips])),
@@ -630,8 +698,8 @@
         Math.abs(b.damage-damage)/enemyHp-Math.abs(b.breakDamage-breakDamage)/enemyBreak || a.sample-b.sample)[0];
       const averageByMember=key=>Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o[key][m.id],0)/samples]));
       return {...representative,damage,breakDamage,staggers:mean('staggers'),gauge:averageByMember('gauge'),remainingMp:averageByMember('remainingMp'),remainingHp:averageByMember('remainingHp'),hpSpent:averageByMember('hpSpent'),
-        initiativeSamples:samples,gambleSamples:gamblePresent?samples:0,sampleKind:gamblePresent?'native-initiative-and-gamble':'native-initiative',representativeSample:representative.sample,usesAreRepresentative:samples>1,
-        expectedLimitUses:Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o.uses[m.id].length,0)/samples]))};
+        combatSamples:combatRandom?samples:0,initiativeSamples:samples,gambleSamples:gamblePresent?samples:0,sampleKind:bonusPresent || defenseChancePresent?'native-initiative-and-combat':gamblePresent?'native-initiative-and-gamble':'native-initiative',representativeSample:representative.sample,usesAreRepresentative:samples>1,
+        expectedExtraActions:averageByMember('extraActions'),expectedLimitUses:Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o.uses[m.id].length,0)/samples]))};
     }
     function setupTurnsFor(prepared,skill){
       const turns=[];
@@ -812,7 +880,7 @@
       const consider=(skill,turn)=>{
         const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn);
         const allPassives=unique([...freeIds,...packageInfo.passiveIds,...turn.reservedIds.filter(id=>indexes.passives.has(id))]);
-        const passiveAnalysis=analysis(allPassives,skill,turn.context);
+        const passiveAnalysis=analysis(allPassives,skill,{...turn.context,lbCapacity:prepared.limitMax});
         const calculated=S.characterStats(catalog,snapshot,characterId,equipment,passiveAnalysis.terms);
         const stats={...calculated.stats,level:calculated.level};
         const baseAgility=turn.focus?S.characterStats(catalog,snapshot,characterId,equipment,analysis(allPassives,skill,turn.baseContext || {}).terms).stats.Agility:stats.Agility;
@@ -860,13 +928,21 @@
         }
         const canHeal=ensureSupport(prepared.healSkills,'healer'),canProtect=ensureSupport(prepared.protectSkills,'protector');
         for(const supportId of unique([...prepared.support.buffs,...prepared.support.debuffs].filter(a=>['damagePercent','statPercent'].includes(a.kind)).map(a=>a.skillId)).slice(0,3))ensureSupport([indexes.skills.get(supportId)],'support');
+        const call=indexes.skills.get(401140),callBundle=call?.effectBundles?.find(bundle=>Number(bundle.effectId)===54105),callEffect=indexes.effects.get(54105);
+        const callSupported=prepared.legal.has(401140) && call?.relation==='Friendlies' && clean(call.target)==='Single' &&
+          clean(callBundle?.TargetType)==='SkillTarget' && clean(callBundle?.targetRelation)==='Friendlies' && clean(callBundle?.activeSkillAddTiming)==='AfterDamageCalculation' &&
+          clean(callBundle?.conditionData?.Condition || 'None')==='None' && clean(callEffect?.type)==='AddExPhase' && number(callEffect?.params?.[0])===100 &&
+          number(callEffect?.prob,100)===100 && number(callEffect?.activationProbability,100)===100 && clean(callEffect?.condition?.Condition || 'None')==='None';
+        if(callSupported)ensureSupport([call],'bonusPhase');
         const legalSkills=new Set([...packageFree,...activeSelected,...selected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
+        if(callSupported && legalSkills.has(call.id) && number(call.cost)<=availableMp)supportActions.push({skillId:call.id,name:call.name,kind:'bonusPhase',mpCost:number(call.cost),rootRelation:'Friendlies',rootTarget:'Single',effectId:54105,probability:100,activationProbability:100});
         const survivability=number(stats.MaxHitPoint)*.02+defenseSum(stats,passiveAnalysis.modifiers);
         const limit=prepared.limitMax>0?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds])):null;
         const setupLimit=limit && turn.setupContext?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds]),turn.setupContext):null;
-        const actionPlan=scenario.incomingDamage>0 || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo') || allPassives.some(id=>[1511,1499].includes(id))?{turn,openingTurn:turn.openingTurn,rotationTurns:turn.rotationTurns,luckPolicy:turn.luckPolicy,characterId,equipment,passiveIds:allPassives,maxHp:number(stats.MaxHitPoint),maxMp:number(stats.MaxMagicPoint ?? stats.MagicPoint)}:null;
-        const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan}]);
+        const fallbackActionPlan={turn,openingTurn:turn.openingTurn,rotationTurns:turn.rotationTurns,luckPolicy:turn.luckPolicy,characterId,equipment,passiveIds:allPassives,maxHp:number(stats.MaxHitPoint),maxMp:number(stats.MaxMagicPoint ?? stats.MagicPoint)};
+        const actionPlan=scenario.incomingDamage>0 || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo' || (indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(id))) || allPassives.some(id=>[1511,1499,1404].includes(id))?fallbackActionPlan:null;
+        const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan,fallbackActionPlan}]);
         const score=goalScore({damage:fight.damage,breakDamage:damage.breakVerified?fight.breakDamage:0,gauge:fight.gauge[characterId],durability:actionPlan?(fight.remainingHp[characterId]>0?(fight.remainingHp[characterId]*.02+defenseSum(stats,passiveAnalysis.modifiers))*.5:0):survivability*.5});
         const warnings=[...(calculated.warnings || []),...(prepared.learn.warnings || [])];
         if(packageInfo.masterIds.length)warnings.push('Spirit bundles use native mastery grants and their descriptions; exact runtime expansion has not been traced.');
@@ -876,10 +952,10 @@
         if(turn.multi)warnings.push(`${turn.recipeLabel}. Native child filters, hierarchy restrictions and queue order are enforced.`);
         if(turn.boost)warnings.push('Each Magic Boost applies to its own following magic attack; its native MP factor uses truncation.');
         if(fight.mpExhaustedRounds[characterId].length)warnings.push(`Not enough MP for the chosen action in rounds ${fight.mpExhaustedRounds[characterId].join(', ')}; those turns contribute no damage. MP recovery and replacement actions are not modeled.`);
-        results.push({valid:true,score,...damage,turn,limit,setupLimit,actionPlan,baseAgility:turn.focus?baseAgility:undefined,setupAgility:turn.focus?stats.Agility:undefined,focus:!!turn.focus,remainingHp:fight.remainingHp[characterId],hpSpent:fight.hpSpent[characterId],resourceSkips:fight.resourceSkips[characterId],fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
+        results.push({valid:true,score,...damage,turn,limit,setupLimit,actionPlan,fallbackActionPlan,baseAgility:turn.focus?baseAgility:undefined,setupAgility:turn.focus?stats.Agility:undefined,focus:!!turn.focus,remainingHp:fight.remainingHp[characterId],hpSpent:fight.hpSpent[characterId],resourceSkips:fight.resourceSkips[characterId],fightDamage:fight.damage,fightBreakDamage:fight.breakDamage,limitUses:fight.uses[characterId],gaugePerRound:fight.gauge[characterId],firstStagger:fight.firstStagger,mpExhaustedRounds:fight.mpExhaustedRounds[characterId],remainingMp:fight.remainingMp[characterId],skillId:skill.id,actionCount:turn.actions,multiActionId:turn.multi,magicBoost:turn.boost,turnMp:turn.mp,singleDamage:single.damage,skillCost:supportCost,skillBudget:calculated.skillBudget,maxSkillSlots:calculated.maxSkillSlots,
           stateLeafResults:fight.stateLeafResults[characterId],resourceEvents:fight.resourceEvents[characterId],remainingGoodLuck:fight.remainingGoodLuck[characterId],overclockCharges:fight.overclockCharges[characterId],overclockStates:fight.overclockStates[characterId],overheat:fight.overheat[characterId],demonForm:fight.demonForm[characterId],
           leafResults:fight.stateLeafResults[characterId]?.length?fight.stateLeafResults[characterId]:leafRolls.map(leaf=>({skillId:leaf.skillId,kind:leaf.kind,context:leaf.context,mpCost:leaf.mpCost,paymentSuppressed:leaf.paymentSuppressed,damage:leaf.normal.damage,breakDamage:leaf.normal.breakDamage,common:leaf.normal.common})),
-          recipeLabel:turn.recipeLabel,recipeSteps:turn.steps,skillIds:unique([...turn.leaves.map(leaf=>leaf.skillId),...(turn.reactionSkills || [])]),recklessAbandonment:!!turn.reckless,mixedSearchApproximate:true,initiativeSamples:fight.initiativeSamples,gambleSamples:fight.gambleSamples,sampleKind:fight.sampleKind,expectedLimitUses:fight.expectedLimitUses,representativeSample:fight.representativeSample,
+          recipeLabel:turn.recipeLabel,recipeSteps:turn.steps,skillIds:unique([...turn.leaves.map(leaf=>leaf.skillId),...(turn.reactionSkills || [])]),recklessAbandonment:!!turn.reckless,mixedSearchApproximate:true,initiativeSamples:fight.initiativeSamples,gambleSamples:fight.gambleSamples,combatSamples:fight.combatSamples,extraActions:fight.extraActions?.[characterId],expectedExtraActions:fight.expectedExtraActions?.[characterId],phaseEvents:fight.phaseEvents?.[characterId],sampleKind:fight.sampleKind,expectedLimitUses:fight.expectedLimitUses,representativeSample:fight.representativeSample,
           passiveIds:packageInfo.passiveIds,equippedSkillIds:unique([...selected,...activeSelected]),alwaysPassiveIds:freeIds,stats,level:calculated.level,
           canHeal,canProtect:canProtect || !!turn.reactionSetup,supportTags:supports.map(s=>s.role),supportSkillIds:supports.map(s=>s.skillId),supportActions,
           appliedSynergies:passiveAnalysis.applied.map(t=>({name:t.passiveName || t.type,reason:`${t.passiveName || t.type}: ${t.kind} ${t.value ?? t.element} ${t.parameter || ''}`})),
@@ -969,6 +1045,27 @@
         }
       }
 
+      // Phase-only abilities have zero value in a normal-turn surrogate; compare their legal packages explicitly.
+      if(!prepared.fixed){
+        const ranked=results.slice().sort((a,b)=>b.score-a.score),phaseBases=new Set([ranked[0]]);
+        for(const ids of [[447800,447810],[447400,447410]])phaseBases.add(ranked.find(result=>result.turn.leaves.some(leaf=>ids.includes(leaf.skillId))));
+        for(const base of [...phaseBases].filter(Boolean)){
+          const ids=[1335,...(base.turn.leaves.some(leaf=>[447800,447810].includes(leaf.skillId))?[1361,1466]:[]),...(base.turn.leaves.some(leaf=>[447400,447410].includes(leaf.skillId))?[1436]:[])].filter(id=>prepared.learned.includes(id));
+          for(let mask=1;mask<(1<<ids.length);mask++){
+            const reservedIds=unique([...base.turn.reservedIds,...ids.filter((_,index)=>mask&(1<<index))]);
+            consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
+          }
+        }
+      }
+
+      const conditionalPassives=[...(prepared.limitMax>0?[1404]:[]),...(scenario.incomingDamage>0 && scenario.incomingType==='Physic'?[1334]:[])].filter(id=>prepared.learned.includes(id));
+      if(!prepared.fixed && conditionalPassives.length)for(const base of results.slice().sort((a,b)=>b.score-a.score).slice(0,2)){
+        for(const id of conditionalPassives){
+          const optionalOpening=id===1404 && prepared.learned.includes(1004)?[[],[1004]]:[[]];
+          for(const opening of optionalOpening){const reservedIds=unique([...base.turn.reservedIds,id,...opening]);consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});}
+        }
+      }
+
       // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
       // Only the strongest learned fill-rate passive is tried (Triple over Double), on the best turn.
       const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)).slice(-1),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
@@ -994,11 +1091,36 @@
       const simulate=overrides=>simulateFight(members.map(m=>{
         const override=overrides[m.characterId];
         const e=override?.supportedTurn?{...m.evaluation,supportSourceId:override.supportSourceId,supportedTurn:override.supportedTurn,supportedActionPlan:override.supportedActionPlan}:{...m.evaluation,...override};
-        return {id:m.characterId,agility:e.baseAgility ?? e.stats.Agility,setupAgility:e.setupAgility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,setupLimit:e.setupLimit,setupDuration:e.turn?.setupDuration,actionPlan:e.actionPlan,supportedActionPlan:e.supportedActionPlan,
+        return {id:m.characterId,agility:e.baseAgility ?? e.stats.Agility,setupAgility:e.setupAgility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,setupLimit:e.setupLimit,setupDuration:e.turn?.setupDuration,actionPlan:e.actionPlan,fallbackActionPlan:e.fallbackActionPlan,bonusLimit:e.bonusLimit,supportedActionPlan:e.supportedActionPlan,
           passiveIds:unique([...(e.alwaysPassiveIds || []),...(e.passiveIds || [])]),supportSourceId:e.supportSourceId,supportedTurn:e.supportedTurn};
       }));
       let fight=simulate({});
       const fightScore=f=>goalScore({damage:f.damage,breakDamage:f.breakDamage,gauge:members.reduce((sum,m)=>sum+number(f.gauge[m.characterId]),0)/Math.max(1,members.length)});
+      // Call replaces the normal command; the selected ally's paid additional turn is queued by the native phase model.
+      for(const caster of members)for(const action of caster.evaluation.supportActions || []){
+        if(action.kind!=='bonusPhase' || action.skillId!==401140)continue;
+        const source=caster.evaluation,original=source.actionPlan || source.fallbackActionPlan;
+        if(!original?.turn)continue;
+        for(const target of members.filter(member=>member!==caster)){
+          const targetPlan=target.evaluation.actionPlan || target.evaluation.fallbackActionPlan;
+          if(!targetPlan || number(targetPlan.maxHp)<=0)continue;
+          const context={friendlyTargetId:target.characterId},mpCost=number(action.mpCost,number(indexes.skills.get(action.skillId)?.cost));
+          const leaf={skillId:action.skillId,kind:'support',context,mpCost,actionIndex:0};
+          const callTurn={leaves:[leaf],steps:[{...leaf,depth:0}],mp:mpCost,recipeLabel:`${action.name} → ${indexes.characters.get(target.characterId)?.name || target.characterId}`};
+          const callPlan={...original,turn:callTurn,openingTurn:undefined,rotationTurns:undefined,luckPolicy:undefined,bonusTurn:original.turn};
+          const overrides={[caster.characterId]:{skillId:action.skillId,skillIds:[action.skillId],damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],
+            turnMp:mpCost,actionCount:1,multiActionId:null,magicBoost:false,limit:source.limit?{...source.limit,options:[]}:null,bonusLimit:source.bonusLimit || source.limit,
+            setupLimit:null,turn:callTurn,actionPlan:callPlan,recipeLabel:callTurn.recipeLabel,recipeSteps:callTurn.steps,
+            leafResults:[{skillId:action.skillId,kind:'support',context,mpCost,damage:0,breakDamage:0,common:{}}],
+            actionDescription:`Uses ${action.name} instead of its normal attack; ${indexes.characters.get(target.characterId)?.name || target.characterId} may take one paid additional participation after normal actors finish.`}};
+          const nextFight=simulate(overrides);
+          if(fightScore(nextFight)>fightScore(fight)){
+            fight=nextFight;damage=baseline-source.damage;breakDamage=baselineBreak-number(source.breakDamage);actionOverrides=overrides;
+            supportUsed={characterId:caster.characterId,skillId:action.skillId,kind:'bonusPhase',targetIds:[target.characterId]};
+            supportDescription=`${indexes.characters.get(caster.characterId)?.name || caster.characterId} uses ${action.name} on ${indexes.characters.get(target.characterId)?.name || target.characterId}. It costs ${mpCost} MP each normal turn; the recipient pays its own additional action cost. Duplicate grants do not add another participation.`;
+          }
+        }
+      }
       // A support action replaces its caster's attack. No free pre-buff or off-turn setup.
       for(const caster of members){
         if(!goals.has('damage'))break;
@@ -1019,11 +1141,11 @@
             let nextBreak=baselineBreak-number(caster.evaluation.breakDamage);
             const casterEvaluation=caster.evaluation;
             const supportTurn={leaves:[{skillId:action.skillId,kind:'support',context:{},mpCost:supportMp,actionIndex:0}],steps:[{skillId:action.skillId,kind:'support',context:{},mpCost:supportMp,depth:0}],mp:supportMp,recipeLabel:action.name};
-            const supportPlan=scenario.incomingDamage>0 || casterEvaluation.actionPlan?{turn:supportTurn,characterId:caster.characterId,
+            const supportPlan=scenario.incomingDamage>0 || casterEvaluation.actionPlan?{turn:supportTurn,bonusTurn:casterEvaluation.turn,characterId:caster.characterId,
               equipment:caster.equipment || savedById.get(caster.characterId)?.equipment,
               passiveIds:unique([...(casterEvaluation.alwaysPassiveIds || []),...(casterEvaluation.passiveIds || []),...(casterEvaluation.actionPlan?.passiveIds || [])]),
               maxHp:number(casterEvaluation.stats.MaxHitPoint),maxMp:number(casterEvaluation.stats.MaxMagicPoint ?? casterEvaluation.availableMp)}:null;
-            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:casterEvaluation.limit?{...casterEvaluation.limit,options:[]}:null,setupLimit:null,turn:supportPlan?supportTurn:null,actionPlan:supportPlan,recipeLabel:action.name,actionDescription:'Recasts a support action each round instead of attacking.'}};
+            const overrides={[caster.characterId]:{skillId:action.skillId,damage:0,damageMin:0,damageMax:0,brokenDamage:0,breakDamage:0,hits:[],turnMp:supportMp,actionCount:1,multiActionId:null,magicBoost:false,limit:casterEvaluation.limit?{...casterEvaluation.limit,options:[]}:null,bonusLimit:casterEvaluation.limit,setupLimit:null,turn:supportPlan?supportTurn:null,actionPlan:supportPlan,recipeLabel:action.name,actionDescription:'Recasts a support action each round instead of attacking.'}};
             for(const target of targets){
               const evaluation=target.evaluation,skill=indexes.skills.get(evaluation.skillId);
               if((action.tests || []).some(test=>test.key!=='skill.dmgType'))continue;
@@ -1049,7 +1171,8 @@
               next+=supportedTurn.damage-evaluation.damage;
               nextBreak+=supportedTurn.breakDamage-number(evaluation.breakDamage);
               const supportPhase=phase=>phase && ({...phase,leaves:phase.leaves.map(leaf=>({...leaf,context:{...leaf.context,...supportContext(leaf)}}))});
-              const supportedActionPlan=evaluation.actionPlan?{...evaluation.actionPlan,turn:supportPhase(evaluation.turn),openingTurn:supportPhase(evaluation.actionPlan.openingTurn),rotationTurns:evaluation.actionPlan.rotationTurns?.map(supportPhase),luckPolicy:evaluation.actionPlan.luckPolicy?{...evaluation.actionPlan.luckPolicy,generatorTurn:supportPhase(evaluation.actionPlan.luckPolicy.generatorTurn),spenderTurn:supportPhase(evaluation.actionPlan.luckPolicy.spenderTurn)}:undefined}:null;
+              const referencePlan=evaluation.actionPlan || evaluation.fallbackActionPlan;
+              const supportedActionPlan=referencePlan?{...referencePlan,turn:supportPhase(evaluation.turn),bonusTurn:supportPhase(referencePlan.bonusTurn),openingTurn:supportPhase(referencePlan.openingTurn),rotationTurns:referencePlan.rotationTurns?.map(supportPhase),luckPolicy:referencePlan.luckPolicy?{...referencePlan.luckPolicy,generatorTurn:supportPhase(referencePlan.luckPolicy.generatorTurn),spenderTurn:supportPhase(referencePlan.luckPolicy.spenderTurn)}:undefined}:null;
               overrides[target.characterId]={...supportedTurn,skillId:skill.id,supportedTurn,supportedActionPlan,supportSourceId:caster.characterId,actionDescription:`Receives ${action.name} only when its caster acts earlier in the sampled round.`};
             }
             const nextFight=simulate(overrides);
@@ -1064,7 +1187,7 @@
       const gaugePerRound=members.reduce((sum,m)=>sum+number(fight.gauge[m.characterId]),0)/Math.max(1,members.length);
       const score=goalScore({damage,breakDamage,gauge:gaugePerRound,durability:defenseScore});
       return {score,damage,breakDamage,roundDamage,roundBreakDamage,limitUses:fight.uses,gauge:fight.gauge,mpExhaustedRounds:fight.mpExhaustedRounds,remainingMp:fight.remainingMp,remainingHp:fight.remainingHp,hpSpent:fight.hpSpent,resourceSkips:fight.resourceSkips,stateLeafResults:fight.stateLeafResults,resourceEvents:fight.resourceEvents,remainingGoodLuck:fight.remainingGoodLuck,overclockCharges:fight.overclockCharges,overclockStates:fight.overclockStates,overheat:fight.overheat,demonForm:fight.demonForm,staggers:fight.staggers,firstStagger:fight.firstStagger,rounds:scenario.rounds,supportUsed,supportDescription,actionOverrides,warnings:globalWarnings,
-        initiativeSamples:fight.initiativeSamples,gambleSamples:fight.gambleSamples,sampleKind:fight.sampleKind,representativeSample:fight.representativeSample,usesAreRepresentative:true,expectedLimitUses:fight.expectedLimitUses,
+        initiativeSamples:fight.initiativeSamples,gambleSamples:fight.gambleSamples,combatSamples:fight.combatSamples,extraActions:fight.extraActions,expectedExtraActions:fight.expectedExtraActions,phaseEvents:fight.phaseEvents,sampleKind:fight.sampleKind,representativeSample:fight.representativeSample,usesAreRepresentative:true,expectedLimitUses:fight.expectedLimitUses,
         baselineDamage:baseline,goals:[...goals],objectiveWeights:'Sum of shares filled per round: enemy HP (damage), enemy stagger bar (stagger), average LB gauge (limit), durability in enemy-HP units.'};
     }
     function explainAbilities({characterId,visionId,equipment,evaluation}){

@@ -42,7 +42,8 @@ test('a stagger-causing hit uses normal damage and subsequent hits use staggered
   actor.evaluation.damage=200;
   actor.evaluation.brokenDamage=300;
   const result=model().evaluateParty([actor]);
-  assert.equal(result.damage,250);
+  assert.equal(result.damage,550,'normal 100 + 150, then two additional staggered hits at 150');
+  assert.equal(result.extraActions[1],1);
   assert.equal(result.breakDamage,100,'hits against an already staggered target deal no further BP damage');
   assert.equal(result.staggers,1);
   assert.equal(result.gauge[1],50);
@@ -53,13 +54,16 @@ test('hits before and including the break keep normal damage, and only later hit
   actor.evaluation.hits=[{damage:100,brokenDamage:150,breakDamage:50},{damage:100,brokenDamage:150,breakDamage:50},{damage:100,brokenDamage:150,breakDamage:0}];
   actor.evaluation.damage=300;
   actor.evaluation.brokenDamage=450;
-  assert.equal(model().evaluateParty([actor]).damage,350);
+  const result=model().evaluateParty([actor]);
+  assert.equal(result.damage,800,'normal 100 + 100 + 150, then three additional hits at 150');
+  assert.equal(result.extraActions[1],1);
 });
 
 test('ordinary stagger recovers at the next global turn boundary',()=>{
   const result=model({rounds:3}).evaluateParty([member(1,100,100),member(2,50,0)]);
   assert.equal(result.staggers,3);
-  assert.equal(result.damage,250);
+  assert.equal(result.damage,550,'each new global turn recovers, then one normal and one additional party pass');
+  assert.deepEqual(result.extraActions,{1:3,2:3});
 });
 
 test('LB selection never values additional stagger against an already staggered target',()=>{
@@ -67,7 +71,7 @@ test('LB selection never values additional stagger against an already staggered 
   const middle=member(2,75,100,{max:100,mult:2,options:[{skillId:1,cost:100,damage:1e12,brokenDamage:1.5e12,breakDamage:0}]});
   const late=member(3,50,100,{max:100,mult:2,options:[{skillId:2,cost:100,damage:1,brokenDamage:1.5,breakDamage:200}]});
   const result=model({rounds:3,goals:['damage','stagger']}).evaluateParty([early,middle,late]);
-  assert.equal(result.limitUses[2][0].round,2);
+  assert.deepEqual(result.limitUses[2][0],{round:1,phase:'additional',skillId:1});
   assert.deepEqual(result.limitUses[3],[]);
 });
 
@@ -78,10 +82,10 @@ test('native opening gauge is assigned once, is not multiplied and is not earned
   assert.equal(result.gauge[1],0,'opening gauge is not newly earned fill');
 });
 
-test('opening gauge plus a native break reward makes an LB available on the following turn',()=>{
+test('opening gauge plus a native break reward makes an LB available in the same-round additional phase',()=>{
   const actor=member(1,100,100,{initial:50,max:100,options:[{skillId:1,cost:100,damage:1e12,brokenDamage:1.5e12,breakDamage:0}]});
   const result=model({rounds:2}).evaluateParty([actor]);
-  assert.deepEqual(result.limitUses[1],[{round:2,skillId:1}]);
+  assert.deepEqual(result.limitUses[1],[{round:1,phase:'additional',skillId:1}]);
 });
 
 test('wrapper action counts agree with extracted native sequential command recipes',()=>{

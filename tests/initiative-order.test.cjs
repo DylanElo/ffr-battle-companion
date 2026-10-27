@@ -13,10 +13,10 @@ test('native initiative sampling is reproducible and does not guarantee slightly
  const {model,early,late}=fixture({agility:51});
  const a=model.evaluateParty([early,late]),b=model.evaluateParty([early,late]);
  assert.equal(a.initiativeSamples,16);assert.deepEqual(a,b);
- assert.ok(a.damage>200 && a.damage<300,'some native rolls let the non-breaker act first');
+ assert.ok(a.damage>600 && a.damage<700,'some native rolls let the non-breaker act first');
 });
 test('First Strike changes opening priority only, not every later global turn',()=>{
  const initial=fixture({agility:1,offset:true}),later=fixture({agility:1,offset:true,rounds:2});
- assert.equal(initial.model.evaluateParty([initial.early,initial.late]).damage,300);
- assert.equal(later.model.evaluateParty([later.early,later.late]).damage,250);
+ assert.equal(initial.model.evaluateParty([initial.early,initial.late]).damage,700,'opening first strike: 100 + 200 normal, then 200 + 200 additional');
+ assert.equal(later.model.evaluateParty([later.early,later.late]).damage,650,'second round loses first-strike priority: normal 100 + 100, then 200 + 200 additional');
 });

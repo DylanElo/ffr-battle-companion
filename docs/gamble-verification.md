@@ -20,7 +20,7 @@ The other-effect accuracy sum at `0x145236E50` explicitly excludes this CritOrMi
 
 The result is stored in effect +B8. On success, getter `0x145115470` contributes `FLT_MAX` to the normal critical-rate sum, guaranteeing a critical when damage lands. On failure, getter `0x145111AD0` contributes -99999 to ordinary accuracy. With the current accuracy-effect magnitudes this forces a miss. This is a shared branch, not independent critical/miss choices for each displayed hit.
 
-Event dispatcher `0x1451379D0` refuses another BeginDmgCalc activation once effect +9C is positive (`0x1451379FA–0x145137A01`), calls the handler at `0x145137A34`, then increments that counter. The immediate activation path `0x145153220–0x145153269` uses the same guard. There is at most one Gamble random draw for the installed effect during this selection.
+The selected task `0x144F7FAC0` emits source BeginDmgCalc event 14 once at `0x144F7FB1F–0x144F7FB2B`, before initializing its eight-part loop at `0x144F7FD17–0x144F7FD1F`. This establishes one shared Gamble draw per selection. The counter guard at `0x1451379F6` belongs to AddEffect timing 1 and is not proof of BeginDmgCalc multiplicity.
 
 ## Ordinary hit checks remain separate
 

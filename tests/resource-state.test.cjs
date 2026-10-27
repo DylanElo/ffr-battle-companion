@@ -84,7 +84,7 @@ test('an unavailable resource wrapper cannot grant its unpaid child action',()=>
 
 test('Glücksschmied uses current luck for damage then clears it after the burst',()=>{
  const result=execute({ids:[406080],rounds:1,passiveIds:[1511],lbReset:true});
- assert.deepEqual(result.limitUses[1],[{round:1,skillId:406040}]);
+ assert.deepEqual(result.limitUses[1],[{round:1,phase:'normal',skillId:406040}]);
  assert.equal(result.remainingGoodLuck[1],0);
 });
 

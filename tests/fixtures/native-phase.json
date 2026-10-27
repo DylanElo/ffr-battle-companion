@@ -1,0 +1,424 @@
+{
+  "evidence": "Static installed executable/cooked rows and isolated copied scalar comparison; no live battle observation.",
+  "executableSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "enum": [
+    {
+      "name": "eBtlPhaseType::Normal",
+      "value": 0,
+      "record": "0x14863db68"
+    },
+    {
+      "name": "eBtlPhaseType::Additional",
+      "value": 1,
+      "record": "0x14863db78"
+    },
+    {
+      "name": "eBtlPhaseType::Finish",
+      "value": 2,
+      "record": "0x14863db88"
+    }
+  ],
+  "isolatedComparisonsPassed": 229376,
+  "procVectors": [
+    {
+      "threshold": 0,
+      "successSamples": 0,
+      "totalSamples": 32768,
+      "probability": 0.0
+    },
+    {
+      "threshold": 20,
+      "successSamples": 6554,
+      "totalSamples": 32768,
+      "probability": 0.20001220703125
+    },
+    {
+      "threshold": 25,
+      "successSamples": 8192,
+      "totalSamples": 32768,
+      "probability": 0.25
+    },
+    {
+      "threshold": 35,
+      "successSamples": 11469,
+      "totalSamples": 32768,
+      "probability": 0.350006103515625
+    },
+    {
+      "threshold": 75,
+      "successSamples": 24576,
+      "totalSamples": 32768,
+      "probability": 0.75
+    },
+    {
+      "threshold": 100,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    },
+    {
+      "threshold": 125,
+      "successSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0
+    }
+  ],
+  "transitionVectors": [
+    {
+      "name": "normal adds owner once",
+      "phase": 0,
+      "pending": [],
+      "owner": "A",
+      "after": [
+        "A"
+      ]
+    },
+    {
+      "name": "duplicate normal grant does not stack",
+      "phase": 0,
+      "pending": [
+        "A"
+      ],
+      "owner": "A",
+      "after": [
+        "A"
+      ]
+    },
+    {
+      "name": "additional cannot chain",
+      "phase": 1,
+      "pending": [
+        "A"
+      ],
+      "owner": "B",
+      "after": [
+        "A"
+      ]
+    },
+    {
+      "name": "finish cannot chain",
+      "phase": 2,
+      "pending": [
+        "A"
+      ],
+      "owner": "B",
+      "after": [
+        "A"
+      ]
+    },
+    {
+      "name": "explicit impossible effect rejects grant",
+      "phase": 0,
+      "pending": [],
+      "owner": "A",
+      "blocked": true,
+      "after": []
+    },
+    {
+      "name": "normal exhaustion with no pending skips bonus",
+      "normalActorsRemaining": 0,
+      "pending": [],
+      "additionalRuns": false
+    },
+    {
+      "name": "normal exhaustion with pending enters bonus",
+      "normalActorsRemaining": 0,
+      "pending": [
+        "A"
+      ],
+      "phaseOnEntry": 1
+    },
+    {
+      "name": "turn end clears quota",
+      "before": [
+        "A",
+        "B"
+      ],
+      "after": []
+    },
+    {
+      "name": "previous skill critical does not satisfy current skill proc",
+      "previousSkillAnyCritical": true,
+      "currentSkillAnyCritical": false,
+      "effectId": 54103,
+      "thresholdBonus": 0
+    },
+    {
+      "name": "Vaan proc sees same selected skill break after bundle installation",
+      "newBreakResults": [
+        false,
+        true,
+        false
+      ],
+      "effectId": 54101,
+      "sourceBreakEventsAtActionEnd": 1,
+      "procAttempts": 1
+    },
+    {
+      "name": "multiple new target breaks still emit one source Break event",
+      "newBreakResults": [
+        true,
+        true,
+        true
+      ],
+      "effectId": 54101,
+      "sourceBreakEventsAtActionEnd": 1,
+      "procAttempts": 1
+    },
+    {
+      "name": "already staggered targets do not count as a new Break",
+      "newBreakResults": [
+        false,
+        false
+      ],
+      "effectId": 54101,
+      "sourceBreakEventsAtActionEnd": 0,
+      "procAttempts": 0
+    }
+  ],
+  "effectRows": [
+    {
+      "id": 11904,
+      "row": "Ex\u30d5\u30a7\u30a4\u30ba\u8ffd\u52a0\u4e0d\u53ef",
+      "type": "ImpossibleAddExPhase",
+      "params": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54100,
+      "row": "Ex\u30d5\u30a7\u30a4\u30ba\u3078\u8ffd\u52a0\u30fb\u78ba\u738725%(\u30b7\u30d5\u30c8\u30d6\u30ec\u30a4\u30af)",
+      "type": "AddExPhase",
+      "params": [
+        25,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "SkillEnd",
+      "proceedTiming": "SkillEnd",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54101,
+      "row": "Ex\u30d5\u30a7\u30a4\u30ba\u3078\u5473\u65b9\u3092\u30e9\u30f3\u30c0\u30e0\u306b\u8ffd\u52a0\u30fb\u78ba\u738725%(\u30ec\u30c3\u30c9\u30b9\u30d1\u30a4\u30e9\u30eb)",
+      "type": "AddRandExPhase",
+      "params": [
+        20,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "Break",
+      "proceedTiming": "SkillEnd",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54102,
+      "row": "\u30b7\u30d5\u30c8\u30d6\u30ec\u30a4\u30af\u30fb\u30a2\u30b5\u30eb\u30c8\u306eEx\u30d5\u30a7\u30a4\u30ba\u8ffd\u52a0\u78ba\u7387+50%(\u30b7\u30d5\u30c8\u7387UP)",
+      "type": "IncExAddProb",
+      "params": [
+        50,
+        447800,
+        447810,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54103,
+      "row": "\u30af\u30ea\u30c6\u30a3\u30ab\u30eb\u6642\u306eEx\u30d5\u30a7\u30a4\u30ba\u8ffd\u52a0(\u30af\u30ea\u30c6\u30a3\u30ab\u30eb\u30b7\u30d5\u30c8)",
+      "type": "IncExAddProb",
+      "params": [
+        100,
+        447800,
+        447810,
+        -1,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54104,
+      "row": "\u81ea\u7531\u306e\u7ffc\u306eEx\u30d5\u30a7\u30a4\u30ba\u8ffd\u52a0\u78ba\u7387+15%",
+      "type": "IncExAddProb",
+      "params": [
+        15,
+        447400,
+        447410,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 54105,
+      "row": "Ex\u30d5\u30a7\u30a4\u30ba\u3078\u8ffd\u52a0(\u53f7\u4ee4)",
+      "type": "AddExPhase",
+      "params": [
+        100,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": 1,
+      "applyTiming": "AddEffect",
+      "proceedTiming": "SkillEnd",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "boundaries": [
+    "Pending insertion/UI list order is verified; selected bonus command execution order still needs the manual selection path.",
+    "Finish gate includes native equipped-vision readiness; do not assume an owned finisher is ready.",
+    "Actor replacement/status availability gates remain native inputs, not invented state transitions."
+  ]
+}

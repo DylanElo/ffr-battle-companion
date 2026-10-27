@@ -1,7 +1,7 @@
 import * as S from './save.js?v=21';
-import {createOptimizerController} from './optimizer-controller.js?v=37';
-import {comparison} from './optimizer-ui.js?v=37';
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=7';
+import {createOptimizerController} from './optimizer-controller.js?v=38';
+import {comparison} from './optimizer-ui.js?v=38';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions} from './build-details.js?v=8';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -255,7 +255,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=37', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=38', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -395,6 +395,7 @@ function deepResult() {
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
     <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
     <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${ev.turn?.openingTurn || ev.turn?.rotationTurns ? ' for the regular action' : ''}${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
+    ${bonusActions(ev)}
     ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
     ${gearExplanation(r, index)}
     ${buildExplanation(r, index)}

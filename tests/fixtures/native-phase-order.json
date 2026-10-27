@@ -1,0 +1,84 @@
+{
+  "evidenceKind": "Static native UI control flow and current cooked data; not live input recording",
+  "phase": "Additional",
+  "nativeCmdType": 1,
+  "pendingActorOrderPreservedIntoUi": true,
+  "currentActorIndexInitial": 0,
+  "currentActorIndexOffset": "subsystem+58",
+  "actorIdsOffset": "subsystem+60",
+  "actorCountOffset": "subsystem+68",
+  "arbitraryManualActorPermutationSupported": false,
+  "nativeSites": {
+    "pendingIds": "144FB6464-144FB64A0",
+    "beginTag": "148941D28 Delegate.Battle.Cmd.Begin",
+    "beginBroadcast": "144FB656E",
+    "beginThunk": "144EB66C0->14514B6F0",
+    "indexReset": "14514B77D",
+    "pendingListCopy": "14514B81E-14514B826",
+    "currentActorLookup": "1451457E0",
+    "uiCurrentActorLookup": "145150417-14515042B",
+    "decideCurrentActor": "145141159-14514116D",
+    "submittedActorFieldsOverwritten": "1451411A4",
+    "nextActorIndex": "14514126B",
+    "orderedPerActorEmission": "14514128D-145141332"
+  },
+  "derivedOrderCases": [
+    {
+      "pending": [
+        202,
+        101,
+        303
+      ],
+      "manualEntryActorOrder": [
+        202,
+        101,
+        303
+      ],
+      "submittedRecipeOrderAffectsActorPermutation": false
+    },
+    {
+      "pending": [
+        101
+      ],
+      "manualEntryActorOrder": [
+        101
+      ]
+    }
+  ],
+  "callToAction": {
+    "id": 401140,
+    "target": "Single",
+    "relation": "Friendlies",
+    "isTargetIgnoreSelf": true,
+    "isAliveOnly": true,
+    "selfCastAllowed": false,
+    "effectBundle": {
+      "effectId": 54105,
+      "TargetType": "SkillTarget",
+      "targetRelation": "Friendlies",
+      "activeSkillAddTiming": "AfterDamageCalculation",
+      "passiveSkillAddTiming": "None",
+      "conditionData": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  },
+  "cookedAssets": [
+    {
+      "decoded": "layout.json",
+      "sha256": "82834528dfdd2fcf2093885062405da7661e15b6d889ba52c895ab65ba61422f"
+    },
+    {
+      "decoded": "vm.json",
+      "sha256": "bbcda9ca4f00cb7bf48d0e9aa044a0d10a858c3acfe5847f8554ed4f370371d5"
+    }
+  ],
+  "boundaries": [
+    "Final action-manager scheduling links to ordered native queue append evidence.",
+    "Automatic actors and bespoke overrides are separate.",
+    "No proof of arbitrary manual Additional actor permutations."
+  ]
+}
