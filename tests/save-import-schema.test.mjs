@@ -5,13 +5,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readSave } from '../docs/save-io.js';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dll=path.join(root,'importer/bin/Release/net10.0/BattleCompanionImporter.dll');
-const parse=await import('data:text/javascript;base64,'+fs.readFileSync(path.join(root,'docs/save.js')).toString('base64'));
-const app=fs.readFileSync(path.join(root,'docs/app.js'),'utf8');
-const isolated=app.slice(app.indexOf('export async function readSave('),app.indexOf('\nasync function loadSave(')).replace('export ','');
-const readSave=Function('S',isolated+';return readSave;')(parse);
 
 test('browser and desktop importers agree on battle inputs in every detected save, without changing source files',async t=>{
   if(!fs.existsSync(dll))return t.skip('Local read-only desktop importer is not present in the published site.');

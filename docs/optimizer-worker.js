@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js', 'passives.js?v=24', 'damage.js?v=6', 'stats.js?v=22', 'battle.js?v=34', 'search.js?v=25');
+importScripts('core.js?v=21', 'passives.js?v=24', 'damage.js?v=6', 'stats.js?v=22', 'battle.js?v=34', 'search.js?v=26');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -11,7 +11,7 @@ let rulesPromise;
 self.onmessage = async event => {
   const {id,catalog,snapshot,enemyId,options} = event.data;
   try {
-    rulesPromise ||= fetch('skill-rules.json').then(response=>{if(!response.ok)throw new Error('Native skill eligibility rules are unavailable.');return response.json();});
+    rulesPromise ||= fetch('skill-rules.json?v=1').then(response=>{if(!response.ok)throw new Error('Native skill eligibility rules are unavailable.');return response.json();});
     catalog.skillRules=await rulesPromise;
     const enemy=enemyId===CompanionBattle.GENERAL_ENEMY_ID?CompanionBattle.generalEnemy(catalog,snapshot):catalog.enemies.find(row=>row.id===Number(enemyId));
     if(!enemy)throw new Error('Select an enemy from the native catalog.');
@@ -40,6 +40,7 @@ self.onmessage = async event => {
     }
     self.postMessage({id,type:'progress',message:'Evaluating owned skills, passive combinations and legal equipment…'});
     const result=CompanionSearch.rankParties(catalog,snapshot,{
+      progress:message=>self.postMessage({id,type:'progress',message}),
       evaluate:args=>model.evaluate(args),
       evaluateParty:(members,context)=>model.evaluateParty(members,context),
       enemy,options

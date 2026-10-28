@@ -4,7 +4,7 @@ const S=require('../docs/search.js');
 
 function fixture(n=4) {
   return {
-    catalog:{characters:Array.from({length:n},(_,i)=>({id:i+1,sex:'Male',weaponType:'Sword',armorTypes:['Light']})),
+    catalog:{characters:Array.from({length:n},(_,i)=>({id:i+1,name:`C${i+1}`,sex:'Male',weaponType:'Sword',armorTypes:['Light']})),
       visions:Array.from({length:n},(_,i)=>({id:100+i,name:`Vision${i}`})),equipment:[
         {id:10,name:'Sword',type:'Weapon',detailType:'Sword',sexLimit:'None',stats:{PhysicalAttack:10}},
         {id:20,name:'Armor',type:'Armor',detailType:'Light',sexLimit:'None',stats:{}},
@@ -178,4 +178,41 @@ test('party startup preserves saved setups without an unbounded alternative-Reso
   }finally{Date.now=originalNow;}
   assert.deepEqual(seen.slice(0,4).map(input=>input.characterId),[1,2,3,4]);
   assert.ok(seen.every(input=>input.visionId===snapshot.characters.find(c=>c.id===input.characterId).equipment.visionId));
+});
+// A fake clock: each call advances it, so time budgets are exercised deterministically.
+function withClock(fn){
+  const originalNow=Date.now;let clock=0;
+  try{Date.now=()=>clock;return fn(ms=>{clock+=ms;});}finally{Date.now=originalNow;}
+}
+test('a slow party simulation cannot run the search past its party time budget',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(6);
+  let simulations=0;
+  S.rankParties(catalog,snapshot,{options:{...options,timeMs:1000,partyTimeMs:1000},evaluate:({characterId})=>({score:characterId}),
+    evaluateParty:members=>{simulations++;tick(100);return {score:members.reduce((sum,m)=>sum+m.score,0)};}});
+  // Ten simulations fit the budget; the rest are the re-scored finalists and their slot completion.
+  assert.ok(simulations<500,`${simulations} party simulations`);
+}));
+test('teams ranked after the party time budget are still compared, so the strongest team can win',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(6);
+  const result=S.rankParties(catalog,snapshot,{options:{...options,timeMs:1000,partyTimeMs:1000},evaluate:({characterId})=>({score:characterId}),
+    evaluateParty:members=>{tick(100);return {score:members.reduce((sum,m)=>sum+m.score,0)};}});
+  assert.deepEqual(result.results[0].members.map(m=>m.characterId).sort(),[3,4,5,6]);
+}));
+test('a candidate time budget spent on the first characters does not limit the search to the first team',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(6);
+  const result=S.rankParties(catalog,snapshot,{options:{...options,timeMs:40},evaluate:({characterId})=>{tick(1);return {score:characterId};}});
+  assert.deepEqual(result.results[0].members.map(m=>m.characterId).sort(),[3,4,5,6]);
+}));
+test('every character gets a share of the candidate time budget',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(6);
+  const explored=new Set();
+  S.rankParties(catalog,snapshot,{options:{...options,timeMs:60},evaluate:({characterId,equipment})=>{
+    tick(1);if(equipment.weaponId>0)explored.add(characterId);return {score:characterId};}});
+  assert.deepEqual([...explored].sort(),[1,2,3,4,5,6]);
+}));
+test('party search reports progress while it runs',()=>{
+  const {catalog,snapshot}=fixture(5);
+  const messages=[];
+  S.rankParties(catalog,snapshot,{options,progress:message=>messages.push(message),evaluate:({characterId})=>({score:characterId})});
+  assert.deepEqual([messages[0],messages.at(-1)],['Building C1’s options (1 of 5)…','Finishing the top parties…']);
 });
