@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {gearExplanation, buildExplanation, estimateNotice} from '../docs/build-details.js';
+import {gearExplanation, abilityList, alwaysOnList, moveDetails} from '../docs/build-details.js';
 import {comparison} from '../docs/optimizer-ui.js';
 
 const indexes = Object.fromEntries(['equipment','skills','passives','masterSkills','effects'].map(k => [k,new Map()]));
-indexes.equipment.set(1,{id:1,name:'Blade <test>',stats:{PhysicalAttack:10},passiveIds:[]});
-indexes.skills.set(2,{id:2,name:'Attack',calcType:'Physic',mag:100,equipCost:5});
-indexes.masterSkills.set(3,{id:3,name:'Mastery bundle',desc:'Grants abilities',equipCost:20});
+indexes.equipment.set(1,{id:1,name:'Blade <test>',stats:{PhysicalAttack:10},passiveIds:[7]});
+indexes.skills.set(2,{id:2,name:'Attack',calcType:'Physic',mag:100,equipCost:5,desc:'Deal physical damage to an enemy.'});
+indexes.skills.set(5,{id:5,name:'Cure',equipCost:10,desc:'Restore HP for an ally.'});
+indexes.masterSkills.set(3,{id:3,name:'Mastery bundle',desc:'Grants abilities',equipCost:20,grants:{activeIds:[5],passiveIds:[]}});
+indexes.passives.set(7,{id:7,name:'Counter',desc:'Counter physical attacks.'});
+indexes.passives.set(8,{id:8,name:'Magic Attack +30%',desc:'Increases magic attack by 30%.'});
 
 test('all equipment slots remain visible, including reserved and unsupported accessories',()=>{
   const html=gearExplanation({equipment:{weaponId:1,armorId:-1,accessoryIds:[-1,-1]},gearReasons:[
@@ -14,46 +17,52 @@ test('all equipment slots remain visible, including reserved and unsupported acc
     {slot:'accessory',index:1,reason:'unsupported'}]},indexes);
   assert.equal((html.match(/class="gear-choice"/g)||[]).length,4);
   assert.match(html,/Accessory 1/);assert.match(html,/Accessory 2/);
-  assert.match(html,/reserved by other characters/);assert.match(html,/could not be evaluated reliably/);
+  assert.match(html,/used by other characters/);assert.match(html,/can’t estimate yet/);
   assert.match(html,/Blade &#60;test&#62;/);assert.doesNotMatch(html,/<test>/);
 });
 
-test('gear removal shows tradeoffs and unmodeled effects without claiming an optimum',()=>{
+test('gear says what an item adds, its trade-offs, and which of its effects are not counted',()=>{
   const html=gearExplanation({equipment:{weaponId:1,accessoryIds:[]},gearReasons:[
-    {slot:'weapon',damageDelta:100,staggerDelta:-5,unmodeledEffects:[{passiveName:'Counter',reason:'Requires an enemy attack'}]}]},indexes);
-  assert.match(html,/100 less estimated damage/);assert.match(html,/5 more stagger/);
-  assert.match(html,/Not included in this estimate: Counter/);
+    {slot:'weapon',damageDelta:100,staggerDelta:-5,unmodeledEffects:[{passiveId:7,passiveName:'Counter',reason:'Requires an enemy attack'}]}]},indexes);
+  assert.match(html,/\+100 damage per round, −5 stagger per round/);
+  assert.match(html,/<b>Counter<\/b> <span class="dim">\(not counted\)<\/span> — Counter physical attacks/);
+  assert.doesNotMatch(html,/Requires an enemy attack/);
 });
 
-test('ability explanations include Mastery, real AP totals and insufficient-MP rounds',()=>{
-  const html=buildExplanation({characterId:1001,equipment:{},abilityReasons:[{id:3,cost:20,damageDelta:100}],evaluation:{
-    equippedSkillIds:[2,3],skillId:2,skillCost:25,skillBudget:50,maxSkillSlots:8,mpExhaustedRounds:[3,4,5],
-    common:{attack:100,defense:90,level:30},availableMp:35,turnMp:15}},indexes);
-  assert.match(html,/25 \/ 50 AP/);assert.match(html,/Mastery bundle/);assert.match(html,/20 AP/);
-  assert.match(html,/Insufficient MP in round\(s\) 3, 4, 5/);
-  assert.match(html,/other equipment and equipped abilities fixed/);
-  assert.match(html,/not additive bonuses/);
+test('abilities show their AP, what they do, what they add, and what a Mastery bundle includes',()=>{
+  const html=abilityList({abilityReasons:[{id:3,cost:20,damageDelta:100}],evaluation:{equippedSkillIds:[3]}},indexes);
+  assert.match(html,/<b>Mastery bundle<\/b><span class="dim">20 AP<\/span>/);
+  assert.match(html,/\+100 damage per round/);assert.match(html,/Grants abilities/);assert.match(html,/Includes Cure/);
 });
 
-test('unavailable baseline and estimate notice avoid falsely asserting measured upgrades',()=>{
-  assert.match(comparison(null,{damage:100}),/could not be fully evaluated/);
-  assert.doesNotMatch(comparison(null,{damage:100}),/no usable attack/);
-  assert.match(estimateNotice(),/arithmetic checked against the installed executable/);
-  assert.match(estimateNotice(),/native stagger\/LB event order and nested command expiry are applied/);
-  assert.match(estimateNotice(),/native opening LB effects/);
+test('a support ability says what role it keeps instead of a damage figure',()=>{
+  const html=abilityList({abilityReasons:[{id:5,cost:10,damageDelta:0}],evaluation:{equippedSkillIds:[5],supportSkillIds:[5],supportTags:['healer']}},indexes);
+  assert.match(html,/Lets this character heal/);assert.doesNotMatch(html,/damage per round/);
+});
+
+test('always-on effects list the Resonance and character passives, not ones already under a gear slot',()=>{
+  const html=alwaysOnList({equipment:{weaponId:1,accessoryIds:[]},evaluation:{alwaysPassiveIds:[7,8]}},indexes);
+  assert.match(html,/Magic Attack \+30%/);assert.doesNotMatch(html,/Counter/);
+});
+
+test('the move opens to what its skill does',()=>{
+  const html=moveDetails({skillId:2,recipeLabel:'Attack',turnMp:12},indexes);
+  assert.match(html,/<summary>Attack <small>12 MP<\/small><\/summary><p>Deal physical damage to an enemy\.<\/p>/);
+});
+
+test('the before/after states the change against the current setup',()=>{
+  assert.match(comparison({damage:100},{damage:138}),/\+38% damage<\/b>[\s\S]*vs your current setup \(100 per round\)/);
 });
 
 test('native description placeholders show their effect values instead of template keys',()=>{
   const local={...indexes,passives:new Map([[4,{id:4,name:'Fill LB',equipCost:20,desc:'Fills {Effect1Param1}% gauge.',effectBundles:[{effectId:10}]}]]),
     effects:new Map([[10,{id:10,params:[10]}]])};
-  const html=buildExplanation({characterId:1,evaluation:{equippedSkillIds:[4],skillCost:20,skillBudget:100,maxSkillSlots:8}},local);
+  const html=abilityList({evaluation:{equippedSkillIds:[4]}},local);
   assert.match(html,/Fills 10% gauge/);assert.doesNotMatch(html,/Effect1Param1/);
 });
 
-test('modeled opening LB effects are explained separately without a contradictory unsupported warning',()=>{
-  const html=buildExplanation({characterId:1,evaluation:{equippedSkillIds:[],limit:{max:100,initial:50,mult:3,baseStaggerGain:50,fillOnStagger:0,recuperate:0,effectIds:[1014]},
-    passiveAnalysis:{unsupported:[{effectId:1014,passiveName:'LB Charge Opener',reason:'InitialLimitBurstPoint is not modeled.'}]}}},indexes);
-  assert.match(html,/Opening gauge 50; capacity 100/);
-  assert.match(html,/does not multiply opening gauge/);
-  assert.doesNotMatch(html,/InitialLimitBurstPoint is not modeled/);
+test('a move made of several skills names each one with what it does, in order',()=>{
+  const local={...indexes,skills:new Map([...indexes.skills,[6,{id:6,name:'Focus',desc:'Raise speed.'}]])};
+  const html=moveDetails({skillId:2,turn:{openingTurn:{recipeLabel:'Focus',leaves:[{skillId:6}]},leaves:[{skillId:2}]}},local);
+  assert.match(html,/<p><b>Focus<\/b> — Raise speed\.<\/p><p><b>Attack<\/b> — Deal physical damage to an enemy\.<\/p>/);
 });

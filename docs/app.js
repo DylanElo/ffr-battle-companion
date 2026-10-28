@@ -1,7 +1,7 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
-import {createOptimizerController} from './optimizer-controller.js?v=41';
-import {comparison} from './optimizer-ui.js?v=40';
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=10';
+import {createOptimizerController} from './optimizer-controller.js?v=42';
+import {comparison} from './optimizer-ui.js?v=41';
+import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -352,28 +352,27 @@ function deepPanel(native) {
   </div>`;
 }
 
-// Result of Build, shown above the slots it filled in: the number, the move, then details on demand.
+// Result of Build, shown above the slots it filled in: the number, the move, the abilities; each opens to what it does.
 function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
   if (!d.results.length) return `<div class="deep-result"><p>No usable attack was found against ${h(against)}.</p></div>`;
-  const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
-  const goals = d.goals || ['damage'], limits = ev.limitUses || [];
+  const r = d.results[d.pick], ev = r.evaluation, limits = ev.limitUses || [], outOfMp = ev.mpExhaustedRounds || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
-  const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : ''].filter(Boolean);
+  const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : '',
+    outOfMp.length ? `Out of MP from round ${Math.min(...outOfMp)}` : ''].filter(Boolean);
+  const alwaysOn = alwaysOnList(r, index);
   return `<div class="deep-result" aria-busy="false">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span></div>
-    ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
-    <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">· ${n(ev.turnMp ?? skill.cost)} MP</span>` : ''}</p>
+    ${d.current ? comparison({ damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger }) : ''}
+    <div class="member-hit">${moveDetails(ev, index)}</div>
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
+    <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
+    ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
     <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
-    <details class="build-explanation"><summary>Why this gear</summary>${gearExplanation(r, index)}</details>
-    ${buildExplanation(r, index)}
-    <details class="how"><summary>How this is estimated</summary>${estimateNotice()}
-      <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. ${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.gaugePerRound ? `; LB gauge +${n(ev.gaugePerRound)} per round` : ''}. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p></details>
   </div>`;
 }
 

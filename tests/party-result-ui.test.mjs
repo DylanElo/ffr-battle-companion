@@ -23,7 +23,18 @@ test('Equip in my save comes before the member cards',()=>{
   const html=party();
   assert.ok(html.indexOf('data-equip-party-index')<html.indexOf('class="member"'));
 });
-test('model caveats and warnings sit in the collapsed estimate panel, not above the result',()=>{
-  const html=party(),panel=html.indexOf('<details class="how">');
-  assert.ok(panel>0 && html.indexOf('Model estimate')>panel && html.indexOf('A model limit &#60;test&#62;')>panel);
+test('the result carries no engine notes, sample counts or model warnings',()=>{
+  const html=party({initiativeSamples:16});
+  assert.doesNotMatch(html,/Model estimate|How this is estimated|native-priority samples|A model limit|Why this build/);
+});
+test('each card lists its abilities with their AP and what they do',()=>{
+  const html=renderOptimizer({catalog:{...catalog,passives:[{id:900,name:'Mana Overload',desc:'Magic damage +35% while MP is high.',equipCost:20}]},snapshot,canEquip:true,result:{results:[{members:[
+    {characterId:2,equipment:{accessoryIds:[]},abilityReasons:[{id:900,cost:20,damageDelta:918.2}],evaluation:{skillId:500,damage:1234,equippedSkillIds:[900],skillCost:20,skillBudget:100}}],
+    evaluation:{damage:1234}}]}});
+  assert.match(card(html,'Fina'),/Abilities <span class="dim">20 \/ 100 AP<\/span>[\s\S]*Mana Overload[\s\S]*\+918 damage per round[\s\S]*Magic damage \+35%/);
+});
+test('a card shows the round its member runs out of MP',()=>{
+  const html=renderOptimizer({catalog,snapshot,result:{results:[{members:[
+    {characterId:2,equipment:{accessoryIds:[]},evaluation:{skillId:500,damage:1234,mpExhaustedRounds:[4,5]}}],evaluation:{damage:1234}}]}});
+  assert.match(card(html,'Fina'),/class="warn">Out of MP from round 4</);
 });

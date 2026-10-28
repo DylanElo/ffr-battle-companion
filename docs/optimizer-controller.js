@@ -1,4 +1,4 @@
-import {renderOptimizer} from './optimizer-ui.js?v=40';
+import {renderOptimizer} from './optimizer-ui.js?v=41';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipParty}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,incomingDamage:0,incomingType:'Physic',fixedCharacterIds:[],progress:'',partyIndex:0};
@@ -30,15 +30,6 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     worker.onerror=event=>{if(id!==run)return;error=event.message || 'The search worker could not start.';cancel();rerender();};
     worker.postMessage({id,catalog,snapshot,enemyId:state.against==='general'?'general':state.enemyId,options});rerender();
   }
-  function exportParty(index){
-    const party=result?.results?.[index];if(!party)return;
-    const snapshot=getSnapshot();
-    const content={created:new Date().toISOString(),save:snapshot.source.fileName,sourceHash:snapshot.source.sha256,
-      scenario:result.scenario,modelEvidence:result.modelEvidence,search:{approximate:true,evaluations:result.evaluations,reasons:result.reasons},
-      note:'Native-formula prediction and companion plan; not a game save.',party};
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'}));
-    a.download='ffr-party-recommendation.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-  }
   document.addEventListener('click',event=>{
     const button=event.target.closest('button');if(!button)return;
     if(button.hasAttribute('data-solve-party'))start();
@@ -50,7 +41,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     }else if(button.hasAttribute('data-equip-party-index')){
       const party=result?.results?.[Number(button.dataset.equipPartyIndex)];
       if(party){try{error='';equipParty(party.members);}catch(e){error=e.message;}rerender();}
-    }else if(button.hasAttribute('data-export-party'))exportParty(Number(button.dataset.exportParty));
+    }
   });
   document.addEventListener('input',event=>{
     if(event.target.id==='optimizer-enemy-q'){state.enemyQ=event.target.value;result=null;rerender();}
