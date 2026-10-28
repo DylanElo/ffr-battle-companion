@@ -52,8 +52,10 @@ function roundRect(g, x, y, w, h, r) {
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
 
-function text(g, value, x, y, { size = 16, weight = 400, color = COLORS.ink, align = 'left', max = Infinity } = {}) {
+function text(g, value, x, y, { size = 16, weight = 400, color = COLORS.ink, align = 'left', max = Infinity, shrinkTo = size } = {}) {
   g.font = `${weight} ${size}px Chivo, system-ui, sans-serif`; g.fillStyle = color; g.textAlign = align;
+  // Names shrink a little to fit before they lose letters.
+  while (size > shrinkTo && g.measureText(String(value)).width > max) g.font = `${weight} ${--size}px Chivo, system-ui, sans-serif`;
   let shown = String(value);
   // Long names end in an ellipsis instead of running into the next column.
   if (g.measureText(shown).width > max) {
@@ -70,7 +72,7 @@ function drawMember(g, m, x, y, h, images) {
   g.strokeStyle = COLORS.line; g.lineWidth = 1; g.stroke();
   const portrait = images.get(`unit${m.id}`), icon = images.get(`summon${m.visionId}`);
   if (portrait) g.drawImage(portrait, x + 14, y + 14, 88, 88);
-  text(g, m.name, x + 112, y + 48, { size: 22, weight: 700, max: COL - 124 });
+  text(g, m.name, x + 112, y + 48, { size: 22, weight: 700, max: COL - 124, shrinkTo: 16 });
   if (icon) g.drawImage(icon, x + 110, y + 60, 28, 28);
   text(g, m.resonance, x + (icon ? 142 : 112), y + 81, { size: 16, color: m.resonance === 'No Resonance' ? COLORS.dim : COLORS.gold, max: COL - 154 });
   const support = m.damage === 'Support';
