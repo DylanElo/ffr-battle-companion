@@ -38,3 +38,8 @@ test('a card shows the round its member runs out of MP',()=>{
     {characterId:2,equipment:{accessoryIds:[]},evaluation:{skillId:500,damage:1234,mpExhaustedRounds:[4,5]}}],evaluation:{damage:1234}}]}});
   assert.match(card(html,'Fina'),/class="warn">Out of MP from round 4</);
 });
+test('the picture shape toggle sits next to Copy image and marks the chosen shape',()=>{
+  const html=renderOptimizer({catalog,snapshot,picture:'square',result:{results:[{members:[
+    {characterId:2,equipment:{accessoryIds:[]},evaluation:{skillId:500,damage:1234}}],evaluation:{damage:1234}}]}});
+  assert.match(html,/Copy image<\/button><span class="shape" role="group" aria-label="Picture shape"><button type="button" class="chip" data-picture="wide" aria-pressed="false">Wide<\/button><button type="button" class="chip" data-picture="square" aria-pressed="true">Square<\/button>/);
+});

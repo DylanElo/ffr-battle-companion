@@ -1,6 +1,6 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
-import {createOptimizerController} from './optimizer-controller.js?v=42';
-import {comparison} from './optimizer-ui.js?v=41';
+import {createOptimizerController} from './optimizer-controller.js?v=43';
+import {comparison} from './optimizer-ui.js?v=42';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
 import {shareCard, partyImage} from './share-image.js?v=4';
 
@@ -30,6 +30,17 @@ const pretty = s => C.clean(s).replace('Sowrd', 'Sword').replace(/([a-z])([A-Z])
 const opt = (value, text, selected) => `<option value="${h(value)}" ${selected ? 'selected' : ''}>${h(text)}</option>`;
 // Portraits are the game's own face icons (img/), named unit<id>, summon<id> and mons<FaceIconId>.
 let faces = {};
+
+// The party picture's shape: the player's last choice, else square on a phone and wide elsewhere.
+const PICTURE_KEY = 'ffr-companion-picture';
+let picture = (() => {
+  try { const saved = localStorage.getItem(PICTURE_KEY); if (['wide', 'square'].includes(saved)) return saved; } catch {}
+  return matchMedia('(max-width: 560px)').matches ? 'square' : 'wide';
+})();
+function setPicture(shape) {
+  picture = shape;
+  try { localStorage.setItem(PICTURE_KEY, shape); } catch {}
+}
 const img = (file, size = '') => file ? `<img class="face ${size}" src="img/${file}.webp" alt="" width="128" height="128" decoding="async">` : '';
 const enemyFace = (id, size) => img(faces[id], size);
 const charFace = (id, size) => index.characters?.has(Number(id)) ? img(`unit${id}`, size) : '';
@@ -137,7 +148,7 @@ function party() {
         <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', next' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
       ${!general && enemy ? `<div class="boss-summary">${bossCard(enemy)}</div>` : ''}
     </section>
-    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true })}</section>
+    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
   </div>`;
 }
 
@@ -552,12 +563,12 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
   },
   canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)), shareParty });
 
-// Copies a picture of the party for Discord: square on a phone, wide elsewhere. A single build is already compact,
-// so it stays wide. Browsers without image clipboard support get it as a download instead.
+// Copies a picture of the party for Discord in the chosen shape. A single build is already compact, so it stays wide.
+// Browsers without image clipboard support get it as a download instead.
 async function shareParty(party, { enemyId, against, current, heading = 'Best party' }) {
   const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
   const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
-  const single = party.members.length === 1, square = !single && matchMedia('(max-width: 560px)').matches;
+  const single = party.members.length === 1, square = !single && picture === 'square';
   const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id, square });
   const prefix = single ? `build-${name('characters', party.members[0].characterId)}` : 'party';
   try {
@@ -650,6 +661,7 @@ document.addEventListener('click', e => {
     if (bytes) { download(bytes, fileName); t.textContent = t.dataset.download === 'backup' ? 'Backup downloaded ✓' : 'New save downloaded ✓'; }
     return;
   }
+  if (t.dataset.picture) { setPicture(t.dataset.picture); render(); return; }
   if (t.dataset.partyFor) { go(() => { ui.enemyId = +t.dataset.partyFor; optimizerController.setAgainst('enemy'); view = 'party'; scrollTo({ top: 0 }); }); return; }
   if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
   if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.bossId) go(() => { ui.bossId = +t.dataset.enemy; }, t); return; }

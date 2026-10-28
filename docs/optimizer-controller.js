@@ -1,4 +1,4 @@
-import {renderOptimizer} from './optimizer-ui.js?v=41';
+import {renderOptimizer} from './optimizer-ui.js?v=42';
 
 export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipParty,shareParty}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,incomingDamage:0,incomingType:'Physic',fixedCharacterIds:[],progress:'',partyIndex:0};

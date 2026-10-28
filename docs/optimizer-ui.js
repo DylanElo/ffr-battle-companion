@@ -56,7 +56,11 @@ export function comparison(now, next) {
     <span class="dim small">vs your current setup (${num(now.damage)} per round)</span></p>`;
 }
 
-function partyView(party, index, indexes, canEquip, current) {
+const PICTURE_SHAPES = [['wide', 'Wide'], ['square', 'Square']];
+const shapeToggle = picture => `<span class="shape" role="group" aria-label="Picture shape">${PICTURE_SHAPES.map(([shape, label]) =>
+  `<button type="button" class="chip" data-picture="${shape}" aria-pressed="${picture === shape}">${label}</button>`).join('')}</span>`;
+
+function partyView(party, index, indexes, { canEquip, current, picture }) {
   const members = list(party.members ?? party.party), evaluated = party.evaluation || party;
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   const total = finite(evaluated.damage) ? evaluated.damage : summed;
@@ -70,11 +74,11 @@ function partyView(party, index, indexes, canEquip, current) {
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
     <div class="toolbar">${canEquip ? `<button type="button" class="primary" data-equip-party-index="${index}">Equip in my save</button>
       <button type="button" data-apply-party-index="${index}">Edit gear</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}
-      <button type="button" class="ghost" data-share-party-index="${index}" title="A picture of this party to paste into Discord">Copy image</button></div>
+      <button type="button" class="ghost" data-share-party-index="${index}" title="A picture of this party to paste into Discord">Copy image</button>${shapeToggle(picture)}</div>
     <div class="members">${members.map(m => memberCard(m, indexes, evaluated.supportUsed)).join('')}</div>`;
 }
 
-export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false }) {
+export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false, picture = 'wide' }) {
   const indexes = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills', 'effects'].map(kind => [kind, new Map(list(catalog[kind]).map(item => [Number(item.id), item]))]));
   const people = list(snapshot?.characters).filter(joined).filter(c => indexes.characters.has(Number(c.id)));
   const fixed = list(state.fixedCharacterIds).map(Number);
@@ -103,7 +107,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   let body;
   if (busy) body = `<p class="dim" role="status">${h(state.progress || 'Searching your characters, Resonances, gear and abilities…')}</p>`;
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
-    ${partyView(results[pick], pick, indexes, canEquip, result.current)}`;
+    ${partyView(results[pick], pick, indexes, { canEquip, current: result.current, picture })}`;
   else if (result) body = '<p>No party fits those requirements. Try turning off Healer or Protection, or lock fewer characters.</p>';
   else body = `<p class="dim">${people.length < 4 ? 'You need four recruited characters to build a party.' : 'Finds the strongest party of four you can field, with their gear and Resonances.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
