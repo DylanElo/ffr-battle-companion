@@ -231,7 +231,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.deepEnemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=40', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=41', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
@@ -243,7 +243,7 @@ function deepSearch() {
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
     options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: ui.deepIncomingDamage, incomingType: ui.deepIncomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
-      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 12000, visionSlices: true,
+      perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 8000, visionSlices: true,
       visionIds: ui.pickVision || !(Number(draft.visionId) > 0) ? null : [Number(draft.visionId)] } });
   render();
 }

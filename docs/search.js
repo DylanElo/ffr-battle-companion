@@ -37,6 +37,8 @@
       reserveNonParty:false,...options};
   }
   const deadlineAfter = ms => ms>0?Date.now()+ms:Infinity;
+  // Party simulations while searching use the first few of their reproducible paths; every party shown is re-scored on all of them.
+  const QUICK_SAMPLES = 4;
   function stateFor(options) {
     return {evaluations:0,cache:new Map(),truncated:false,reasons:new Set(),
       started:Date.now(),deadline:deadlineAfter(options.timeMs),options};
@@ -223,7 +225,7 @@
       ...equipment.accessoryIds.map((_,i)=>['accessory',i,e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
     const out=members.slice();
     const partyScore=rows=>{
-      const result=callbacks.evaluateParty?.(rows,{enemy:callbacks.enemy,options:fillState.options});
+      const result=callbacks.evaluateParty?.(rows,{enemy:callbacks.enemy,options:fillState.options,samples:QUICK_SAMPLES});
       return callbacks.evaluateParty?Number(result?.score):rows.reduce((sum,m)=>sum+m.score,0);
     };
     for(let memberIndex=0;memberIndex<out.length;memberIndex++){
@@ -308,8 +310,8 @@
     const progress=(message,force)=>{if(force || Date.now()-reported>=250){reported=Date.now();callbacks.progress?.(message);}};
     const nameOf=id=>catalog.characters.find(c=>c.id===id)?.name || `#${id}`;
     const sumOf=members=>({score:members.reduce((sum,m)=>sum+m.score,0),evaluation:null});
-    const partyScore=members=>{
-      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options});
+    const partyScore=(members,samples)=>{
+      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options,...(samples?{samples}:{})});
       return detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:sumOf(members);
     };
     const stockFor=team=>options.reserveNonParty?reserveOutside(snapshot,team,inventory(snapshot)):inventory(snapshot);
@@ -340,7 +342,7 @@
     // remaining parties by their members' own scores, so every team is still compared and the search ends.
     const partyDeadline=deadlineAfter(options.partyTimeMs ?? options.timeMs);
     const rank=members=>{
-      if(Date.now()<partyDeadline)return partyScore(members);
+      if(Date.now()<partyDeadline)return {...partyScore(members,QUICK_SAMPLES),estimated:true};
       state.truncated=true;state.reasons.add('party time budget');
       return {...sumOf(members),estimated:true};
     };
@@ -387,8 +389,10 @@
       // Spare results: filling empty slots can make near-duplicates identical.
       if(results.length>options.maxResults*5)results.length=options.maxResults*5;
     }
-    // Compare finalists like with like: parties ranked after the deadline carry only their members' sum.
-    for(const result of results)if(result.estimated)Object.assign(result,partyScore(result.members),{estimated:false});
+    // Compare the leading finalists on every sample: the beam ranked them on a few, or on members' own scores after
+    // its deadline. The rest are spares for duplicates, and each party kept below is re-scored in full anyway.
+    results.sort((a,b)=>b.score-a.score);
+    for(const result of results.slice(0,options.maxResults*2))if(result.estimated)Object.assign(result,partyScore(result.members),{estimated:false});
     results.sort((a,b)=>b.score-a.score);
     progress('Finishing the top parties…',true);
     const seen=new Set(),unique=[];

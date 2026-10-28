@@ -216,3 +216,10 @@ test('party search reports progress while it runs',()=>{
   S.rankParties(catalog,snapshot,{options,progress:message=>messages.push(message),evaluate:({characterId})=>({score:characterId})});
   assert.deepEqual([messages[0],messages.at(-1)],['Building C1’s options (1 of 5)…','Finishing the top parties…']);
 });
+test('the search ranks parties on a few samples and scores every party it shows on all of them',()=>{
+  const {catalog,snapshot}=fixture(5);
+  const requested=[];
+  const result=S.rankParties(catalog,snapshot,{options,evaluate:({characterId})=>({score:characterId}),
+    evaluateParty:(members,{samples}={})=>{requested.push(samples);return {score:members.reduce((sum,m)=>sum+m.score,0),samples:samples ?? 'all'};}});
+  assert.deepEqual([requested.includes(4),result.results.map(r=>r.evaluation.samples)],[true,['all','all','all']]);
+});
