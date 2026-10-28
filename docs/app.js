@@ -1,21 +1,25 @@
-import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=1';
-import {createOptimizerController} from './optimizer-controller.js?v=40';
-import {comparison} from './optimizer-ui.js?v=39';
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions, finishActions} from './build-details.js?v=9';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
+import {createOptimizerController} from './optimizer-controller.js?v=41';
+import {comparison} from './optimizer-ui.js?v=40';
+import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=10';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['next', 'Next fight'], ['fight', 'Fight'], ['characters', 'Characters'], ['resonances', 'Resonances']];
+const VIEWS = [['party', 'Party'], ['bosses', 'Bosses'], ['characters', 'Characters'], ['resonances', 'Resonances']];
+const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new';
 
-let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'fight';
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, perspective: 0, charId: 0, pickVision: true,
+let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
+// enemyId is the Party page's boss, bossId the one browsed on Bosses, deepEnemyId the Characters build target.
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0, pickVision: true,
   reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
-const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
+const NOUNS = { characters: 'character', visions: 'Resonance', equipment: 'item', skills: 'ability', passives: 'ability', masterSkills: 'ability', enemies: 'enemy' };
+// An id missing from the bundled game data comes from a newer game version.
+const name = (kind, id) => index[kind]?.get(Number(id))?.name ?? (Number(id) > 0 ? `New ${NOUNS[kind] || 'entry'} #${id}` : 'Empty');
 const owned = id => snapshot.resonances.find(r => r.id === Number(id));
 const recruited = () => snapshot.characters.filter(C.joined).filter(c => index.characters.has(c.id));
 const hasSave = () => snapshot !== EMPTY;
@@ -34,14 +38,22 @@ function toast(text) {
   const t = $('#toast'); t.textContent = text; t.hidden = false;
   clearTimeout(toast.timer); toast.timer = setTimeout(() => t.hidden = true, 3000);
 }
-function error(text = '') { $('#error').textContent = text; $('#error').hidden = !text; }
+function error(text = '', report = '') {
+  const box = $('#error');
+  box.innerHTML = text ? `${h(text)}${report ? ` <a href="${h(`${REPORT_URL}?title=${encodeURIComponent(report)}`)}" target="_blank" rel="noopener">Report it</a>` : ''}` : '';
+  box.hidden = !text;
+}
+// Messages written for players pass through; anything else is a save layout this version can't read yet.
+const PLAYER_ERRORS = /not a FINAL FANTASY RESONANCE game save|integrity check|settings file/;
+const loadError = e => PLAYER_ERRORS.test(e.message) ? [e.message]
+  : ['This save couldn’t be read. It may be from a newer version of the game.', `Save couldn't be read: ${e.message}`];
 
 async function loadSave(file) {
   error();
   await ready;
   let parsed;
   try { parsed = await readSave(file); }
-  catch (e) { return error(e.message); }
+  catch (e) { return error(...loadError(e)); }
   loadSnapshot(parsed);
   saveFile = file;
 }
@@ -53,7 +65,7 @@ export function loadSnapshot(parsed) {
   try { plans = JSON.parse(localStorage.getItem('ffr-companion-plans:' + snapshot.source.sha256)) || {}; } catch { plans = {}; }
   const people = recruited(), first = snapshot.party.find(id => people.some(c => c.id === id)) ?? people[0]?.id ?? 0;
   ui.charId = ui.perspective = first; ui.ownedOnly = true;
-  ui.enemyId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'next';
+  ui.enemyId = ui.bossId = ui.deepEnemyId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'party';
   setDraft();
   render();
   toast(`Loaded ${snapshot.source.fileName}`);
@@ -103,41 +115,48 @@ function suggestedBoss() {
   return bosses.find(e => e.level >= level) ?? bosses.at(-1);
 }
 
-function next() {
-  if (!hasSave()) return `<section class="window"><h2>Your next fight</h2>${loadPrompt('Load your save to get a party built for your next fight and equip it in one click.')}</section>`;
+function welcome() {
+  return `<section class="window welcome">
+    <h2>The best party for your next boss</h2>
+    <p class="sub">Load your save, pick a boss, then equip the party in one click.</p>
+    <div class="toolbar"><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}</div>
+    <p class="dim small">Your save stays on your computer. Nothing is uploaded.</p>
+    <p class="dim small">No save handy? Look up <button type="button" class="ghost" data-view="bosses">bosses</button> or <button type="button" class="ghost" data-view="resonances">Resonances</button>.</p>
+  </section>`;
+}
+
+function party() {
+  if (!hasSave()) return welcome();
   optimizerController.setEnemy(ui.enemyId);
   const general = optimizerController.against() === 'general', enemy = index.enemies.get(ui.enemyId), suggested = suggestedBoss();
   const bosses = catalog.enemies.filter(e => e.isBoss).sort((a, b) => a.level - b.level);
-  return `<div class="stack next">
+  return `<div class="stack">
     <section class="window">
-      <h2>Your next fight</h2>
-      <p class="dim small">Your party is level ${partyLevel()}. Pick the fight, build a party for it, then equip it straight into your save.</p>
-      <ol class="steps"><li>Pick the fight</li><li>Find the best party</li><li>Equip in my save</li></ol>
-      <label class="against">Fight <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', suggested' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
+      <label class="against"><span class="dim small">Boss · your party is level ${partyLevel()}</span>
+        <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', next' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
+      ${!general && enemy ? `<div class="boss-summary">${bossCard(enemy)}</div>` : ''}
     </section>
-    ${!general && enemy ? `<section class="window">${bossCard(enemy)}</section>` : ''}
     <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true })}</section>
   </div>`;
 }
 
-// ---------- fight: who to bring against an enemy ----------
+// ---------- bosses: weaknesses and what you own that hits them ----------
 
-function fight() {
+function bosses() {
   const q = ui.enemyQ.trim().toLowerCase();
   const list = catalog.enemies.filter(e => (!ui.bossOnly || e.isBoss) && `${e.name} ${e.id}`.toLowerCase().includes(q))
     .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
-  if (!list.some(e => e.id === ui.enemyId)) ui.enemyId = list[0]?.id ?? 0;
-  const enemy = index.enemies.get(ui.enemyId);
-  if (enemy) optimizerController.setEnemy(enemy.id);
+  if (!list.some(e => e.id === ui.bossId)) ui.bossId = list[0]?.id ?? 0;
+  const enemy = index.enemies.get(ui.bossId);
   return `<div class="split">
     <section class="window" aria-label="Choose an enemy">
       <input type="search" id="enemy-q" data-key="enemy-q" placeholder="Search enemies" value="${h(ui.enemyQ)}" aria-label="Search enemies">
       <label class="check"><input type="checkbox" id="boss-only" ${ui.bossOnly ? 'checked' : ''}> Bosses only</label>
-      <ul class="pick" role="listbox" aria-label="Enemies">${list.map(e => `<li role="option" tabindex="0" data-enemy="${e.id}" data-key="e${e.id}" aria-selected="${e.id === ui.enemyId}">${enemyFace(e.id, 'sm')}<span>${h(e.name)}</span><small>Lv ${e.level}</small></li>`).join('') || '<li class="dim">No enemies match.</li>'}</ul>
+      <ul class="pick" role="listbox" aria-label="Enemies">${list.map(e => `<li role="option" tabindex="0" data-enemy="${e.id}" data-key="e${e.id}" aria-selected="${e.id === ui.bossId}">${enemyFace(e.id, 'sm')}<span>${h(e.name)}</span><small>Lv ${e.level}</small></li>`).join('') || '<li class="dim">No enemies match.</li>'}</ul>
     </section>
     ${enemy ? `<div class="stack">
-      <section class="window">${bossCard(enemy)}</section>
-      <section class="window"><h3>Best party</h3>${hasSave() ? optimizerController.render() : loadPrompt('Load your save to find the best party of four you can field against this enemy.')}</section>
+      <section class="window">${bossCard(enemy)}
+        ${hasSave() ? `<div class="toolbar"><button type="button" class="primary" data-party-for="${enemy.id}">Build a party for ${h(enemy.name)}</button></div>` : ''}</section>
       <section class="window">${fightDetails(enemy)}</section>
     </div>` : '<section class="window"><p class="dim">No enemy selected.</p></section>'}
   </div>`;
@@ -210,7 +229,7 @@ let deepWorker = null, deepRun = 0;
 function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; }
 function deepSearch() {
   cancelDeep();
-  const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.enemyId, goals = [...ui.deepGoals];
+  const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.deepEnemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
   const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=40', import.meta.url));
   worker.onmessage = e => {
@@ -312,50 +331,49 @@ function characters() {
 // The one build tool: Resonance (or the one you locked), gear, attack, abilities and passives, searched together.
 function deepPanel(native) {
   const d = ui.deep || {}, busy = !!d.busy, locked = !ui.pickVision && Number(draft.visionId) > 0;
-  const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.enemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.deepEnemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return `<div class="deep">
     <h4>Build ${h(native.name)}</h4>
-    <p class="dim small">Searches your owned Resonances, gear and learned abilities together. Results show their estimated effect and AP cost, compared with your saved setup.</p>
+    <p class="dim small">Finds the best Resonance, gear and abilities you own for this character.</p>
     <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
       `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
-    <p class="dim small">Combine goals: each counts how much of a bar it fills per round (enemy HP, enemy stagger bar, your LB gauge).</p>
     <label class="against"><span class="dim small">Against</span>
-      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.enemyId)).join('')}</select></label>
-    <details data-keep="deep-advanced"><summary>Incoming hit scenario</summary>
+      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.deepEnemyId)).join('')}</select></label>
+    <details data-keep="deep-advanced"><summary>Expert scenario</summary>
       <p class="dim small">One fixed hit per character after acting, each round. Damage is after defense, before Mirror reduction. Set 0 for no incoming hits.</p>
       <label class="small">Hit damage <input type="number" id="deep-incoming-damage" min="0" max="99999999" step="1" value="${h(ui.deepIncomingDamage)}" ${busy ? 'disabled' : ''}></label>
       <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,ui.deepIncomingType===value)).join('')}</select></label>
     </details>
     <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''} ${busy ? 'disabled' : ''}> Let it pick the Resonance</label>
-    ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}. Pick another in the Resonance box, or tick the box above.</p>` : ''}
+    ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}.</p>` : ''}
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
-      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button><span class="dim small">Search time varies with learned skills</span>`}</div>
+      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button>`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
   </div>`;
 }
 
-// Result of "Build for a fight", shown above the slots it filled in.
+// Result of Build, shown above the slots it filled in: the number, the move, then details on demand.
 function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
-  if (!d.results.length) return `<div class="deep-result"><p>No legal attack was found for this character against ${h(against)}.</p></div>`;
+  if (!d.results.length) return `<div class="deep-result"><p>No usable attack was found against ${h(against)}.</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
-  const goals = d.goals || ['damage'];
+  const goals = d.goals || ['damage'], limits = ev.limitUses || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
+  const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : ''].filter(Boolean);
   return `<div class="deep-result" aria-busy="false">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
-    ${estimateNotice()}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
-      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> estimated damage per round</span>
-      <span class="dim small">${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.firstStagger ? ` · staggers in round ${ev.firstStagger}` : ''}${ev.gaugePerRound ? ` · LB gauge +${n(ev.gaugePerRound)} per round` : ''}</span></div>
+      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span></div>
     ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
-    <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p>
-    <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">(${n(ev.turnMp ?? skill.cost)} MP${ev.turn?.openingTurn || ev.turn?.rotationTurns ? ' for the regular action' : ''}${C.clean(skill.element) !== 'None' ? `, ${h(C.clean(skill.element))}` : ''})</span>` : ''}. Resonance and gear below are filled in.</p>
-    ${bonusActions(ev)}${finishActions(ev, index)}
-    ${(ev.limitUses || []).length ? `<p class="small">Limit Burst: ${ev.limitUses.map(u => `<b>${h(index.skills.get(Number(u.skillId))?.name)}</b> in round ${u.round}`).join(', ')} of a five-round fight, based on this character’s own stagger rewards. Averages ${n(ev.fightDamage)} damage per round.</p>` : ''}
-    ${gearExplanation(r, index)}
+    <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">· ${n(ev.turnMp ?? skill.cost)} MP</span>` : ''}</p>
+    ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
+    <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
+    <details class="build-explanation"><summary>Why this gear</summary>${gearExplanation(r, index)}</details>
     ${buildExplanation(r, index)}
+    <details class="how"><summary>How this is estimated</summary>${estimateNotice()}
+      <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. ${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.gaugePerRound ? `; LB gauge +${n(ev.gaugePerRound)} per round` : ''}. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p></details>
   </div>`;
 }
 
@@ -372,7 +390,7 @@ function equipTabs(native, v, available) {
     ${inv.map(([o, e]) => `<tr class="${['weapon', 'armor', 'accessory'].some(s => C.eligible(e, native, s)) ? '' : 'dim'}"><td>${h(e.name)}</td><td>${available.get(e.id) || 0}/${o.quantity}</td><td>${h(statsText(e))}</td></tr>`).join('')}
     </tbody></table>`;
   else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
-    ${passiveIds.length ? '<p class="dim small">Effects aren’t scored by Optimize. Check them before swapping.</p>' : ''}`;
+`;
   return `${tabs('charTab', [['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
@@ -479,38 +497,50 @@ function kit(v) {
 
 function about() {
   const tiers = ['S', 'A', 'B', 'C'].map(t => [t, catalog.legacyTiers.filter(v => v.impact === t)]);
+  const doc = file => `https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/${file}`;
   return `<section>
-    <h2>How this works</h2>
-    <p class="sub">Everything here comes from the game’s own data tables: ${catalog.visions.length} Resonances, ${catalog.equipment.length} pieces of equipment, ${catalog.characters.length} playable characters and ${catalog.enemies.length} enemies. English text comes from an earlier version of the game, so a few names may be outdated.</p>
-    <h3>What the recommendations do and don’t cover</h3>
-    <ul>
-      <li><b>Optimize</b> (Characters) adds up flat equipment stats for the stats you gear for, each scaled to its own range. Effects like “+20% Fire damage” aren’t scored, so they’re listed for you to judge. It picks the Resonance whose unlocked skills add the most power in those stats.</li>
-      <li>Damage and healing use the user’s own Attack (physical skills) or Magic (magic skills), whichever Resonance grants the skill. What Divine does in battle hasn’t been confirmed.</li>
-      <li><b>Best party</b> (Fight) compares owned gear, Resonances and legal AP/slot packages using recovered native damage rules. Compatible nested and mixed actions, paid opening turns, luck generation, Overclock, Demon Form and Focus are scored over five rounds. Costs, state expiry, stagger and LB timing affect the result. Optional incoming-hit settings enable controlled counter forecasts. It is a bounded search: the strongest parties found, not proof of the best. <a href="https://github.com/DylanElo/ffr-battle-companion/blob/main/docs/model-notes.md" target="_blank" rel="noopener">Model notes and evidence</a>.</li>
-      <li>Owned counts include equipped copies. With “Don’t take other characters’ gear” on, their current gear and any plans are reserved.</li>
-      <li>A Resonance is reserved for one character at a time. Whether two characters can share one hasn’t been confirmed.</li>
-      <li>Weakness matches count skills you’ve unlocked at the selected character’s awakening and sync. They aren’t a damage ranking, and battle conditions still decide what you can use.</li>
-      <li>Enemy entries are base data. A specific fight may change level, stats or actions. Enemy data can spoil later content.</li>
+    <h2>How it works</h2>
+    <ul class="plain">
+      <li>Your save is read in this browser tab and never uploaded. It only changes when you press Equip, as a new file you download.</li>
+      <li><b>Best party</b> tries the parties of four you can field, with your Resonances, gear and abilities, and estimates their damage over a five-round boss fight.</li>
+      <li>Numbers come from the game’s own damage formulas and data: ${catalog.visions.length} Resonances, ${catalog.equipment.length} items, ${catalog.enemies.filter(e => e.isBoss).length} bosses. They are estimates; a real fight can differ.</li>
+      <li>The search is fast, not exhaustive: it shows the strongest parties it found.</li>
+      <li>Boss entries are base data. Some fights change stats or actions, and boss data can spoil later content.</li>
     </ul>
-    <p class="dim small">Finish: after Additional, the party can choose one equipped Resonance finisher when all modeled enemies are staggered. The build compares damage, verified recovery and next-hit protection. Cure, Regen, Protect/Shell and additional recovery bonuses are listed when they are not scored.</p>
-    <h3>Impact tiers</h3>
-    <p class="dim small">${h(catalog.meta.legacyTierMethod)} Calculated on 28 September 2026.</p>
-    <table><tbody>${tiers.map(([t, l]) => `<tr><td><span class="tier ${t}">${t}</span></td><td>${l.map(v => h(v.name)).join(', ') || '<span class="dim">None</span>'}</td></tr>`).join('')}</tbody></table>
-    <details><summary>Source tables</summary>
+    <details><summary>For the curious</summary>
+      <p class="small"><a href="${doc('model-notes.md')}" target="_blank" rel="noopener">Model notes</a> · <a href="${doc('combat-verification.md')}" target="_blank" rel="noopener">What was verified against the game</a></p>
+      <h3>Impact tiers</h3>
+      <p class="dim small">${h(catalog.meta.legacyTierMethod)} Calculated on 28 September 2026.</p>
+      <table><tbody>${tiers.map(([t, l]) => `<tr><td><span class="tier ${t}">${t}</span></td><td>${l.map(v => h(v.name)).join(', ') || '<span class="dim">None</span>'}</td></tr>`).join('')}</tbody></table>
+      <h3>Source tables</h3>
       <table><thead><tr><th>Table</th><th>Rows</th><th>SHA-256</th></tr></thead><tbody>
-      ${catalog.provenance.map(p => `<tr><td>${h(p.table)}</td><td>${p.rows}</td><td><code>${h(p.sha256)}</code></td></tr>`).join('')}</tbody></table></details>
+      ${catalog.provenance.map(p => `<tr><td>${h(p.table)}</td><td>${p.rows}</td><td><code>${h(p.sha256)}</code></td></tr>`).join('')}</tbody></table>
+    </details>
   </section>`;
 }
 
 // ---------- frame ----------
 
-const optimizerController=createOptimizerController({getCatalog:()=>catalog,getSnapshot:()=>snapshot,getFaces:()=>faces,rerender:()=>render(),stageParty:members=>{
-  const next=Object.fromEntries(members.map(member=>[member.characterId,{...member.equipment,visionId:member.visionId,
-    equippedSkillIds:member.evaluation.equippedSkillIds || [],recommendedActionId:member.evaluation.skillId}]));
-  for(const member of members){const invalid=C.validPlan(catalog,snapshot,member.characterId,next[member.characterId],next,false);if(invalid)throw new Error(invalid);}
-  plans=next;ui.reserve=false;ui.charId=members[0].characterId;storePlans();setDraft();toast('Party planned. Their gear is on the Characters page; your save is unchanged.');
-},canEquip:()=>!!saveFile,equipPlans:()=>applyPlans()});
-const RENDER = { next, fight, characters, resonances };
+// A party result as plans: each member's gear, Resonance and abilities. Throws if any of them can't be equipped.
+function partyPlans(members) {
+  const next = Object.fromEntries(members.map(member => [member.characterId, { ...member.equipment, visionId: member.visionId,
+    equippedSkillIds: member.evaluation.equippedSkillIds || [], recommendedActionId: member.evaluation.skillId }]));
+  for (const member of members) {
+    const invalid = C.validPlan(catalog, snapshot, member.characterId, next[member.characterId], next, false);
+    if (invalid) throw new Error(invalid);
+  }
+  return next;
+}
+const optimizerController = createOptimizerController({ getCatalog: () => catalog, getSnapshot: () => snapshot, getFaces: () => faces, rerender: () => render(),
+  stageParty: members => {
+    const next = partyPlans(members);
+    // Other characters keep their plans while those still fit next to this party.
+    for (const [id, plan] of Object.entries(plans)) if (!next[id] && !C.validPlan(catalog, snapshot, id, plan, next, false)) next[id] = plan;
+    plans = next; ui.reserve = false; ui.charId = members[0].characterId; storePlans(); setDraft(); view = 'characters'; scrollTo({ top: 0 });
+    toast('Party planned. Adjust their gear here; your save is unchanged.');
+  },
+  canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)) });
+const RENDER = { party, bosses, characters, resonances };
 
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
@@ -521,8 +551,7 @@ function render() {
        <b>${h(snapshot.source.fileName)}</b><span class="dim">${recruited().length} characters, ${snapshot.resonances.length} Resonances</span>
        <label class="load"><input type="file" accept=".sav" data-pick><span>Load another</span></label>`
     : `<label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}`;
-  if (view === 'next' && !hasSave()) view = 'fight';
-  $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.filter(([id]) => id !== 'next' || hasSave()).map(([id, label]) =>
+  $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
   for (const d of document.querySelectorAll('details[data-keep]')) if (keepOpen.has(d.dataset.keep)) d.open = true;
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
@@ -549,25 +578,30 @@ const download = (bytes, fileName) => {
   a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
-async function applyPlans() {
+// Writes plans into a copy of the loaded save, then walks the player through swapping it in. Each download is its
+// own click: browsers ask before letting a page start a second download, and players miss that prompt.
+async function applyPlans(toWrite = plans) {
   try {
     // Chrome refuses to read a picked file that changed on disk since it was picked.
     const original = new Uint8Array(await saveFile.arrayBuffer().catch(() => { throw new Error(SAVE_CHANGED); }));
-    const { bytes: out, removed } = await savedWithPlans(original, snapshot, plans, { catalog, core: C, stats: globalThis.CompanionStats });
-    const base = saveFile.name.replace(/\.sav$/i, '');
-    download(original, `${base} (backup).sav`);
-    download(out, saveFile.name);
-    $('#about-body').innerHTML = `<h2>Plans equipped</h2>
-      <p>Two files were downloaded: <b>${h(saveFile.name)}</b> with your plans equipped, and <b>${h(base)} (backup).sav</b>, your save as it was.</p>
-      <ol><li>Close the game.</li><li>Open your save folder: <code>${h(SAVE_DIR)}</code>, then the numbered folder inside.</li>
-      <li>Replace <b>${h(saveFile.name)}</b> with the downloaded one.</li><li>Start the game and load that save.</li></ol>
-      ${(swapIn => swapIn.length ? `<p>Then put <b>${swapIn.map(id => h(name('characters', id))).join(', ')}</b> in your party in the game.</p>` : '')(Object.keys(plans).map(Number).filter(id => !snapshot.party.includes(id)))}
-      ${removed.length ? `<p>Taken off characters without a plan, because a plan uses them:</p><ul>${removed.map(r => `<li>${h(r)}</li>`).join('')}</ul>` : ''}
-      <p class="dim">Something wrong? Put the backup back under the name ${h(saveFile.name)}.</p>`;
+    const { bytes, removed } = await savedWithPlans(original, snapshot, toWrite, { catalog, core: C, stats: globalThis.CompanionStats });
+    const file = saveFile.name, base = file.replace(/\.sav$/i, '');
+    pending = { backup: [original, `${base} (backup).sav`], save: [bytes, file] };
+    const swapIn = new Intl.ListFormat('en').format(Object.keys(toWrite).map(Number).filter(id => !snapshot.party.includes(id)).map(id => name('characters', id)));
+    $('#about-body').innerHTML = `<h2>Equip in your save</h2>
+      <ol class="checklist">
+        <li>Close the game.</li>
+        <li><button type="button" data-download="backup">Download a backup</button></li>
+        <li><button type="button" class="primary" data-download="save">Download the new save</button></li>
+        <li>Open <code>${h(SAVE_DIR)}</code> <button type="button" class="ghost" data-copy-path>Copy</button>, then the numbered folder.
+          Replace <b>${h(file)}</b> with the new one. <span class="dim small">If your browser added a number to its name, remove it.</span></li>
+        <li>Start the game${swapIn ? ` and put ${h(swapIn)} in your party` : ''}.</li>
+      </ol>
+      ${removed.length ? `<details><summary>Taken off other characters (${removed.length})</summary><ul class="notes">${removed.map(r => `<li>${h(r)}</li>`).join('')}</ul></details>` : ''}
+      <p class="dim small">Something wrong? Put the backup back under the name ${h(file)}.</p>`;
     $('#about').showModal();
   } catch (e) { error(e.message); }
 }
-
 function exportPlans() {
   const content = { created: new Date().toISOString(), save: snapshot.source.fileName, note: 'Gear plans from Resonance Battle Companion. Not a game save.',
     plans: Object.entries(plans).map(([id, p]) => ({ character: name('characters', id), weapon: name('equipment', p.weaponId), armor: name('equipment', p.armorId),
@@ -583,8 +617,14 @@ document.addEventListener('click', e => {
     return;
   }
   const t = e.target.closest('button, [data-enemy], [data-char], [data-kit]'); if (!t || !catalog) return;
+  if (t.dataset.download) {
+    const [bytes, fileName] = pending?.[t.dataset.download] || [];
+    if (bytes) { download(bytes, fileName); t.textContent = t.dataset.download === 'backup' ? 'Backup downloaded ✓' : 'New save downloaded ✓'; }
+    return;
+  }
+  if (t.dataset.partyFor) { go(() => { ui.enemyId = +t.dataset.partyFor; optimizerController.setAgainst('enemy'); view = 'party'; scrollTo({ top: 0 }); }); return; }
   if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
-  if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.enemyId) go(() => { ui.enemyId = +t.dataset.enemy; }, t); return; }
+  if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.bossId) go(() => { ui.bossId = +t.dataset.enemy; }, t); return; }
   if (t.dataset.tab) { const [key, value] = t.dataset.tab.split(':'); ui[key] = value; render(); return; }
   if (t.id === 'how') { $('#about-body').innerHTML = about(); $('#about').showModal(); return; }
   if (t.dataset.kit) {
@@ -601,7 +641,7 @@ document.addEventListener('click', e => {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.deepGeneral = false; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
+      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.deepGeneral = false; ui.deepEnemyId = ui.bossId; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
@@ -639,7 +679,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
   else if (t.id === 'deep-incoming-damage') { ui.deepIncomingDamage = Math.max(0, Math.min(99999999, Math.trunc(Number(t.value) || 0))); cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-incoming-type') { ui.deepIncomingType = t.value === 'Magic' ? 'Magic' : 'Physic'; cancelDeep(); ui.deep = null; }
-  else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.enemyId = +t.value; }
+  else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.deepEnemyId = +t.value; }
   else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;
   else if (t.dataset.slot) { ui.deep = null; const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }

@@ -239,6 +239,7 @@ dialog form { text-align: right; margin-top: 12px; }
 .member-who h4 { font-size: 17px; }
 .member-vision { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); font-size: 14px; }
 .member-vision .face { width: 24px; height: 24px; }
+.member-vision.none { color: var(--dim); }
 .member-hit { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 10px 0 4px; }
 .member-hit small { color: var(--dim); }
 .member-hit b { font-size: 20px; }
@@ -286,7 +287,8 @@ dialog form { text-align: right; margin-top: 12px; }
 .model-notice { padding: 9px 11px; border-left: 3px solid var(--gold); background: rgba(0,0,0,.16); line-height: 1.5; }
 .build-gear { display: grid; gap: 0; margin: 10px 0; font-size: 12px; }
 .gear-choice { border-bottom: 1px solid var(--line); padding: 7px 0; min-width: 0; }
-.gear-choice summary { display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 6px; cursor: pointer; list-style: none; }
+.gear-choice summary { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 6px; cursor: pointer; list-style: none; font-size: 14px; }
+.gear-choice summary > span { white-space: nowrap; }
 .gear-choice summary b { overflow-wrap: anywhere; }
 .gear-choice summary b::after { content: ' +'; color: var(--gold); }
 .gear-choice[open] summary b::after { content: ' −'; }
@@ -405,11 +407,33 @@ dialog form { text-align: right; margin-top: 12px; }
   *, ::before, ::after { animation: none !important; transition: none !important; }
 }
 
-/* alternative Resonances offered after Optimize */
-
-/* Next fight: the three steps, and the roster's Party tag under the name. */
-.steps { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 14px; padding-left: 20px; color: var(--dim); font-size: 14px; }
-.next .against select { margin-left: 8px; max-width: 100%; }
+/* the roster's Party tag under the name */
 .pick li > span > small { display: block; }
 .compare { margin: 8px 0; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, .05); }
 .compare b { margin-left: 4px; }
+
+/* ---------- Party page: the welcome, the boss, the result ---------- */
+.welcome { max-width: 720px; margin: 24px auto; padding: 32px 28px; text-align: center; }
+.welcome .sub { font-size: 18px; margin-bottom: 18px; }
+.welcome .toolbar { justify-content: center; }
+.welcome .where[open] { flex-basis: 100%; }
+.welcome .where > div { position: static; width: auto; margin-top: 8px; box-shadow: none; text-align: left; }
+.welcome .ghost { padding: 0; border: 0; font-size: inherit; }
+.boss-summary { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.member-hit b.support { color: var(--good); font-size: 16px; }
+.how { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+.how > :not(summary) { margin-top: 8px; }
+.expert { display: grid; gap: 8px; margin-top: 8px; }
+.checklist { display: grid; gap: 12px; margin: 14px 0; padding-left: 22px; }
+.checklist li::marker { color: var(--gold); font-weight: 700; }
+ul.plain { display: grid; gap: 8px; padding-left: 18px; }
+
+/* phones: four sections must fit without a hidden scroll, so the current one is gold instead of pointed at */
+@media (max-width: 560px) {
+  .commands ul { justify-content: space-between; }
+  .commands button { font-size: 15px; padding: 6px 6px; }
+  .commands button::before, .commands button[aria-current=page]::before { display: none; }
+  .commands button[aria-current=page] { color: var(--gold); }
+  .save .dim { display: none; }
+  .welcome { margin: 8px 0; padding: 24px 16px; }
+}

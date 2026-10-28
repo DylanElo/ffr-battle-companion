@@ -18,6 +18,11 @@ test('opening and rotating commands remain visible rather than showing only the 
  assert.match(buildExplanation({characterId:1,evaluation:{...ev,actionPlan:{maxHp:100},remainingHp:100}},indexes),/Opening: Witching Hour — 8 MP/);
 });
 
+test('an opening already named by the battle model is not announced twice',()=>{
+ const ev={recipeLabel:'Open with Witching Hour; then Dystopia',turn:{openingTurn:phase(408090,'Witching Hour')}};
+ assert.equal(commandPlan(ev,indexes),'Open with Witching Hour; then Dystopia');
+});
+
 test('resource explanations show paid HP, native skips and the representative state trace',()=>{
  const html=buildExplanation({characterId:1,evaluation:{skillId:220010,recipeLabel:'Fire',actionPlan:{maxHp:100},remainingHp:0,hpSpent:100,remainingMp:5,remainingGoodLuck:8,
  resourceSkips:[{round:4,skillId:220010,reason:'The caster has no HP remaining. <test>'}],resourceEvents:[{round:1,skillId:220010,mpCost:5,hpCost:5,hpBefore:100,hpAfter:95,goodLuckAfter:8}],
