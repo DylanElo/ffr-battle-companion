@@ -36,14 +36,15 @@
       candidatesPerVision:6,beamWidth:120,timeMs:12000,minHealers:0,minProtectors:0,
       reserveNonParty:false,...options};
   }
+  const deadlineAfter = ms => ms>0?Date.now()+ms:Infinity;
   function stateFor(options) {
     return {evaluations:0,cache:new Map(),truncated:false,reasons:new Set(),
-      started:Date.now(),options};
+      started:Date.now(),deadline:deadlineAfter(options.timeMs),options};
   }
   function stopped(state) {
     const {options} = state;
     const reason = state.evaluations>=options.maxEvaluations?'evaluation budget':
-      options.timeMs>0 && Date.now()-state.started>=options.timeMs?'time budget':'';
+      Date.now()>=state.deadline?'time budget':'';
     if (reason) { state.truncated=true;state.reasons.add(reason);return true; }
     return false;
   }
@@ -107,7 +108,7 @@
       // Native timing checks can exhaust the budget during seeding; retain that completed comparison.
       if(seeds.get(visionId))local.set(keyOf(base),seeds.get(visionId));
       let attempts=0;
-      const sliceEnd=options.visionSlices && options.timeMs>0?Date.now()+(options.timeMs-(Date.now()-state.started))/(visions.length-n):Infinity;
+      const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())/(visions.length-n):Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
         const equip={weaponId,armorId,accessoryIds,visionId},key=keyOf(equip);
         if (local.has(key)) return true;
@@ -303,11 +304,45 @@
       fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,perLoadoutBudget:0,visionIds:[Number(person.equipment.visionId)]},inventory(snapshot),seedState));
     }
     state.cache=seedState.cache;state.evaluations=seedState.evaluations;
-    let considered=0,teamCount=0;
+    let considered=0,teamCount=0,reported=0;
+    const progress=(message,force)=>{if(force || Date.now()-reported>=250){reported=Date.now();callbacks.progress?.(message);}};
+    const nameOf=id=>catalog.characters.find(c=>c.id===id)?.name || `#${id}`;
+    const sumOf=members=>({score:members.reduce((sum,m)=>sum+m.score,0),evaluation:null});
     const partyScore=members=>{
       const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options});
-      return detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:
-        {score:members.reduce((sum,m)=>sum+m.score,0),evaluation:null};
+      return detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:sumOf(members);
+    };
+    const stockFor=team=>options.reserveNonParty?reserveOutside(snapshot,team,inventory(snapshot)):inventory(snapshot);
+    const candidatesFor=(id,stock)=>{
+      const key=`${id}:${[...stock].sort((a,b)=>a[0]-b[0]).map(([item,n])=>`${item}:${n}`).join(',')}`;
+      if(!candidateCache.has(key)) {
+        const generated=stopped(state)?[]:buildCandidates(catalog,snapshot,id,callbacks,options,stock,state);
+        const combined=new Map([...generated,...(fallback.get(id)||[]).filter(c=>fits(c.equipment,stock))].map(c=>[c.key,c]));
+        candidateCache.set(key,[...combined.values()]);
+      }
+      return candidateCache.get(key);
+    };
+    if(!options.reserveNonParty) {
+      // Every character gets an equal share of the remaining time before any team is ranked. Building them
+      // team by team let the first team spend the whole budget, leaving later characters only their saved setup.
+      for(const [n,id] of people.entries()) {
+        progress(`Building ${nameOf(id)}’s options (${n+1} of ${people.length})…`,true);
+        const end=state.deadline;
+        state.deadline=Math.min(end,Date.now()+(end-Date.now())/(people.length-n));
+        candidatesFor(id,inventory(snapshot));
+        state.deadline=end;
+      }
+      // Strongest teams first, so a party time budget only ever cuts the least promising ones short.
+      const bound=new Map(teams.map(team=>[team,team.reduce((sum,id)=>sum+Math.max(0,...candidatesFor(id,inventory(snapshot)).map(c=>c.score)),0)]));
+      teams.sort((a,b)=>bound.get(b)-bound.get(a));
+    }
+    // A full party simulation costs tens to hundreds of milliseconds. After this deadline the beam ranks the
+    // remaining parties by their members' own scores, so every team is still compared and the search ends.
+    const partyDeadline=deadlineAfter(options.partyTimeMs ?? options.timeMs);
+    const rank=members=>{
+      if(Date.now()<partyDeadline)return partyScore(members);
+      state.truncated=true;state.reasons.add('party time budget');
+      return {...sumOf(members),estimated:true};
     };
     const baselineIds=(snapshot.party || []).filter(id=>people.includes(id)).slice(0,options.partySize);
     let baseline=null;
@@ -322,20 +357,10 @@
       }
     }
     for (const team of teams) {
-      if (stopped(state) && results.length)break;
       teamCount++;
-      const stock=options.reserveNonParty?reserveOutside(snapshot,team,inventory(snapshot)):inventory(snapshot);
-      const stockKey=[...stock].sort((a,b)=>a[0]-b[0]).map(([id,n])=>`${id}:${n}`).join(',');
-      const candidates=new Map();
-      for(const id of team) {
-        const key=`${id}:${stockKey}`;
-        if(!candidateCache.has(key)) {
-          const generated=stopped(state)?[]:buildCandidates(catalog,snapshot,id,callbacks,options,stock,state);
-          const combined=new Map([...generated,...(fallback.get(id)||[]).filter(c=>fits(c.equipment,stock))].map(c=>[c.key,c]));
-          candidateCache.set(key,[...combined.values()]);
-        }
-        candidates.set(id,candidateCache.get(key));
-      }
+      progress(`Comparing parties (${teamCount} of ${teams.length})…`);
+      const stock=stockFor(team);
+      const candidates=new Map(team.map(id=>[id,candidatesFor(id,stock)]));
       const order=team.slice().sort((a,b)=>candidates.get(a).length-candidates.get(b).length);
       let beam=[{members:[],used:new Map(),visions:new Set(),score:0}];
       for(let depth=0;depth<order.length;depth++) {
@@ -349,7 +374,7 @@
              members.filter(m=>m.roles.includes('protector')).length+remaining<options.minProtectors)continue;
           const used=new Map(partial.used);for(const [id,n]of counts)used.set(id,(used.get(id)||0)+n);
           const visions=new Set(partial.visions);if(candidate.visionId>0)visions.add(candidate.visionId);
-          const score=partyScore(members);considered++;
+          const score=rank(members);considered++;
           next.push({members,used,visions,...score});
         }
         next.sort((a,b)=>b.score-a.score);
@@ -362,6 +387,10 @@
       // Spare results: filling empty slots can make near-duplicates identical.
       if(results.length>options.maxResults*5)results.length=options.maxResults*5;
     }
+    // Compare finalists like with like: parties ranked after the deadline carry only their members' sum.
+    for(const result of results)if(result.estimated)Object.assign(result,partyScore(result.members),{estimated:false});
+    results.sort((a,b)=>b.score-a.score);
+    progress('Finishing the top parties…',true);
     const seen=new Set(),unique=[];
     for(const result of results) {
       if(unique.length>=options.maxResults)break;

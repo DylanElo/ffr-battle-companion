@@ -29,7 +29,7 @@ Static files in [`docs/`](docs), no build step: `python -m http.server -d docs`.
 - [`docs/save.js`](docs/save.js): the encrypted save format. [`docs/save-io.js`](docs/save-io.js) reads a save into a snapshot and writes plans into a copy of it, refusing a save that changed after it was loaded.
 - [`docs/app.js`](docs/app.js): the interface.
 - [`docs/damage.js`](docs/damage.js), [`docs/passives.js`](docs/passives.js) and [`docs/stats.js`](docs/stats.js): native-formula damage, supported effect rules and saved-progression stat derivation.
-- [`docs/battle.js`](docs/battle.js) and [`docs/search.js`](docs/search.js): legal action/passive loadouts and shared-inventory party search. A Web Worker keeps the interface responsive and makes cancellation immediate.
+- [`docs/battle.js`](docs/battle.js) and [`docs/search.js`](docs/search.js): legal action/passive loadouts and shared-inventory party search. A Web Worker keeps the interface responsive and makes cancellation immediate. Every character gets a share of the candidate time budget before teams are ranked; after the party time budget, remaining teams are ranked by their members' own scores and the finalists are re-scored with the full simulation.
 - Asset links carry `?v=` cache versions. Bump a file's version in every reference when it changes; `tests/asset-versions.test.cjs` fails on unversioned or mismatched references.
 - [`docs/data/catalog.json`](docs/data/catalog.json): game tables (Resonances, skills, passives, equipment, characters, enemies), generated locally from an installed copy of the game.
 
