@@ -9,13 +9,16 @@ const Search=require('../docs/search.js');
 const root=path.resolve(__dirname,'..');
 const catalog=JSON.parse(fs.readFileSync(path.join(root,'docs/data/catalog.json'),'utf8'));
 catalog.skillRules=JSON.parse(fs.readFileSync(path.join(root,'docs/skill-rules.json'),'utf8'));
-const snapshot=JSON.parse(cp.execFileSync('dotnet',[path.join(root,'importer/bin/Release/net10.0/BattleCompanionImporter.dll')],{encoding:'utf8'}));
+// Save-backed tests need the local read-only desktop importer and a real save; a clean checkout skips them.
+const importer=path.join(root,'importer/bin/Release/net10.0/BattleCompanionImporter.dll');
+const snapshot=fs.existsSync(importer)?JSON.parse(cp.execFileSync('dotnet',[importer],{encoding:'utf8'})):null;
+const saveTest=(name,fn)=>test(name,{skip:!snapshot && 'Local read-only desktop importer is not present in the published site.'},fn);
 const enemy=catalog.enemies.find(e=>e.id===113);
-const own=snapshot.characters.find(c=>c.id===1001);
-const input={characterId:own.id,visionId:own.equipment.visionId,equipment:own.equipment};
-const sourceHash=crypto.createHash('sha256').update(fs.readFileSync(snapshot.source.path)).digest('hex');
+const own=snapshot?.characters.find(c=>c.id===1001);
+const input=own && {characterId:own.id,visionId:own.equipment.visionId,equipment:own.equipment};
+const sourceHash=snapshot && crypto.createHash('sha256').update(fs.readFileSync(snapshot.source.path)).digest('hex');
 
-test('battle evaluation respects native skill cost, slots, difficulty and source ownership',()=>{
+saveTest('battle evaluation respects native skill cost, slots, difficulty and source ownership',()=>{
   const model=B.createModel(catalog,snapshot,enemy,{difficulty:'save',objective:'balanced'});
   const result=model.evaluate(input);
   assert.equal(result.valid,true);
@@ -32,7 +35,7 @@ test('battle evaluation respects native skill cost, slots, difficulty and source
   assert.ok(result.equippedSkillIds.every(id=>allowed.has(id)));
 });
 
-test('element immunity and absorption are not ranked as positive enemy damage',()=>{
+saveTest('element immunity and absorption are not ranked as positive enemy damage',()=>{
   for(const resistance of ['Invalid','Absorb']){
     const target={...enemy,resistances:Object.fromEntries(['None','Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'].map(e=>[e,resistance]))};
     const result=B.createModel(catalog,snapshot,target,{difficulty:'Normal',objective:'damage'}).evaluate(input);
@@ -40,14 +43,14 @@ test('element immunity and absorption are not ranked as positive enemy damage',(
   }
 });
 
-test('zero MP scenario never recommends an unaffordable spell',()=>{
+saveTest('zero MP scenario never recommends an unaffordable spell',()=>{
   const result=B.createModel(catalog,snapshot,enemy,{mpPercent:0,objective:'damage'}).evaluate(input);
   assert.equal(result.valid,true);
   assert.equal(catalog.skills.find(s=>s.id===result.skillId).cost,0);
   assert.equal(result.availableMp,0);
 });
 
-test('native joint solver returns legal owned teams and preserves a healing option',()=>{
+saveTest('native joint solver returns legal owned teams and preserves a healing option',()=>{
   const model=B.createModel(catalog,snapshot,enemy,{objective:'balanced',minHealers:1,difficulty:'save'});
   const result=Search.rankParties(catalog,snapshot,{evaluate:a=>model.evaluate(a),evaluateParty:members=>model.evaluateParty(members),enemy,
     options:{maxEvaluations:1200,perLoadoutBudget:12,timeMs:12000,beamWidth:12,candidatesPerVision:3,minHealers:1}});
@@ -68,7 +71,7 @@ test('healing magic and finishers cannot masquerade as repeatable normal attacks
   for(const skill of catalog.skills.filter(s=>s.attr==='FinishBlow'))assert.equal(B.isAttack(skill),false);
 });
 
-test('all healing/protection/support choices obey zero-LB native state gates',()=>{
+saveTest('all healing/protection/support choices obey zero-LB native state gates',()=>{
   const P=require('../docs/passives.js');
   const model=B.createModel(catalog,snapshot,enemy,{objective:'balanced'});
   for(const person of snapshot.characters.filter(c=>c.joinStatus.endsWith('::Join') && c.usable)){
@@ -81,7 +84,7 @@ test('all healing/protection/support choices obey zero-LB native state gates',()
   }
 });
 
-test('a support turn replaces the caster attack and its stagger in the final action plan',()=>{
+saveTest('a support turn replaces the caster attack and its stagger in the final action plan',()=>{
   const supportSave={...snapshot,characters:snapshot.characters.map(c=>c.id===1003?{...c,joinStatus:'Join',usable:true}:c)};
   const supportCatalog={...catalog,skills:[{...catalog.skills.find(s=>s.id===403010),dmgType:'Magic',calcType:'Magic'},catalog.skills.find(s=>s.id===230110)]};
   const model=B.createModel(supportCatalog,supportSave,enemy,{objective:'damage',difficulty:'Normal'});
@@ -98,7 +101,7 @@ test('a support turn replaces the caster attack and its stagger in the final act
   assert.equal(party.roundDamage,party.actionOverrides[1003].damage);
 });
 
-test('weakness-only stagger passives see the final attack element',()=>{
+saveTest('weakness-only stagger passives see the final attack element',()=>{
   const skill={...catalog.skills.find(s=>s.id===401010),id:900001,element:'Ice',criticalHitRate:0,mag:100};
   const item={id:900002,name:'Fixture weapon',type:'Weapon',detailType:'GreatSowrd',sexLimit:'None',stats:{},passiveIds:[900003]};
   const passive={id:900003,name:'Weakness stagger fixture',equipCost:0,effectBundles:[{effectId:1431,TargetType:'Self',targetRelation:'Friendlies',passiveSkillAddTiming:'SpawnUnit',conditionData:{Condition:'None'}}]};
@@ -113,7 +116,7 @@ test('weakness-only stagger passives see the final attack element',()=>{
   assert.equal(neutral.passiveAnalysis.breakFactor,1);
 });
 
-test('hits use the native cap selected by the equipped damage-limit-break effect',()=>{
+saveTest('hits use the native cap selected by the equipped damage-limit-break effect',()=>{
   const soft={...enemy,stats:Object.fromEntries(Object.keys(enemy.stats).map(k=>[k,1])),
     resistances:Object.fromEntries(['None','Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'].map(e=>[e,'Weakness']))};
   const model=B.createModel(catalog,snapshot,soft,{objective:'damage',broken:true,critical:true});
@@ -124,7 +127,7 @@ test('hits use the native cap selected by the equipped damage-limit-break effect
   assert.equal(model.evaluate({...input,equippedSkillIds:[]}).common.damageCap,9999);
 });
 
-test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within the budget',()=>{
+saveTest('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within the budget',()=>{
   const model=B.createModel(catalog,snapshot,enemy,{objective:'damage',rounds:1});
   const result=model.evaluate(input);
   if(!model.prep(input.characterId,input.visionId).legal.has(400650))return;
@@ -135,7 +138,7 @@ test('Arms Akimbo turns repeat the attack, pay its MP and AP, and stay within th
   assert.ok(result.turnMp<=result.availableMp && result.skillCost<=result.skillBudget);
 });
 
-test('a Limit Burst that beats the normal turn is used once staggers fill the gauge',()=>{
+saveTest('a Limit Burst that beats the normal turn is used once staggers fill the gauge',()=>{
   const fragile={...enemy,stats:{...enemy.stats,MaxBreakPoint:1}};
   const model=B.createModel(catalog,snapshot,fragile,{objective:'damage',mpPercent:0});
   const result=model.evaluate(input);
@@ -145,7 +148,7 @@ test('a Limit Burst that beats the normal turn is used once staggers fill the ga
   assert.ok(result.fightDamage>result.damage);
 });
 
-test('Any fight is a neutral boss at the party level that the model can score',()=>{
+saveTest('Any fight is a neutral boss at the party level that the model can score',()=>{
   const general=B.generalEnemy(catalog,snapshot);
   assert.equal(general.id,B.GENERAL_ENEMY_ID);
   assert.ok(Object.values(general.resistances).every(r=>r==='None'));
@@ -155,7 +158,7 @@ test('Any fight is a neutral boss at the party level that the model can score',(
   assert.ok(result.fightDamage>0);
 });
 
-test('current setup scores only what is equipped, and a short search still beats it',()=>{
+saveTest('current setup scores only what is equipped, and a short search still beats it',()=>{
   const C=require('../docs/core.js'),options={goals:['damage'],perLoadoutBudget:250,candidatesPerVision:4,maxEvaluations:5000,timeMs:4000,visionSlices:true};
   const model=B.createModel(catalog,snapshot,B.generalEnemy(catalog,snapshot),options);
   const current=model.evaluate({...input,current:true}),full=model.evaluate(input);

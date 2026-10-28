@@ -754,10 +754,10 @@ document.addEventListener('change', e => {
 
 const ready = (async () => {
   try {
-    const r = await fetch('data/catalog.json');
+    const r = await fetch('data/catalog.json?v=1');
     if (!r.ok) throw new Error(`Couldn’t load game data (${r.status}). Reload to try again.`);
     catalog = await r.json();
-    faces = await fetch('data/faces.json').then(x => x.ok ? x.json() : {}, () => ({}));
+    faces = await fetch('data/faces.json?v=1').then(x => x.ok ? x.json() : {}, () => ({}));
     for (const k of ['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills', 'effects', 'enemies']) index[k] = new Map(catalog[k].map(x => [x.id, x]));
     document.body.classList.add('entering');
     render();
