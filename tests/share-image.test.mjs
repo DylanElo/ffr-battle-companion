@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {shareCard} from '../docs/share-image.js';
+import {shareCard, cardLayout} from '../docs/share-image.js';
 
 const indexes={characters:new Map([[1,{id:1,name:'Nichol'}],[2,{id:2,name:'Fina'}]]),visions:new Map([[10,{id:10,name:'Victoria'}]]),
   equipment:new Map([[100,{id:100,name:'Death Adder'}],[101,{id:101,name:'Earrings'}]]),
@@ -36,4 +36,16 @@ test('the card lists the boss weaknesses it was given, and none for any fight',(
 });
 test('a single build carries its own heading',()=>{
   assert.equal(shareCard({members:[party().members[1]],evaluation:{damage:5645}},indexes,{heading:'Best build'}).heading,'Best build');
+});
+test('the square picture is 1080 by 1080 with four members two to a row',()=>{
+  const {width,height,cells}=cardLayout({members:4,abilityRows:6,square:true});
+  assert.deepEqual([width,height,cells.map(c=>[c.x,c.y])],[1080,1080,[[40,168],[550,168],[40,596],[550,596]]]);
+});
+test('every square panel fits its content and stays inside the picture',()=>{
+  const layout=cardLayout({members:4,gearRows:4,abilityRows:6,square:true});
+  assert.ok(layout.cells.every(c=>c.h>=182+Math.max(4*26,24+6*22)+8 && c.y+c.h<=layout.height-76));
+});
+test('the wide picture keeps its four columns across 1200 pixels',()=>{
+  const {width,cells}=cardLayout({members:4,abilityRows:5});
+  assert.deepEqual([width,cells.map(c=>c.x),cells[0].w],[1200,[40,325,610,895],265]);
 });

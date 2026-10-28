@@ -2,7 +2,7 @@ import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
 import {createOptimizerController} from './optimizer-controller.js?v=42';
 import {comparison} from './optimizer-ui.js?v=41';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
-import {shareCard, partyImage} from './share-image.js?v=3';
+import {shareCard, partyImage} from './share-image.js?v=4';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -552,12 +552,14 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
   },
   canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)), shareParty });
 
-// Copies a picture of the party for Discord. Browsers without image clipboard support get it as a download instead.
+// Copies a picture of the party for Discord: square on a phone, wide elsewhere. A single build is already compact,
+// so it stays wide. Browsers without image clipboard support get it as a download instead.
 async function shareParty(party, { enemyId, against, current, heading = 'Best party' }) {
   const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
   const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
-  const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id });
-  const prefix = party.members.length === 1 ? `build-${name('characters', party.members[0].characterId)}` : 'party';
+  const single = party.members.length === 1, square = !single && matchMedia('(max-width: 560px)').matches;
+  const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id, square });
+  const prefix = single ? `build-${name('characters', party.members[0].characterId)}` : 'party';
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })]);
     toast('Image copied. Paste it into Discord.');

@@ -35,9 +35,22 @@ export function shareCard(party, indexes, { heading = 'Best party', title = 'Any
 
 // ---------- drawing ----------
 
-const PAD = 40, GAP = 20;
-// A party fills four columns of a 1200 px card; one character gets a narrower card with one wide column.
-const widthFor = count => count > 1 ? 1200 : 840;
+const PAD = 40, GAP = 20, HEADER = 168, FOOTER = 76, SQUARE = 1080;
+
+/**
+ * Where each member's panel goes. Wide: a party fills four columns of a 1200 px card, one character an 840 px card.
+ * Square (for phones): 1080 × 1080, members two to a row, each panel with gear and abilities side by side.
+ */
+export function cardLayout({ members, gearRows = 4, abilityRows = 1, square = false }) {
+  const width = square ? SQUARE : members > 1 ? 1200 : 840;
+  const cols = square ? Math.min(2, members) : members, rows = Math.ceil(members / cols);
+  const w = (width - PAD * 2 - GAP * (cols - 1)) / cols;
+  const content = square ? 182 + Math.max(gearRows * 26, 24 + abilityRows * 22) + 8 : 182 + gearRows * 26 + 42 + abilityRows * 24;
+  const height = square ? SQUARE : HEADER + 8 + content + FOOTER;
+  const h = square ? (height - HEADER - FOOTER - GAP * (rows - 1)) / rows : content;
+  const cells = Array.from({ length: members }, (_, i) => ({ x: PAD + (i % cols) * (w + GAP), y: HEADER + Math.floor(i / cols) * (h + GAP), w, h }));
+  return { width, height, cells, split: square };
+}
 const COLORS = { top: '#34509f', bottom: '#141f5c', frame: '#e9ecf8', ink: '#ffffff', dim: '#aab4dc', gold: '#ffd75e',
   good: '#8fe3b0', line: 'rgba(233, 236, 248, .18)', panel: 'rgba(10, 15, 46, .35)', night: '#0c1230' };
 // The site's element colours (style.css), so a weakness reads the same in the picture as on the page.
@@ -87,7 +100,7 @@ function drawWeaknesses(g, elements, x, y) {
   }
 }
 
-function drawMember(g, m, x, y, COL, h, images) {
+function drawMember(g, m, { x, y, w: COL, h }, split, images) {
   g.fillStyle = COLORS.panel; roundRect(g, x, y, COL, h, 10); g.fill();
   g.strokeStyle = COLORS.line; g.lineWidth = 1; g.stroke();
   const portrait = images.get(`unit${m.id}`), icon = images.get(`summon${m.visionId}`);
@@ -100,25 +113,33 @@ function drawMember(g, m, x, y, COL, h, images) {
   const damageWidth = g.measureText(m.damage).width;
   text(g, m.move, x + 14, y + 136, { size: 16, max: COL - 42 - damageWidth });
   divider(g, x + 14, y + 154, COL - 28);
+  // Split panels (square card) put abilities beside the gear instead of under it.
+  const gearWidth = split ? (COL - 28) / 2 : COL - 28;
   m.gear.forEach((slot, i) => {
     text(g, slot.label, x + 14, y + 182 + i * 26, { size: 13, color: COLORS.dim });
-    text(g, slot.name, x + 76, y + 182 + i * 26, { size: 15, weight: 700, color: slot.name === '—' ? COLORS.dim : COLORS.ink, max: COL - 90 });
+    text(g, slot.name, x + 76, y + 182 + i * 26, { size: 15, weight: 700, color: slot.name === '—' ? COLORS.dim : COLORS.ink, max: gearWidth - 66 });
   });
+  const names = m.abilities.length ? m.abilities : ['None needed'], color = m.abilities.length ? COLORS.ink : COLORS.dim;
+  if (split) {
+    const left = x + 14 + gearWidth + 14;
+    g.fillStyle = COLORS.line; g.fillRect(left - 8, y + 166, 1, h - 180);
+    text(g, 'Abilities', left, y + 176, { size: 13, weight: 700, color: COLORS.gold });
+    names.forEach((name, i) => text(g, name, left, y + 200 + i * 22, { size: 15, color, max: x + COL - 14 - left }));
+    return;
+  }
   const top = y + 182 + m.gear.length * 26;
   divider(g, x + 14, top - 8, COL - 28);
   text(g, 'Abilities', x + 14, top + 16, { size: 13, weight: 700, color: COLORS.gold });
-  (m.abilities.length ? m.abilities : ['None needed']).forEach((name, i) =>
-    text(g, name, x + 14, top + 42 + i * 24, { size: 15, color: m.abilities.length ? COLORS.ink : COLORS.dim, max: COL - 28 }));
+  names.forEach((name, i) => text(g, name, x + 14, top + 42 + i * 24, { size: 15, color, max: COL - 28 }));
 }
 
 /** Draws the card as a PNG. `faces` maps enemy ids to their portrait file, as in data/faces.json. */
-export async function partyImage(card, { faces = {}, bossId = null } = {}) {
+export async function partyImage(card, { faces = {}, bossId = null, square = false } = {}) {
   await Promise.all([400, 700, 900].map(weight => document.fonts.load(`${weight} 20px Chivo`)));
   const files = [...card.members.flatMap(m => [`unit${m.id}`, m.visionId > 0 ? `summon${m.visionId}` : null]), bossId ? faces[bossId] : null].filter(Boolean);
   const images = new Map((await Promise.all(files.map(async file => [file, await loadImage(file)]))).filter(([, image]) => image));
   const gearRows = Math.max(...card.members.map(m => m.gear.length), 4), abilityRows = Math.max(1, ...card.members.map(m => m.abilities.length));
-  const columnHeight = 182 + gearRows * 26 + 42 + abilityRows * 24, height = 176 + columnHeight + 76;
-  const W = widthFor(card.members.length), COL = (W - PAD * 2 - GAP * (card.members.length - 1)) / card.members.length;
+  const { width: W, height, cells, split } = cardLayout({ members: card.members.length, gearRows, abilityRows, square });
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = height;
   const g = canvas.getContext('2d');
@@ -139,7 +160,7 @@ export async function partyImage(card, { faces = {}, bossId = null } = {}) {
   text(g, 'damage per round', W - PAD, 120, { size: 17, color: COLORS.dim, align: 'right' });
   if (card.change) text(g, card.change, W - PAD, 146, { size: 17, weight: 700, color: COLORS.good, align: 'right' });
 
-  card.members.forEach((m, i) => drawMember(g, m, PAD + i * (COL + GAP), 168, COL, columnHeight, images));
+  card.members.forEach((m, i) => drawMember(g, m, cells[i], split, images));
   text(g, 'Resonance Battle Companion', PAD, height - 34, { size: 16, weight: 700 });
   text(g, SITE, W - PAD, height - 34, { size: 16, color: COLORS.dim, align: 'right' });
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The image could not be created.')), 'image/png'));
