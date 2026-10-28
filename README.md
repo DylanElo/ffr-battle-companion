@@ -28,7 +28,7 @@ Evidence and limits: [model notes](docs/model-notes.md), [combat](docs/combat-ve
 Static files in [`docs/`](docs), no build step: `python -m http.server -d docs`. Tests: `node --test` (Node 22+); CI runs the same command. Tests that need the local desktop importer and a real save skip without it.
 
 - [`docs/app.js`](docs/app.js): the interface. Party (home), Bosses, Characters and Resonances.
-- [`docs/optimizer-ui.js`](docs/optimizer-ui.js) and [`docs/build-details.js`](docs/build-details.js): results, short first, details collapsed.
+- [`docs/optimizer-ui.js`](docs/optimizer-ui.js) and [`docs/build-details.js`](docs/build-details.js): results as the move, gear, abilities and always-on effects; each opens to the game's description and what it adds.
 - [`docs/core.js`](docs/core.js): stock, reservations, recommendations and mastery rules.
 - [`docs/save.js`](docs/save.js): the encrypted save format. [`docs/save-io.js`](docs/save-io.js) reads a save into a snapshot and writes plans into a copy of it, refusing a save that changed after it was loaded.
 - [`docs/damage.js`](docs/damage.js), [`docs/passives.js`](docs/passives.js) and [`docs/stats.js`](docs/stats.js): native-formula damage, supported effect rules and saved-progression stat derivation.

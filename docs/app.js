@@ -1,7 +1,8 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
-import {createOptimizerController} from './optimizer-controller.js?v=41';
-import {comparison} from './optimizer-ui.js?v=40';
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=10';
+import {createOptimizerController} from './optimizer-controller.js?v=43';
+import {comparison} from './optimizer-ui.js?v=42';
+import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
+import {shareCard, partyImage} from './share-image.js?v=4';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -29,6 +30,17 @@ const pretty = s => C.clean(s).replace('Sowrd', 'Sword').replace(/([a-z])([A-Z])
 const opt = (value, text, selected) => `<option value="${h(value)}" ${selected ? 'selected' : ''}>${h(text)}</option>`;
 // Portraits are the game's own face icons (img/), named unit<id>, summon<id> and mons<FaceIconId>.
 let faces = {};
+
+// The party picture's shape: the player's last choice, else square on a phone and wide elsewhere.
+const PICTURE_KEY = 'ffr-companion-picture';
+let picture = (() => {
+  try { const saved = localStorage.getItem(PICTURE_KEY); if (['wide', 'square'].includes(saved)) return saved; } catch {}
+  return matchMedia('(max-width: 560px)').matches ? 'square' : 'wide';
+})();
+function setPicture(shape) {
+  picture = shape;
+  try { localStorage.setItem(PICTURE_KEY, shape); } catch {}
+}
 const img = (file, size = '') => file ? `<img class="face ${size}" src="img/${file}.webp" alt="" width="128" height="128" decoding="async">` : '';
 const enemyFace = (id, size) => img(faces[id], size);
 const charFace = (id, size) => index.characters?.has(Number(id)) ? img(`unit${id}`, size) : '';
@@ -136,7 +148,7 @@ function party() {
         <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', next' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
       ${!general && enemy ? `<div class="boss-summary">${bossCard(enemy)}</div>` : ''}
     </section>
-    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true })}</section>
+    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
   </div>`;
 }
 
@@ -352,29 +364,39 @@ function deepPanel(native) {
   </div>`;
 }
 
-// Result of Build, shown above the slots it filled in: the number, the move, then details on demand.
+// Result of Build, shown above the slots it filled in: the number, the move, the abilities; each opens to what it does.
 function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
   if (!d.results.length) return `<div class="deep-result"><p>No usable attack was found against ${h(against)}.</p></div>`;
-  const r = d.results[d.pick], ev = r.evaluation, skill = index.skills.get(Number(ev.skillId));
-  const goals = d.goals || ['damage'], limits = ev.limitUses || [];
+  const r = d.results[d.pick], ev = r.evaluation, limits = ev.limitUses || [], outOfMp = ev.mpExhaustedRounds || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
-  const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : ''].filter(Boolean);
+  const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : '',
+    outOfMp.length ? `Out of MP from round ${Math.min(...outOfMp)}` : ''].filter(Boolean);
+  const alwaysOn = alwaysOnList(r, index);
   return `<div class="deep-result" aria-busy="false">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span></div>
-    ${comparison(d.current && { damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger })}
-    <p class="small">Use <b>${h(commandPlan(ev, index) || skill?.name || '—')}</b>${skill ? ` <span class="dim">· ${n(ev.turnMp ?? skill.cost)} MP</span>` : ''}</p>
+    ${d.current ? comparison({ damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger }) : ''}
+    <div class="member-hit">${moveDetails(ev, index)}</div>
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
+    <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
+    ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
     <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
-    <details class="build-explanation"><summary>Why this gear</summary>${gearExplanation(r, index)}</details>
-    ${buildExplanation(r, index)}
-    <details class="how"><summary>How this is estimated</summary>${estimateNotice()}
-      <p class="dim small">Built for ${goals.map(g => ({ damage: 'damage', stagger: 'stagger', limit: 'Limit Burst', durability: 'durability' })[g]).join(' + ')}, over five rounds using this character’s hits only. ${n(ev.fightBreakDamage ?? ev.breakDamage)} stagger per round${ev.gaugePerRound ? `; LB gauge +${n(ev.gaugePerRound)} per round` : ''}. Stagger ends at the next turn boundary; later hits in the current turn deal ×1.5.</p></details>
+    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button></div>
   </div>`;
+}
+
+// One character's Build result in the shape the party picture takes: one member, its fight damage as the total.
+function shareBuild() {
+  const d = ui.deep, r = d?.results?.[d.pick];
+  if (!r) return;
+  const damage = r.evaluation.fightDamage ?? r.evaluation.damage;
+  shareParty({ members: [{ ...r, evaluation: { ...r.evaluation, damage } }], evaluation: { damage } },
+    { enemyId: d.enemyId, against: d.enemyId === 'general' ? 'general' : 'enemy', heading: 'Best build',
+      current: d.current && { damage: d.current.fightDamage ?? d.current.damage } });
 }
 
 function equipTabs(native, v, available) {
@@ -539,7 +561,24 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
     plans = next; ui.reserve = false; ui.charId = members[0].characterId; storePlans(); setDraft(); view = 'characters'; scrollTo({ top: 0 });
     toast('Party planned. Adjust their gear here; your save is unchanged.');
   },
-  canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)) });
+  canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)), shareParty });
+
+// Copies a picture of the party for Discord in the chosen shape. A single build is already compact, so it stays wide.
+// Browsers without image clipboard support get it as a download instead.
+async function shareParty(party, { enemyId, against, current, heading = 'Best party' }) {
+  const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
+  const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
+  const single = party.members.length === 1, square = !single && picture === 'square';
+  const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id, square });
+  const prefix = single ? `build-${name('characters', party.members[0].characterId)}` : 'party';
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })]);
+    toast('Image copied. Paste it into Discord.');
+  } catch {
+    try { download(await image, `${prefix}-${boss?.name || 'any-fight'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.png'); toast('Image saved to your downloads.'); }
+    catch (e) { error(e.message); }
+  }
+}
 const RENDER = { party, bosses, characters, resonances };
 
 function render() {
@@ -622,6 +661,7 @@ document.addEventListener('click', e => {
     if (bytes) { download(bytes, fileName); t.textContent = t.dataset.download === 'backup' ? 'Backup downloaded ✓' : 'New save downloaded ✓'; }
     return;
   }
+  if (t.dataset.picture) { setPicture(t.dataset.picture); render(); return; }
   if (t.dataset.partyFor) { go(() => { ui.enemyId = +t.dataset.partyFor; optimizerController.setAgainst('enemy'); view = 'party'; scrollTo({ top: 0 }); }); return; }
   if (t.dataset.view) { if (t.dataset.view !== view) go(() => { view = t.dataset.view; }); return; }
   if (t.dataset.enemy) { if (+t.dataset.enemy !== ui.bossId) go(() => { ui.bossId = +t.dataset.enemy; }, t); return; }
@@ -635,6 +675,7 @@ document.addEventListener('click', e => {
   }
   if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
   if (t.id === 'deep') { deepSearch(); return; }
+  if (t.id === 'share-build') { shareBuild(); return; }
   if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
   if (t.dataset.deepPick) { applyDeep(+t.dataset.deepPick); render(); return; }
   if (t.dataset.plan) {

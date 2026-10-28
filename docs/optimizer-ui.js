@@ -1,5 +1,5 @@
-// The party builder on the Party page: a short result first, every detail one click away.
-import {gearExplanation, buildExplanation, estimateNotice, commandPlan} from './build-details.js?v=10';
+// The party builder on the Party page: a short result, and what each piece does one tap away.
+import {gearExplanation, abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
@@ -10,12 +10,6 @@ const option = (value, label, selected) => `<option value="${h(value)}" ${select
 const face = (file, size = '') => file ? `<img class="face ${size}" src="img/${file}.webp" alt="" width="128" height="128" decoding="async">` : '';
 const tabName = index => index === 0 ? 'Top result' : `Option ${index + 1}`;
 
-function text(value) {
-  if (typeof value === 'string') return value;
-  if (!value) return '';
-  return value.reason || value.description || value.name || value.message || value.label || JSON.stringify(value);
-}
-const bullets = values => list(values).length ? `<ul class="notes">${values.map(value => `<li>${h(text(value))}</li>`).join('')}</ul>` : '';
 const expected = damage => typeof damage === 'object' && damage !== null ? damage.expected ?? damage.mean : damage;
 
 // `support` is the party's chosen support action: its caster gives up an attack, its targets hit harder.
@@ -23,30 +17,33 @@ function memberCard(member, indexes, support) {
   const evaluation = member.evaluation || {}, equipment = member.equipment || {};
   const character = indexes.characters.get(Number(member.characterId));
   const vision = indexes.visions.get(Number(member.visionId ?? equipment.visionId));
-  const skill = indexes.skills.get(Number(evaluation.skillId ?? evaluation.actionId));
   const casting = Number(support?.characterId) === Number(member.characterId);
   const boosted = !casting && list(support?.targetIds).map(Number).includes(Number(member.characterId));
   const tags = [...(evaluation.canHeal ? ['Heals'] : []), ...(evaluation.canProtect ? ['Protects'] : []),
     ...(boosted ? [`${indexes.skills.get(Number(support.skillId))?.name || 'Support'} from ${indexes.characters.get(Number(support.characterId))?.name || 'an ally'}`] : [])];
+  const outOfMp = list(evaluation.mpExhaustedRounds);
   const low = evaluation.damageMin ?? evaluation.damage?.min, high = evaluation.damageMax ?? evaluation.damage?.max;
   const limits = list(evaluation.limitUses);
+  const ev = member.explanationEvaluation || evaluation, alwaysOn = alwaysOnList(member, indexes);
   return `<article class="member">
     <div class="member-who">${character ? face(`unit${character.id}`, 'md') : ''}<div>
       <h4>${h(character?.name || `#${member.characterId}`)}</h4>
       <span class="member-vision${vision ? '' : ' none'}">${vision ? face(`summon${vision.id}`, 'sm') : ''}${h(vision?.name || 'No Resonance')}</span>
     </div></div>
-    <div class="member-hit"><span>${h(commandPlan(evaluation, indexes) || skill?.name || 'No attack')}${skill ? ` <small>${num(evaluation.turnMp ?? skill.cost)} MP</small>` : ''}</span>
+    <div class="member-hit">${moveDetails(evaluation, indexes)}
       ${casting ? '<b class="support">Support</b>' : `<b title="${finite(low) && finite(high) ? `${num(low)}–${num(high)}` : ''}">${num(expected(evaluation.damage))}</b>`}</div>
     ${limits.length ? `<p class="small member-lb">Limit Burst in round ${limits.map(u => num(u.round)).join(', ')}</p>` : ''}
-    ${tags.length ? `<div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>` : ''}
+    ${tags.length || outOfMp.length ? `<div class="tags">${tags.map(t => `<span>${h(t)}</span>`).join('')}${outOfMp.length ? `<span class="warn">Out of MP from round ${num(Math.min(...outOfMp))}</span>` : ''}</div>` : ''}
     ${gearExplanation(member, indexes)}
-    ${buildExplanation(member, indexes)}
+    <h5>Abilities <span class="dim">${num(ev.skillCost)} / ${num(ev.skillBudget)} AP</span></h5>
+    ${abilityList(member, indexes)}
+    ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
   </article>`;
 }
 
-// Before/after: the recommended setup against the saved one, both scored by the same model.
+// Before/after: the recommended setup against the saved one, both scored by the same model. Shown only when the
+// saved setup could be scored; otherwise there is nothing honest to compare against.
 export function comparison(now, next) {
-  if (!now) return '<p class="compare dim small">Your current setup could not be fully evaluated, so there is no before/after.</p>';
   const parts = [], change = now.damage > 0 ? Math.round((next.damage - now.damage) / now.damage * 100) : null;
   if (change !== null) parts.push(change ? `${change > 0 ? '+' : ''}${change}% damage` : 'Same damage');
   if (next.firstStagger && now.firstStagger && next.firstStagger !== now.firstStagger) {
@@ -59,14 +56,11 @@ export function comparison(now, next) {
     <span class="dim small">vs your current setup (${num(now.damage)} per round)</span></p>`;
 }
 
-function sampleNote(evaluated) {
-  if (evaluated.combatSamples) return `Averages ${num(evaluated.combatSamples)} reproducible native initiative and combat paths. Bonus actions, luck, event traces, stagger and LB round labels show one representative path; they are not guaranteed.`;
-  if (evaluated.gambleSamples) return `Averages ${num(evaluated.gambleSamples)} reproducible native initiative and Gamble paths. Luck, event traces, stagger and LB round labels show one representative path; they are not guaranteed.`;
-  if (evaluated.initiativeSamples) return `Averages ${num(evaluated.initiativeSamples)} native-priority samples. Stagger and LB round labels show one representative sample; they are not guaranteed timings.`;
-  return '';
-}
+const PICTURE_SHAPES = [['wide', 'Wide'], ['square', 'Square']];
+const shapeToggle = picture => `<span class="shape" role="group" aria-label="Picture shape">${PICTURE_SHAPES.map(([shape, label]) =>
+  `<button type="button" class="chip" data-picture="${shape}" aria-pressed="${picture === shape}">${label}</button>`).join('')}</span>`;
 
-function partyView(party, index, indexes, canEquip, current) {
+function partyView(party, index, indexes, { canEquip, current, picture }) {
   const members = list(party.members ?? party.party), evaluated = party.evaluation || party;
   const summed = members.reduce((total, m) => total + (Number(expected(m.evaluation?.damage)) || 0), 0);
   const total = finite(evaluated.damage) ? evaluated.damage : summed;
@@ -79,20 +73,12 @@ function partyView(party, index, indexes, canEquip, current) {
     ${current ? comparison({ damage: current.damage, firstStagger: current.firstStagger }, { damage: total, firstStagger: evaluated.firstStagger }) : ''}
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
     <div class="toolbar">${canEquip ? `<button type="button" class="primary" data-equip-party-index="${index}">Equip in my save</button>
-      <button type="button" data-apply-party-index="${index}">Edit gear</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}</div>
-    <div class="members">${members.map(m => memberCard(m, indexes, evaluated.supportUsed)).join('')}</div>
-    <details class="how"><summary>How this is estimated</summary>
-      ${estimateNotice()}
-      ${sampleNote(evaluated) ? `<p class="dim small">${h(sampleNote(evaluated))}</p>` : ''}
-      ${current === null ? comparison(null) : ''}
-      <p class="dim small">Your current setup is scored with the abilities recorded in your save. Mastery the save does not record is left out, so the before/after may understate it.</p>
-      ${evaluated.supportDescription ? `<p class="small">${h(evaluated.supportDescription)}</p>` : ''}
-      ${bullets(evaluated.warnings)}
-      <button type="button" class="ghost" data-export-party="${index}">Export this party as JSON</button>
-    </details>`;
+      <button type="button" data-apply-party-index="${index}">Edit gear</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}
+      <button type="button" class="ghost" data-share-party-index="${index}" title="A picture of this party to paste into Discord">Copy image</button>${shapeToggle(picture)}</div>
+    <div class="members">${members.map(m => memberCard(m, indexes, evaluated.supportUsed)).join('')}</div>`;
 }
 
-export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false }) {
+export function renderOptimizer({ catalog, snapshot, state = {}, result = null, busy = false, error = '', canEquip = false, fixedAgainst = false, picture = 'wide' }) {
   const indexes = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills', 'effects'].map(kind => [kind, new Map(list(catalog[kind]).map(item => [Number(item.id), item]))]));
   const people = list(snapshot?.characters).filter(joined).filter(c => indexes.characters.has(Number(c.id)));
   const fixed = list(state.fixedCharacterIds).map(Number);
@@ -121,8 +107,8 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
   let body;
   if (busy) body = `<p class="dim" role="status">${h(state.progress || 'Searching your characters, Resonances, gear and abilities…')}</p>`;
   else if (results.length) body = `${results.length > 1 ? `<div class="tabs" role="tablist">${results.map((_, i) => `<button type="button" role="tab" aria-selected="${i === pick}" data-party-tab="${i}">${tabName(i)}</button>`).join('')}</div>` : ''}
-    ${partyView(results[pick], pick, indexes, canEquip, result.current)}`;
-  else if (result) body = `<p>No party fits those requirements. Try turning off Healer or Protection, or lock fewer characters.</p>${bullets(result.warnings)}`;
+    ${partyView(results[pick], pick, indexes, { canEquip, current: result.current, picture })}`;
+  else if (result) body = '<p>No party fits those requirements. Try turning off Healer or Protection, or lock fewer characters.</p>';
   else body = `<p class="dim">${people.length < 4 ? 'You need four recruited characters to build a party.' : 'Finds the strongest party of four you can field, with their gear and Resonances.'}</p>`;
   return `<div class="party-panel" aria-busy="${busy}">${settings}${error ? `<p class="bad small" role="alert">${h(error)}</p>` : ''}${body}</div>`;
 }
