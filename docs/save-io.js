@@ -64,7 +64,7 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
   if (await sha256Hex(bytes) !== snap.source?.sha256) throw new Error(SAVE_CHANGED);
   const index = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills']
     .map(kind => [kind, new Map((catalog[kind] || []).map(row => [row.id, row]))]));
-  const name = (kind, id) => index[kind].get(Number(id))?.name ?? (Number(id) > 0 ? `Unknown #${id}` : 'Empty');
+  const name = (kind, id) => index[kind].get(Number(id))?.name ?? (Number(id) > 0 ? `New entry #${id}` : 'Empty');
   const people = snap.characters.filter(C.joined), inventory = snap.inventory;
   const save = await S.openSave(bytes);
   let data = save.data;

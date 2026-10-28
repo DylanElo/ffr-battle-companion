@@ -1,6 +1,6 @@
-import {renderOptimizer} from './optimizer-ui.js?v=39';
+import {renderOptimizer} from './optimizer-ui.js?v=40';
 
-export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipPlans}){
+export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipParty}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,incomingDamage:0,incomingType:'Physic',fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
@@ -18,8 +18,8 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     if(selected)state.enemyId=Number(selected.value);
     cancel();const id=run,hash=snapshot.source?.sha256;
     busy=true;error='';result=null;state.partyIndex=0;state.progress='Preparing progression, passive packages and legal equipment…';
-    const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:13000};
-    worker=new Worker(new URL('./optimizer-worker.js?v=40',import.meta.url));
+    const options={...state,partySize:4,maxResults:3,beamWidth:40,candidatesPerVision:4,maxEvaluations:12000,perLoadoutBudget:120,timeMs:10000,partyTimeMs:6000};
+    worker=new Worker(new URL('./optimizer-worker.js?v=41',import.meta.url));
     worker.onmessage=event=>{
       if(event.data.id!==run || getSnapshot().source?.sha256!==hash)return;
       if(event.data.type==='progress')state.progress=event.data.message;
@@ -49,7 +49,7 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
       if(party){try{stageParty(party.members);error='';}catch(e){error=e.message;}rerender();}
     }else if(button.hasAttribute('data-equip-party-index')){
       const party=result?.results?.[Number(button.dataset.equipPartyIndex)];
-      if(party){try{stageParty(party.members);error='';equipPlans();}catch(e){error=e.message;}rerender();}
+      if(party){try{error='';equipParty(party.members);}catch(e){error=e.message;}rerender();}
     }else if(button.hasAttribute('data-export-party'))exportParty(Number(button.dataset.exportParty));
   });
   document.addEventListener('input',event=>{

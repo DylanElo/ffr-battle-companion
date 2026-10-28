@@ -569,7 +569,8 @@
       for(const guard of guards)factor=Math.fround(factor*factorFor(guard.percent));
       return {factor,amount:Math.trunc(Math.max(1,Math.fround(Math.fround(amount)*factor)))};
     };
-    function simulateFight(members){
+    // maxSamples lets a search rank candidates on the first few of the same reproducible paths, then score finalists in full.
+    function simulateFight(members,maxSamples=Infinity){
       const rounds=scenario.rounds,allStaggered=scenario.enemyCount===1;
       const gain=number(allStaggered?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,allStaggered?50:25);
       const phaseHasGamble=turn=>turn && [...(turn.leaves || []).map(leaf=>leaf.skillId),...(turn.reactionSkills || [])].some(id=>isGambleSkill(indexes.skills.get(Number(id))));
@@ -579,7 +580,7 @@
       const defenseChancePresent=scenario.incomingDamage>0 && members.some(member=>(member.actionPlan?.passiveIds || []).some(id=>(indexes.passives.get(id)?.effects || []).includes(19034)));
       const phaseProcPresent=allPlanTurns.some(turn=>(turn.leaves || []).some(leaf=>(indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(Number(id)))));
       const combatRandom=gamblePresent || phaseProcPresent || defenseChancePresent;
-      const samples=combatRandom?32:members.length>1?16:1,partyOrder=new Map((snapshot.party || []).map((id,i)=>[Number(id),i]));
+      const samples=Math.max(1,Math.min(maxSamples,combatRandom?32:members.length>1?16:1)),partyOrder=new Map((snapshot.party || []).map((id,i)=>[Number(id),i]));
       const rateAmplitude=number(catalog.battleRules.actionTimeCalcValueWithAgilityRatio,20),flatAmplitude=number(catalog.battleRules.actionTimeCalcValueWithFixValue,5);
       const draw=(sample,round,id,stream)=>{
         let seed=Math.imul(sample+1,0x85ebca6b)^Math.imul(round,0xc2b2ae35)^Math.imul(Number(id),0x27d4eb2d)^stream;
@@ -1214,7 +1215,7 @@
       // Ties go to the cheaper loadout, so abilities that change nothing for these goals aren't equipped.
       return results.sort((a,b)=>b.score-a.score || b.damage-a.damage || a.turn.reservedIds.length-b.turn.reservedIds.length)[0];
     }
-    function evaluateParty(members){
+    function evaluateParty(members,{samples=Infinity}={}){
       const baseline=members.reduce((sum,m)=>sum+m.evaluation.damage,0);
       const baselineBreak=members.reduce((sum,m)=>sum+number(m.evaluation.breakDamage),0);
       let damage=baseline,breakDamage=baselineBreak,supportDescription='',supportUsed=null,actionOverrides={};
@@ -1223,7 +1224,7 @@
         const e=override?.supportedTurn?{...m.evaluation,supportSourceId:override.supportSourceId,supportedTurn:override.supportedTurn,supportedActionPlan:override.supportedActionPlan,supportedFinishContext:override.supportedFinishContext}:{...m.evaluation,...override};
         return {id:m.characterId,agility:e.baseAgility ?? e.stats.Agility,setupAgility:e.setupAgility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,setupLimit:e.setupLimit,setupDuration:e.turn?.setupDuration,actionPlan:e.actionPlan,fallbackActionPlan:e.fallbackActionPlan,finish:e.finish,bonusLimit:e.bonusLimit,supportedActionPlan:e.supportedActionPlan,supportedFinishContext:e.supportedFinishContext,
           passiveIds:unique([...(e.alwaysPassiveIds || []),...(e.passiveIds || [])]),supportSourceId:e.supportSourceId,supportedTurn:e.supportedTurn};
-      }));
+      }),samples);
       let fight=simulate({});
       const fightScore=f=>goalScore({damage:f.damage,breakDamage:f.breakDamage,gauge:members.reduce((sum,m)=>sum+number(f.gauge[m.characterId]),0)/Math.max(1,members.length)});
       // Call replaces the normal command; the selected ally's paid additional turn is queued by the native phase model.

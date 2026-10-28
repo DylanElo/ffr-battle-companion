@@ -25,7 +25,9 @@ export function commandPlan(ev, indexes) {
   const turn = ev.turn || {};
   const luck = turn.luckPolicy;
   const repeat = luck ? `generate Good Luck to ${n(Math.max(number(luck.requiredLuck),number(luck.requiredTurnLuck)))} with ${phaseName(luck.generatorTurn,indexes)}; then spend with ${phaseName(luck.spenderTurn,indexes)}` : list(turn.rotationTurns).length ? turn.rotationTurns.map(phase => phaseName(phase, indexes)).join(' → ') : ev.recipeLabel || phaseName(turn, indexes);
-  return `${turn.openingTurn ? `Open with ${phaseName(turn.openingTurn, indexes)}; then ` : ''}${turn.rotationTurns?.length && !luck ? 'repeat ' : ''}${repeat}`;
+  // Opening recipes from the battle model already name their opening action.
+  const opening = turn.openingTurn && !repeat.startsWith('Open with ') ? `Open with ${phaseName(turn.openingTurn, indexes)}; then ` : '';
+  return `${opening}${turn.rotationTurns?.length && !luck ? 'repeat ' : ''}${repeat}`;
 }
 function handlesGamble(ev) {
   const plan=ev.actionPlan || ev.fallbackActionPlan;
@@ -117,7 +119,7 @@ export function gearExplanation(member, indexes) {
     ...list(e.accessoryIds).map((id, i) => ['accessory', i, `Accessory ${i + 1}`, id])];
   return `<div class="build-gear" aria-label="Equipment and reasons">${slots.map(([slot, index, label, id]) => {
     const item = lookup(indexes, 'equipment', id), reason = reasons.find(r => r.slot === slot && (slot !== 'accessory' || r.index === index));
-    const title = item?.name || (Number(id) > 0 ? `Unknown item #${id}` : 'Empty');
+    const title = item?.name || (Number(id) > 0 ? `New item #${id}` : 'Empty');
     const stats = Object.entries(item?.stats || {}).filter(([, v]) => Number(v) !== 0).map(([k, v]) => `${labels[k] || k} ${Number(v) > 0 ? '+' : ''}${n(v)}`).join(' · ');
     const effects = list(item?.passiveIds).map(pid => lookup(indexes, 'passives', pid)).filter(Boolean);
     return `<details class="gear-choice"><summary><span class="dim">${label}</span><b>${h(title)}</b></summary>
