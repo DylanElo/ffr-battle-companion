@@ -69,7 +69,8 @@ function partyView(party, index, indexes, canEquip, current) {
     ${current ? comparison({ damage: current.damage, firstStagger: current.firstStagger }, { damage: total, firstStagger: evaluated.firstStagger }) : ''}
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
     <div class="toolbar">${canEquip ? `<button type="button" class="primary" data-equip-party-index="${index}">Equip in my save</button>
-      <button type="button" data-apply-party-index="${index}">Edit gear</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}</div>
+      <button type="button" data-apply-party-index="${index}">Edit gear</button>` : `<button type="button" class="primary" data-apply-party-index="${index}">Use this party</button>`}
+      <button type="button" class="ghost" data-share-party-index="${index}" title="A picture of this party to paste into Discord">Copy image</button></div>
     <div class="members">${members.map(m => memberCard(m, indexes, evaluated.supportUsed)).join('')}</div>`;
 }
 

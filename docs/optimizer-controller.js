@@ -1,6 +1,6 @@
 import {renderOptimizer} from './optimizer-ui.js?v=41';
 
-export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipParty}){
+export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>({}),rerender,stageParty,canEquip=()=>false,equipParty,shareParty}){
   const state={enemyQ:'',bossOnly:true,enemyId:0,against:'enemy',goals:['damage','durability'],minHealers:1,minProtectors:0,difficulty:'save',broken:false,critical:false,mpPercent:100,incomingDamage:0,incomingType:'Physic',fixedCharacterIds:[],progress:'',partyIndex:0};
   let result=null,busy=false,error='',worker=null,run=0,sourceHash='';
   function cancel(){run++;worker?.terminate();worker=null;busy=false;}
@@ -41,6 +41,9 @@ export function createOptimizerController({getCatalog,getSnapshot,getFaces=()=>(
     }else if(button.hasAttribute('data-equip-party-index')){
       const party=result?.results?.[Number(button.dataset.equipPartyIndex)];
       if(party){try{error='';equipParty(party.members);}catch(e){error=e.message;}rerender();}
+    }else if(button.hasAttribute('data-share-party-index')){
+      const party=result?.results?.[Number(button.dataset.sharePartyIndex)];
+      if(party)shareParty(party,{enemyId:state.enemyId,against:state.against,current:result.current});
     }
   });
   document.addEventListener('input',event=>{
