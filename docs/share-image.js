@@ -8,14 +8,14 @@ const MAX_ABILITIES = 6;
 const GEAR_LABELS = ['Weapon', 'Armor', 'Acc. 1', 'Acc. 2', 'Acc. 3', 'Acc. 4'];
 
 /** What the picture says, kept apart from the drawing so it can be checked without a canvas. */
-export function shareCard(party, indexes, { title = 'Any fight', current = null } = {}) {
+export function shareCard(party, indexes, { title = 'Any fight', current = null, weak = [] } = {}) {
   const members = list(party.members), evaluated = party.evaluation || {}, support = evaluated.supportUsed;
   const total = Number.isFinite(Number(evaluated.damage)) ? Number(evaluated.damage)
     : members.reduce((sum, m) => sum + (Number(expected(m.evaluation?.damage)) || 0), 0);
   const change = current?.damage > 0 ? Math.round((total - current.damage) / current.damage * 100) : 0;
   const named = (kind, id, empty) => indexes[kind]?.get(Number(id))?.name || (Number(id) > 0 ? `New #${id}` : empty);
   return {
-    title, total: whole(total),
+    title, total: whole(total), weak: list(weak),
     change: change ? `${change > 0 ? '+' : ''}${change}% vs current setup` : '',
     members: members.map(m => {
       const ev = m.evaluation || {}, e = m.equipment || {}, visionId = Number(m.visionId ?? e.visionId);
@@ -38,6 +38,8 @@ export function shareCard(party, indexes, { title = 'Any fight', current = null 
 const W = 1200, PAD = 40, GAP = 20, COL = (W - PAD * 2 - GAP * 3) / 4;
 const COLORS = { top: '#34509f', bottom: '#141f5c', frame: '#e9ecf8', ink: '#ffffff', dim: '#aab4dc', gold: '#ffd75e',
   good: '#8fe3b0', line: 'rgba(233, 236, 248, .18)', panel: 'rgba(10, 15, 46, .35)', night: '#0c1230' };
+// The site's element colours (style.css), so a weakness reads the same in the picture as on the page.
+const ELEMENT_COLORS = { Fire: '#ff7a59', Ice: '#8fe0ff', Wind: '#8fe3a0', Earth: '#d9a865', Thunder: '#ffe066', Water: '#6fa8ff', Light: '#fff4c9', Dark: '#c49bff' };
 const SITE = 'dylanelo.github.io/ffr-battle-companion';
 
 function loadImage(file) {
@@ -66,6 +68,22 @@ function text(g, value, x, y, { size = 16, weight = 400, color = COLORS.ink, ali
 }
 
 function divider(g, x, y, w) { g.fillStyle = COLORS.line; g.fillRect(x, y, w, 1); }
+
+// "Weak to" followed by one outlined chip per element, like the page's element badges.
+function drawWeaknesses(g, elements, x, y) {
+  text(g, 'Weak to', x, y, { size: 15, color: COLORS.dim });
+  let left = x + g.measureText('Weak to').width + 12;
+  for (const element of elements) {
+    const color = ELEMENT_COLORS[element] || COLORS.ink;
+    g.font = '700 15px Chivo, system-ui, sans-serif';
+    const width = g.measureText(element).width + 34;
+    g.fillStyle = 'rgba(5, 9, 34, .3)'; roundRect(g, left, y - 18, width, 26, 13); g.fill();
+    g.strokeStyle = color; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = color; g.beginPath(); g.arc(left + 13, y - 5, 4, 0, Math.PI * 2); g.fill();
+    text(g, element, left + 23, y, { size: 15, weight: 700, color });
+    left += width + 8;
+  }
+}
 
 function drawMember(g, m, x, y, h, images) {
   g.fillStyle = COLORS.panel; roundRect(g, x, y, COL, h, 10); g.fill();
@@ -110,8 +128,10 @@ export async function partyImage(card, { faces = {}, bossId = null } = {}) {
   const boss = images.get(bossId ? faces[bossId] : '');
   if (boss) g.drawImage(boss, PAD, 34, 104, 104);
   const left = boss ? PAD + 124 : PAD;
-  text(g, 'Best party', left, 72, { size: 18, color: COLORS.dim });
-  text(g, card.title, left, 112, { size: 34, weight: 900, max: W - left - 380 });
+  const weak = card.weak.length > 0;
+  text(g, 'Best party', left, weak ? 62 : 72, { size: 18, color: COLORS.dim });
+  text(g, card.title, left, weak ? 102 : 112, { size: 34, weight: 900, max: W - left - 380 });
+  if (weak) drawWeaknesses(g, card.weak, left, 144);
   text(g, card.total, W - PAD, 92, { size: 54, weight: 900, color: COLORS.gold, align: 'right' });
   text(g, 'damage per round', W - PAD, 120, { size: 17, color: COLORS.dim, align: 'right' });
   if (card.change) text(g, card.change, W - PAD, 146, { size: 17, weight: 700, color: COLORS.good, align: 'right' });

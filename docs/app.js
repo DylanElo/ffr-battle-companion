@@ -2,7 +2,7 @@ import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
 import {createOptimizerController} from './optimizer-controller.js?v=42';
 import {comparison} from './optimizer-ui.js?v=41';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
-import {shareCard, partyImage} from './share-image.js?v=1';
+import {shareCard, partyImage} from './share-image.js?v=2';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -544,7 +544,8 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
 // Copies a picture of the party for Discord. Browsers without image clipboard support get it as a download instead.
 async function shareParty(party, { enemyId, against, current }) {
   const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
-  const image = partyImage(shareCard(party, index, { title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current }), { faces, bossId: boss?.id });
+  const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
+  const image = partyImage(shareCard(party, index, { title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id });
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })]);
     toast('Image copied. Paste it into Discord.');

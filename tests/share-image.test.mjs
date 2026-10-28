@@ -31,3 +31,6 @@ test('a long ability list ends with a count of the rest so the picture keeps its
   const long=party();long.members[1].evaluation.equippedSkillIds=[900,901,902,903,904,905,906,907];
   assert.deepEqual(shareCard(long,indexes).members[1].abilities,['Passive 1','Passive 2','Passive 3','Passive 4','Passive 5','+3 more']);
 });
+test('the card lists the boss weaknesses it was given, and none for any fight',()=>{
+  assert.deepEqual([shareCard(party(),indexes,{weak:['Wind','Light']}).weak,shareCard(party(),indexes).weak],[['Wind','Light'],[]]);
+});
