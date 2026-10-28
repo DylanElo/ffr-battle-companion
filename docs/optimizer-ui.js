@@ -57,7 +57,7 @@ export function comparison(now, next) {
 }
 
 const PICTURE_SHAPES = [['wide', 'Wide'], ['square', 'Square']];
-const shapeToggle = picture => `<span class="shape" role="group" aria-label="Picture shape">${PICTURE_SHAPES.map(([shape, label]) =>
+export const shapeToggle = picture => `<span class="shape" role="group" aria-label="Picture shape">${PICTURE_SHAPES.map(([shape, label]) =>
   `<button type="button" class="chip" data-picture="${shape}" aria-pressed="${picture === shape}">${label}</button>`).join('')}</span>`;
 
 function partyView(party, index, indexes, { canEquip, current, picture }) {

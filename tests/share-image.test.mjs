@@ -45,6 +45,10 @@ test('every square panel fits its content and stays inside the picture',()=>{
   const layout=cardLayout({members:4,gearRows:4,abilityRows:6,square:true});
   assert.ok(layout.cells.every(c=>c.h>=182+Math.max(4*26,24+6*22)+8 && c.y+c.h<=layout.height-76));
 });
+test('a single build in the square picture is drawn twice as large and centered',()=>{
+  const {cells:[cell]}=cardLayout({members:1,gearRows:4,abilityRows:1,square:true});
+  assert.deepEqual([cell.zoom,cell.h,cell.y],[2,588,292]);
+});
 test('the wide picture keeps its four columns across 1200 pixels',()=>{
   const {width,cells}=cardLayout({members:4,abilityRows:5});
   assert.deepEqual([width,cells.map(c=>c.x),cells[0].w],[1200,[40,325,610,895],265]);

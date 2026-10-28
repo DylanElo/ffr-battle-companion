@@ -35,11 +35,12 @@ export function shareCard(party, indexes, { heading = 'Best party', title = 'Any
 
 // ---------- drawing ----------
 
-const PAD = 40, GAP = 20, HEADER = 168, FOOTER = 76, SQUARE = 1080;
+const PAD = 40, GAP = 20, HEADER = 168, FOOTER = 76, SQUARE = 1080, MAX_ZOOM = 2;
 
 /**
  * Where each member's panel goes. Wide: a party fills four columns of a 1200 px card, one character an 840 px card.
  * Square (for phones): 1080 × 1080, members two to a row, each panel with gear and abilities side by side.
+ * A single build in the square is the same panel drawn larger (`zoom`), centered.
  */
 export function cardLayout({ members, gearRows = 4, abilityRows = 1, square = false }) {
   const width = square ? SQUARE : members > 1 ? 1200 : 840;
@@ -47,8 +48,13 @@ export function cardLayout({ members, gearRows = 4, abilityRows = 1, square = fa
   const w = (width - PAD * 2 - GAP * (cols - 1)) / cols;
   const content = square ? 182 + Math.max(gearRows * 26, 24 + abilityRows * 22) + 8 : 182 + gearRows * 26 + 42 + abilityRows * 24;
   const height = square ? SQUARE : HEADER + 8 + content + FOOTER;
-  const h = square ? (height - HEADER - FOOTER - GAP * (rows - 1)) / rows : content;
-  const cells = Array.from({ length: members }, (_, i) => ({ x: PAD + (i % cols) * (w + GAP), y: HEADER + Math.floor(i / cols) * (h + GAP), w, h }));
+  const body = height - HEADER - FOOTER;
+  if (square && members === 1) {
+    const zoom = Math.min(MAX_ZOOM, body / content), h = content * zoom;
+    return { width, height, cells: [{ x: PAD, y: HEADER + (body - h) / 2, w, h, zoom }], split: true };
+  }
+  const h = square ? (body - GAP * (rows - 1)) / rows : content;
+  const cells = Array.from({ length: members }, (_, i) => ({ x: PAD + (i % cols) * (w + GAP), y: HEADER + Math.floor(i / cols) * (h + GAP), w, h, zoom: 1 }));
   return { width, height, cells, split: square };
 }
 const COLORS = { top: '#34509f', bottom: '#141f5c', frame: '#e9ecf8', ink: '#ffffff', dim: '#aab4dc', gold: '#ffd75e',
@@ -98,6 +104,13 @@ function drawWeaknesses(g, elements, x, y) {
     text(g, element, left + 23, y, { size: 15, weight: 700, color });
     left += width + 8;
   }
+}
+
+// Draws a member's panel in its cell, scaled by the cell's zoom.
+function drawCell(g, m, { x, y, w, h, zoom }, split, images) {
+  g.save(); g.translate(x, y); g.scale(zoom, zoom);
+  drawMember(g, m, { x: 0, y: 0, w: w / zoom, h: h / zoom }, split, images);
+  g.restore();
 }
 
 function drawMember(g, m, { x, y, w: COL, h }, split, images) {
@@ -160,7 +173,7 @@ export async function partyImage(card, { faces = {}, bossId = null, square = fal
   text(g, 'damage per round', W - PAD, 120, { size: 17, color: COLORS.dim, align: 'right' });
   if (card.change) text(g, card.change, W - PAD, 146, { size: 17, weight: 700, color: COLORS.good, align: 'right' });
 
-  card.members.forEach((m, i) => drawMember(g, m, cells[i], split, images));
+  card.members.forEach((m, i) => drawCell(g, m, cells[i], split, images));
   text(g, 'Resonance Battle Companion', PAD, height - 34, { size: 16, weight: 700 });
   text(g, SITE, W - PAD, height - 34, { size: 16, color: COLORS.dim, align: 'right' });
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The image could not be created.')), 'image/png'));

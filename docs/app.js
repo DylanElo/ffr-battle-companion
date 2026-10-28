@@ -1,8 +1,8 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
-import {createOptimizerController} from './optimizer-controller.js?v=43';
-import {comparison} from './optimizer-ui.js?v=42';
+import {createOptimizerController} from './optimizer-controller.js?v=44';
+import {comparison, shapeToggle} from './optimizer-ui.js?v=43';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
-import {shareCard, partyImage} from './share-image.js?v=4';
+import {shareCard, partyImage} from './share-image.js?v=5';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -385,7 +385,7 @@ function deepResult() {
     <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
     ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
     <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
-    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button></div>
+    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button>${shapeToggle(picture)}</div>
   </div>`;
 }
 
@@ -563,14 +563,13 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
   },
   canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)), shareParty });
 
-// Copies a picture of the party for Discord in the chosen shape. A single build is already compact, so it stays wide.
-// Browsers without image clipboard support get it as a download instead.
+// Copies a picture of the party or build for Discord in the chosen shape. Browsers without image clipboard support
+// get it as a download instead.
 async function shareParty(party, { enemyId, against, current, heading = 'Best party' }) {
   const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
   const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
-  const single = party.members.length === 1, square = !single && picture === 'square';
-  const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id, square });
-  const prefix = single ? `build-${name('characters', party.members[0].characterId)}` : 'party';
+    const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id, square: picture === 'square' });
+  const prefix = party.members.length === 1 ? `build-${name('characters', party.members[0].characterId)}` : 'party';
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })]);
     toast('Image copied. Paste it into Discord.');
