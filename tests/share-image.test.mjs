@@ -34,3 +34,6 @@ test('a long ability list ends with a count of the rest so the picture keeps its
 test('the card lists the boss weaknesses it was given, and none for any fight',()=>{
   assert.deepEqual([shareCard(party(),indexes,{weak:['Wind','Light']}).weak,shareCard(party(),indexes).weak],[['Wind','Light'],[]]);
 });
+test('a single build carries its own heading',()=>{
+  assert.equal(shareCard({members:[party().members[1]],evaluation:{damage:5645}},indexes,{heading:'Best build'}).heading,'Best build');
+});

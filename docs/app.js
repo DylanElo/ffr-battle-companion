@@ -2,7 +2,7 @@ import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
 import {createOptimizerController} from './optimizer-controller.js?v=42';
 import {comparison} from './optimizer-ui.js?v=41';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
-import {shareCard, partyImage} from './share-image.js?v=2';
+import {shareCard, partyImage} from './share-image.js?v=3';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -374,7 +374,18 @@ function deepResult() {
     <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
     ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
     <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
+    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button></div>
   </div>`;
+}
+
+// One character's Build result in the shape the party picture takes: one member, its fight damage as the total.
+function shareBuild() {
+  const d = ui.deep, r = d?.results?.[d.pick];
+  if (!r) return;
+  const damage = r.evaluation.fightDamage ?? r.evaluation.damage;
+  shareParty({ members: [{ ...r, evaluation: { ...r.evaluation, damage } }], evaluation: { damage } },
+    { enemyId: d.enemyId, against: d.enemyId === 'general' ? 'general' : 'enemy', heading: 'Best build',
+      current: d.current && { damage: d.current.fightDamage ?? d.current.damage } });
 }
 
 function equipTabs(native, v, available) {
@@ -542,15 +553,16 @@ const optimizerController = createOptimizerController({ getCatalog: () => catalo
   canEquip: () => !!saveFile, equipParty: members => applyPlans(partyPlans(members)), shareParty });
 
 // Copies a picture of the party for Discord. Browsers without image clipboard support get it as a download instead.
-async function shareParty(party, { enemyId, against, current }) {
+async function shareParty(party, { enemyId, against, current, heading = 'Best party' }) {
   const boss = against === 'general' ? null : index.enemies.get(Number(enemyId));
   const weak = boss ? enemyRes(boss).filter(([, r]) => r === 'Weakness').map(([e]) => e) : [];
-  const image = partyImage(shareCard(party, index, { title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id });
+  const image = partyImage(shareCard(party, index, { heading, title: boss ? `${boss.name} (Lv ${boss.level})` : 'Any fight', current, weak }), { faces, bossId: boss?.id });
+  const prefix = party.members.length === 1 ? `build-${name('characters', party.members[0].characterId)}` : 'party';
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })]);
     toast('Image copied. Paste it into Discord.');
   } catch {
-    try { download(await image, `party-${(boss?.name || 'any-fight').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`); toast('Image saved to your downloads.'); }
+    try { download(await image, `${prefix}-${boss?.name || 'any-fight'}`.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.png'); toast('Image saved to your downloads.'); }
     catch (e) { error(e.message); }
   }
 }
@@ -649,6 +661,7 @@ document.addEventListener('click', e => {
   }
   if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
   if (t.id === 'deep') { deepSearch(); return; }
+  if (t.id === 'share-build') { shareBuild(); return; }
   if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
   if (t.dataset.deepPick) { applyDeep(+t.dataset.deepPick); render(); return; }
   if (t.dataset.plan) {
