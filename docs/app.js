@@ -1,4 +1,4 @@
-import * as S from './save.js?v=21';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=1';
 import {createOptimizerController} from './optimizer-controller.js?v=39';
 import {comparison} from './optimizer-ui.js?v=39';
 import {gearExplanation, buildExplanation, estimateNotice, commandPlan, bonusActions, finishActions} from './build-details.js?v=9';
@@ -35,49 +35,6 @@ function toast(text) {
   clearTimeout(toast.timer); toast.timer = setTimeout(() => t.hidden = true, 3000);
 }
 function error(text = '') { $('#error').textContent = text; $('#error').hidden = !text; }
-
-// ---------- reading a save (same snapshot shape the desktop importer produced) ----------
-
-export async function readSave(file) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const save = await S.openSave(bytes), fields = S.parse(save.data), by = new Map(fields.map(f => [f.path, f.value]));
-  if (!by.has('Player.currentMoney')) throw new Error('That’s a settings file, not a game save. Pick a GameSaveData file.');
-  const rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const records = (root, key) => {
-    const re = new RegExp(`^${rx(root)}\\[(\\d+)\\]\\.${key}$`);
-    return [...new Set(fields.map(f => f.path.match(re)?.[1]).filter(Boolean).map(Number))].sort((a, b) => a - b);
-  };
-  const list = root => {
-    const re = new RegExp(`^${rx(root)}\\[(\\d+)\\]$`);
-    return fields.map(f => [f.path.match(re)?.[1], f.value]).filter(([i]) => i).sort((a, b) => a[0] - b[0]).map(([, v]) => Number(v));
-  };
-  const num = p => by.has(p) ? Number(by.get(p)) : null;
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-  return {
-    schemaVersion: 1,
-    source: { fileName: file.name, lastWriteUtc: new Date(file.lastModified).toISOString(), sha256: [...digest].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase() },
-    party: list('Party.partyList'),
-    inventory: records('inventory', 'ItemId').map(i => ({ id: num(`inventory[${i}].ItemId`), quantity: num(`inventory[${i}].Num`) })),
-    characters: records('unitParameterList', 'UnitId').map(i => {
-      const p = `unitParameterList[${i}].`;
-      return {
-        id: num(p + 'UnitId'), joinStatus: by.get(p + 'JoinStatus') ?? null, usable: by.get(p + 'IsUsable') ?? null,
-        experience: num(p + 'Experience'), hp: num(p + 'HitPoint'), mp: num(p + 'MagicPoint'),
-        equipment: { weaponId: num(p + 'EquipWeaponId'), armorId: num(p + 'EquipArmorId'), accessoryIds: list(p + 'EquipAccessoryIdList'), visionId: num(p + 'equipVisionId') },
-        baseParameters: list(p + 'baseParameterList'), equippedSkillIds: list(p + 'equipSkillList'), activeSkillIds: list(p + 'activeSkillIdList'),
-        rawFields: Object.fromEntries(fields.filter(f => f.path.startsWith(p)).map(f => [f.path.slice(p.length), f.value])),
-      };
-    }),
-    resonances: records('visionList', 'ID').map(i => {
-      const p = `visionList[${i}].`;
-      return { id: num(p + 'ID'), awakeningPoints: num(p + 'awakeningPoint'),
-        sync: records(p + 'synchroPoints', 'Key').map(j => ({ characterId: num(`${p}synchroPoints[${j}].Key`), points: num(`${p}synchroPoints[${j}].Value`) })),
-        rawFields: Object.fromEntries(fields.filter(f => f.path.startsWith(p)).map(f => [f.path.slice(p.length), f.value])) };
-    }),
-    player: Object.fromEntries(fields.filter(f => f.path.startsWith('Player.')).map(f => [f.path.slice(7), f.value])),
-    artifactOverrides: records('artifactList', 'Key').map(i => ({ id: num(`artifactList[${i}].Key`), active: by.get(`artifactList[${i}].Value.IsActive`) ?? null })),
-  };
-}
 
 async function loadSave(file) {
   error();
@@ -592,73 +549,11 @@ const download = (bytes, fileName) => {
   a.download = fileName; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
-// Writes every plan's gear, Resonance and abilities into a copy of the loaded save.
-// Only fixed-size ints change, so the file layout stays exactly the game's own.
-export async function savedWithPlans(bytes, snap, plans) {
-  const people = snap.characters.filter(C.joined), inventory = snap.inventory;
-  const save = await S.openSave(bytes);
-  let data = save.data;
-  const fields = S.parse(data), at = new Map(fields.map(f => [f.path, f]));
-  const set = (path, value) => { const f = at.get(path); if (!f) throw new Error(`The save has no ${path}.`); data = S.writeField(data, f, value); };
-  const have = new Map(inventory.map(i => [i.id, i.quantity])), used = new Map(), taken = new Map(), removed = [];
-  // Some gear (Fina's Loxley Bow) exists only as equipped, with no inventory entry; it is still owned.
-  const loose = new Map();
-  for (const c of snap.characters) for (const item of C.equipmentIds(c.equipment).map(Number)) if (item > 0 && !inventory.some(i => i.id === item)) loose.set(item, (loose.get(item) || 0) + 1);
-  for (const [item, n] of loose) have.set(item, n);
-  const use = (item, who) => {
-    const n = (used.get(item) || 0) + 1;
-    if (n > (have.get(item) || 0)) throw new Error(`Your plans use ${name('equipment', item)} ${n} times, but you own ${have.get(item) || 0}.`);
-    used.set(item, n);
-  };
-  for (const [id, plan] of Object.entries(plans)) {
-    for (const item of C.equipmentIds(plan)) use(Number(item));
-    const v = Number(plan.visionId);
-    if (v > 0 && taken.has(v)) throw new Error(`${name('characters', taken.get(v))} and ${name('characters', id)} are both planned with ${name('visions', v)}.`);
-    if (v > 0) taken.set(v, Number(id));
-  }
-  // Characters without a plan give up anything a plan needs, as the game's own equip screen would.
-  const changes = { ...plans };
-  for (const c of people) {
-    if (plans[c.id]) continue;
-    const e = c.equipment, keep = item => {
-      if (!(Number(item) > 0)) return item;
-      if ((used.get(Number(item)) || 0) < (have.get(Number(item)) || 0)) { use(Number(item)); return item; }
-      removed.push(`${name('characters', c.id)}: ${name('equipment', item)}`); return -1;
-    };
-    const next = { weaponId: keep(e.weaponId), armorId: keep(e.armorId), accessoryIds: e.accessoryIds.map(keep), visionId: e.visionId };
-    if (taken.has(Number(e.visionId))) { removed.push(`${name('characters', c.id)}: ${name('visions', e.visionId)}`); next.visionId = -1; }
-    if (JSON.stringify(next) !== JSON.stringify({ ...e, accessoryIds: e.accessoryIds })) changes[c.id] = next;
-  }
-  const row = new Map(fields.filter(f => /^unitParameterList\[\d+\]\.UnitId$/.test(f.path)).map(f => [Number(f.value), f.path.slice(0, -'UnitId'.length)]));
-  for (const [id, plan] of Object.entries(changes)) {
-    const p = row.get(Number(id)), saved = people.find(c => c.id === Number(id));
-    if (!p || !saved) continue;
-    set(p + 'EquipWeaponId', plan.weaponId); set(p + 'EquipArmorId', plan.armorId); set(p + 'equipVisionId', plan.visionId);
-    if (plan.accessoryIds.length !== saved.equipment.accessoryIds.length) throw new Error(`${name('characters', id)}'s plan has the wrong number of accessories.`);
-    plan.accessoryIds.forEach((a, i) => set(`${p}EquipAccessoryIdList[${i}]`, a));
-    const wanted = (plan.equippedSkillIds || []).map(Number);
-    if (!plan.equippedSkillIds?.length && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
-    // The plan's abilities first, then the ones already on, while they're learned and fit the slots and EquipCost budget.
-    const cost = id => Number((index.skills.get(id) || index.passives.get(id) || index.masterSkills.get(id))?.equipCost || 0);
-    const learn = CompanionStats.learned(catalog, snap, saved.id, plan.visionId), known = new Set([...learn.learnedPassiveIds, ...learn.learnedActiveIds, ...learn.masterSkillIds]);
-    const budget = Number(CompanionStats.characterStats(catalog, snap, saved.id, plan).skillBudget), slots = saved.equippedSkillIds.length;
-    const skills = [];
-    let spent = 0;
-    for (const id of [...wanted, ...saved.equippedSkillIds].map(Number)) {
-      if (!(id > 0) || skills.includes(id) || skills.length >= slots || spent + cost(id) > budget) continue;
-      if (!wanted.includes(id) && !known.has(id)) continue;
-      skills.push(id); spent += cost(id);
-    }
-    if (wanted.some(id => !skills.includes(id))) throw new Error(`${name('characters', id)}'s planned abilities don't fit its slots.`);
-    for (let i = 0; i < slots; i++) set(`${p}equipSkillList[${i}]`, skills[i] ?? -1);
-  }
-  return { bytes: await S.encodeSave(save, data), removed };
-}
-
 async function applyPlans() {
   try {
-    const original = new Uint8Array(await saveFile.arrayBuffer());
-    const { bytes: out, removed } = await savedWithPlans(original, snapshot, plans);
+    // Chrome refuses to read a picked file that changed on disk since it was picked.
+    const original = new Uint8Array(await saveFile.arrayBuffer().catch(() => { throw new Error(SAVE_CHANGED); }));
+    const { bytes: out, removed } = await savedWithPlans(original, snapshot, plans, { catalog, core: C, stats: globalThis.CompanionStats });
     const base = saveFile.name.replace(/\.sav$/i, '');
     download(original, `${base} (backup).sav`);
     download(out, saveFile.name);
