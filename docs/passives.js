@@ -1,6 +1,7 @@
 (function(root){
   'use strict';
-  const clean=value=>String(value??'').split('::').pop();
+  // Hot in the optimizer: native enum strings repeat, so memoize.
+  const cleaned=new Map(),clean=x=>{const s=String(x??'');let v=cleaned.get(s);if(v===undefined){v=s.split('::').pop();if(cleaned.size<50000)cleaned.set(s,v);}return v;};
   const elements=['None','Fire','Ice','Wind','Earth','Thunder','Water','Light','Dark'];
   const parameters=['None','HitPoint','MagicPoint','BreakPoint','LimitBurstPoint','Attack','Defence','Intelligence','Mind','Agility','Level','EquipCost','PhysicalAttack','PhysicalDefense','MagicalAttack','MagicalDefense','Divine','Role','SkillDamageType','AP'];
   const attributes=['None','Fight','ChaseAttack','Ability','Magic','LimitBurst','Item','Summon','Mechabo','FinishBlow','MixItem','Throw','ThrowMoney','Dualcast','Mimic','MagicSword','Escape'];

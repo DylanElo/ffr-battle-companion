@@ -1,6 +1,7 @@
 (function(root){
   'use strict';
-  const clean=value=>String(value??'').split('::').pop();
+  // Hot in the optimizer: native enum strings repeat, so memoize.
+  const cleaned=new Map(),clean=x=>{const s=String(x??'');let v=cleaned.get(s);if(v===undefined){v=s.split('::').pop();if(cleaned.size<50000)cleaned.set(s,v);}return v;};
   const f=Math.fround,EPS=f(2**-23);
   const parameterNames={1:'HitPoint',2:'MagicPoint',3:'BreakPoint',4:'LimitBurstPoint',5:'Attack',6:'Defence',7:'Intelligence',8:'Mind',9:'Agility',10:'Level',11:'EquipCost',12:'PhysicalAttack',13:'PhysicalDefense',14:'MagicalAttack',15:'MagicalDefense',16:'Divine'};
   const aliases={MaxHitPoint:'HitPoint',MaxMagicPoint:'MagicPoint',MaxBreakPoint:'BreakPoint',SkillEquipCost:'EquipCost'};
@@ -85,7 +86,21 @@
     byCharacter.set(Number(charId),context);
     return context;
   }
-  function characterStats(catalog,snapshot,charId,equipment,terms=[]){
+  // Stats depend only on the character, the equipped item ids and the effect terms. Callers reuse cached term arrays,
+  // so results are shared by identity; returned objects must be treated as read-only.
+  const statsCache=new WeakMap(),NO_TERMS=[];
+  function characterStats(catalog,snapshot,charId,equipment,terms=NO_TERMS){
+    const context=characterContext(catalog,snapshot,charId),gear=equipment||context.saved.equipment||{};
+    let byTerms=statsCache.get(context);
+    if(!byTerms)statsCache.set(context,byTerms=new WeakMap());
+    const termKey=terms.length?terms:NO_TERMS;
+    let byGear=byTerms.get(termKey);
+    if(!byGear)byTerms.set(termKey,byGear=new Map());
+    const key=[gear.weaponId,gear.armorId,...(gear.accessoryIds||[])].join(',');
+    if(!byGear.has(key))byGear.set(key,computeStats(catalog,snapshot,charId,gear,terms));
+    return byGear.get(key);
+  }
+  function computeStats(catalog,snapshot,charId,equipment,terms){
     const context=characterContext(catalog,snapshot,charId);
     const {saved,native,gained,sync,baseStats,seedStats,maxSkillSlots}=context;
     const warnings=[...context.warnings],equipmentStats={};

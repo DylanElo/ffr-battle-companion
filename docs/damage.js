@@ -10,7 +10,8 @@
   const DEFAULT_RULES = Object.freeze({atkDefRandomMag:0.05,criticalDamageMagnification:150,
     breakDamageMagnification:150,exPhaseDamageMagnification:100,allDamageMagnification:40,
     maxEscapeDamageMul:3});
-  const clean=x=>String(x??'').split('::').pop();
+  // Hot in the optimizer: native enum strings repeat, so memoize.
+  const cleaned=new Map(),clean=x=>{const s=String(x??'');let v=cleaned.get(s);if(v===undefined){v=s.split('::').pop();if(cleaned.size<50000)cleaned.set(s,v);}return v;};
   function finite(name,value,min=-Infinity,max=Infinity) {
     if(!Number.isFinite(value) || value<min || value>max)throw new RangeError(`${name} must be finite in [${min}, ${max}].`);
     return value;
