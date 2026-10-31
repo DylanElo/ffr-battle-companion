@@ -55,7 +55,8 @@
     if (state.cache.has(key)) return state.cache.get(key);
     if (stopped(state)) return null;
     state.evaluations++;
-    const evaluation = callbacks.evaluate({characterId,visionId,equipment,enemy:callbacks.enemy,options:state.options});
+    const evaluation = callbacks.evaluate({characterId,visionId,equipment,enemy:callbacks.enemy,options:state.options,
+      ...(state.options.locks?.skillIds?.length?{lockedSkillIds:state.options.locks.skillIds}:{})});
     if (!evaluation || evaluation.valid===false || !Number.isFinite(Number(evaluation.score))) {
       state.cache.set(key,null);return null;
     }
@@ -87,20 +88,36 @@
     if (!native || !saved || !C.joined(saved)) return [];
     const equipment=new Map(catalog.equipment.map(e=>[e.id,e]));
     const legal=(id,slot)=>Number(id)>0 && (available.get(Number(id))||0)>0 && C.eligible(equipment.get(Number(id)),native,slot);
-    const weaponIds=[-1,...catalog.equipment.filter(e=>legal(e.id,'weapon')).map(e=>e.id)];
-    const armorIds=[-1,...catalog.equipment.filter(e=>legal(e.id,'armor')).map(e=>e.id)];
+    // Pinned pieces (options.locks, from lockedPieces) are fixed; one that can't be satisfied leaves nothing to search.
+    const locks=options.locks || {};
+    const lockedAcc=(locks.accessoryIds || []).filter(positive).map(Number);
+    const lockedCounts=countsOf(lockedAcc);
+    if ((positive(locks.weaponId) && !legal(locks.weaponId,'weapon')) || (positive(locks.armorId) && !legal(locks.armorId,'armor')) ||
+      lockedAcc.some(id=>!legal(id,'accessory')) || [...lockedCounts].some(([id,n])=>n>(available.get(id)||0))) return [];
+    const weaponIds=positive(locks.weaponId)?[Number(locks.weaponId)]:[-1,...catalog.equipment.filter(e=>legal(e.id,'weapon')).map(e=>e.id)];
+    const armorIds=positive(locks.armorId)?[Number(locks.armorId)]:[-1,...catalog.equipment.filter(e=>legal(e.id,'armor')).map(e=>e.id)];
     const accessoryIds=[-1,...catalog.equipment.filter(e=>legal(e.id,'accessory')).map(e=>e.id)].sort((a,b)=>a-b);
     const slots=(saved.equipment.accessoryIds || []).length;
     if (slots>4) throw new Error('Unsupported accessory slot count.');
-    const accessories=accessorySets(accessoryIds,slots,available);
-    const base={weaponId:legal(saved.equipment.weaponId,'weapon')?saved.equipment.weaponId:-1,
-      armorId:legal(saved.equipment.armorId,'armor')?saved.equipment.armorId:-1,
+    if (lockedAcc.length>slots) return [];
+    const holdsLocks=set=>{const have=countsOf(set);return [...lockedCounts].every(([id,n])=>(have.get(id)||0)>=n);};
+    const accessories=accessorySets(accessoryIds,slots,available).filter(holdsLocks);
+    const base={weaponId:positive(locks.weaponId)?Number(locks.weaponId):legal(saved.equipment.weaponId,'weapon')?saved.equipment.weaponId:-1,
+      armorId:positive(locks.armorId)?Number(locks.armorId):legal(saved.equipment.armorId,'armor')?saved.equipment.armorId:-1,
       accessoryIds:(saved.equipment.accessoryIds || []).map(id=>legal(id,'accessory')?id:-1)};
-    if (!fits(base,available)) base.accessoryIds=Array(slots).fill(-1);
+    if (lockedAcc.length) {
+      // Pinned accessories first, then the saved ones that aren't already covering a pin.
+      const spare=new Map(lockedCounts);
+      const rest=base.accessoryIds.filter(id=>!(spare.get(id)>0 && spare.set(id,spare.get(id)-1)));
+      base.accessoryIds=[...lockedAcc,...rest].slice(0,slots);
+      while (base.accessoryIds.length<slots) base.accessoryIds.push(-1);
+    }
+    if (!fits(base,available)) base.accessoryIds=[...lockedAcc,...Array(slots-lockedAcc.length).fill(-1)];
     const owned=new Set((snapshot.resonances || []).map(v=>v.id));
     // Try every Resonance with the saved gear first, then search the strongest first, each with an equal share of the
     // remaining time, so a time budget can't end the search before the best (or the saved) Resonance is tried.
-    const pool=[...(options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
+    if (positive(locks.visionId) && !owned.has(Number(locks.visionId))) return [];
+    const pool=[...(positive(locks.visionId)?[Number(locks.visionId)]:options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
       .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
     const seeds=new Map(pool.map(id=>[id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id})]));
     const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || (seeds.get(b)?.score ?? -Infinity)-(seeds.get(a)?.score ?? -Infinity));
@@ -112,6 +129,7 @@
       let attempts=0;
       const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())/(visions.length-n):Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
+        if ((positive(locks.weaponId) && weaponId!==weaponIds[0]) || (positive(locks.armorId) && armorId!==armorIds[0]) || !holdsLocks(accessoryIds)) return true;
         const equip={weaponId,armorId,accessoryIds,visionId},key=keyOf(equip);
         if (local.has(key)) return true;
         if (attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd) return false;
