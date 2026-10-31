@@ -159,3 +159,18 @@ test('an abilities-only plan over the AP budget is refused', async () => {
   const tight = { ...deps, stats: { ...stats, characterStats: (...args) => ({ ...stats.characterStats(...args), skillBudget: 0 }) } };
   await assert.rejects(savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight), /planned abilities don't fit/);
 });
+
+test('a plan matching a padded save is skipped, even with no AP budget', async () => {
+  const { file, snapshot, skill } = await withSkill();
+  assert.ok(character(snapshot, 1001).equippedSkillIds.includes(-1), 'saved list is padded with -1');
+  const tight = { ...deps, stats: { ...stats, characterStats: (...args) => ({ ...stats.characterStats(...args), skillBudget: 0 }) } };
+  const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight);
+  assert.deepEqual(bytes, file);
+});
+
+test('a plan whose set differs from a padded save is still written', async () => {
+  const { file, snapshot, skill } = await withSkill();
+  const other = stats.learned(catalog, snapshot, 1001, amelia).learnedActiveIds.find(id => costly(id) && id !== skill);
+  const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [other] } }, deps);
+  assert.deepEqual(character(await load(bytes), 1001).equippedSkillIds.filter(id => id > 0), [other]);
+});

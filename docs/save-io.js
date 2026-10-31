@@ -108,7 +108,8 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
     plan.accessoryIds.forEach((a, i) => set(`${p}EquipAccessoryIdList[${i}]`, a));
     const explicit = Array.isArray(plan.equippedSkillIds), wanted = (plan.equippedSkillIds || []).map(Number);
     // A plan that lists abilities is exact (an empty list clears them); one without keeps what is on while it still fits.
-    const same = explicit ? wanted.length === saved.equippedSkillIds.length && wanted.every(id => saved.equippedSkillIds.includes(id)) : true;
+    const on = saved.equippedSkillIds.map(Number).filter(id => id > 0), want = wanted.filter(id => id > 0);
+    const same = explicit ? want.length === on.length && want.every(id => on.includes(id)) : true;
     if (same && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
     // The plan's abilities first, then the ones already on, while they're learned and fit the slots and EquipCost budget.
     const cost = id => Number((index.skills.get(id) || index.passives.get(id) || index.masterSkills.get(id))?.equipCost || 0);

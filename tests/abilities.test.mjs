@@ -44,3 +44,15 @@ test('withAbilities makes an untouched draft stringify like the saved build', ()
   assert.equal(JSON.stringify(withAbilities(saved.equipment, saved)), JSON.stringify(withAbilities(withAbilities(saved.equipment, saved), saved)));
   assert.deepEqual(withAbilities({ weaponId: 1, equippedSkillIds: [] }, saved).equippedSkillIds, []);
 });
+
+test('padded empty slots (-1) are not used slots', () => {
+  const l = learned({ maxSkillSlots: 3 });
+  assert.equal(abilityLoad([2, -1, -1], l, indexes).slots, 1);
+  assert.equal(canEquip(3, [2, -1, -1], l, indexes), '');
+});
+test('withAbilities drops empty slots and is stable', () => {
+  const saved = { equipment: { weaponId: 1 }, equippedSkillIds: [2, -1, -1] };
+  const once = withAbilities(saved.equipment, saved);
+  assert.deepEqual(once.equippedSkillIds, [2]);
+  assert.equal(JSON.stringify(withAbilities(once, saved)), JSON.stringify(once));
+});

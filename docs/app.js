@@ -1,10 +1,10 @@
-import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=3';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=4';
 import {createOptimizerController} from './optimizer-controller.js?v=43';
 import {comparison} from './optimizer-ui.js?v=42';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=4';
 import {renderSlot, renderAbilityList} from './slot-ui.js?v=2';
-import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild} from './abilities.js?v=2';
+import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild} from './abilities.js?v=3';
 import {describeItem, describeAbility} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;

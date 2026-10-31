@@ -10,7 +10,7 @@ export function equippableAbilities(learned, indexes) {
 }
 
 export function abilityLoad(ids, learned, indexes) {
-  return { used: ids.reduce((sum, id) => sum + costOf(id, indexes), 0), budget: Number(learned.skillBudget) || 0, slots: ids.length, maxSlots: Number(learned.maxSkillSlots) || 0 };
+  return { used: ids.reduce((sum, id) => sum + costOf(id, indexes), 0), budget: Number(learned.skillBudget) || 0, slots: ids.filter(id => id > 0).length, maxSlots: Number(learned.maxSkillSlots) || 0 };
 }
 
 /** '' when the ability fits, otherwise the reason it does not. */
@@ -26,8 +26,8 @@ export function dropUnavailable(ids, learned) {
   return { kept: ids.filter(id => ok.has(id)), dropped: ids.filter(id => !ok.has(id)) };
 }
 
-/** A build with its abilities filled in (from `saved` when it has none), so builds compare and stringify alike. */
-export const withAbilities = (build, saved) => ({ ...structuredClone(build), equippedSkillIds: [...(build.equippedSkillIds ?? saved?.equippedSkillIds ?? [])] });
+/** A build with its abilities filled in (from `saved` when it has none), empty (-1) slots dropped, so builds compare and stringify alike. */
+export const withAbilities = (build, saved) => ({ ...structuredClone(build), equippedSkillIds: (build.equippedSkillIds ?? saved?.equippedSkillIds ?? []).filter(id => id > 0) });
 
 /** `learned` for a build. The AP budget follows the build's gear (EquipCost), not the saved gear stats.learned assumes. */
 export function learnedForBuild(stats, catalog, snapshot, charId, build) {
