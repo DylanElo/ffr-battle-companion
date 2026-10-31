@@ -12,7 +12,7 @@ const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['party', 'Party'], ['bosses', 'Bosses'], ['characters', 'Characters'], ['resonances', 'Resonances']];
+const VIEWS = [['characters', 'Characters'], ['bosses', 'Bosses'], ['resonances', 'Resonances'], ['party', 'Team ideas']];
 const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new';
 
 let goals = {};
@@ -24,7 +24,7 @@ function setGoal(charId, patch) {
   goals[charId] = { ...goalFor(charId), ...patch };
   try { localStorage.setItem(goalsKey(), JSON.stringify(goals)); } catch {}
 }
-let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
+let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'characters', pending = null;
 // enemyId is the Party page's boss, bossId the one browsed on Bosses; the Characters build target lives in goalFor(charId).
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, perspective: 0, charId: 0,
   reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'abilities', deep: null, openSlot: null,
@@ -90,7 +90,7 @@ export function loadSnapshot(parsed) {
   try { goals = JSON.parse(localStorage.getItem(goalsKey())) || {}; } catch { goals = {}; }
   const people = recruited(), first = snapshot.party.find(id => people.some(c => c.id === id)) ?? people[0]?.id ?? 0;
   ui.charId = ui.perspective = first; ui.ownedOnly = true;
-  ui.enemyId = ui.bossId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'party';
+  ui.enemyId = ui.bossId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'characters';
   setDraft();
   render();
   toast(`Loaded ${snapshot.source.fileName}`);
@@ -144,8 +144,8 @@ function suggestedBoss() {
 
 function welcome() {
   return `<section class="window welcome">
-    <h2>The best party for your next boss</h2>
-    <p class="sub">Load your save, pick a boss, then equip the party in one click.</p>
+    <h2>Build your characters, one at a time</h2>
+    <p class="sub">Load your save, pick a character and a goal, place the gear and Resonance you want, then keep it as a plan.</p>
     <div class="toolbar"><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}</div>
     <p class="dim small">Your save stays on your computer. Nothing is uploaded.</p>
     <p class="dim small">No save handy? Look up <button type="button" class="ghost" data-view="bosses">bosses</button> or <button type="button" class="ghost" data-view="resonances">Resonances</button>.</p>
@@ -163,7 +163,7 @@ function party() {
         <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', next' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
       ${!general && enemy ? `<div class="boss-summary">${bossCard(enemy)}</div>` : ''}
     </section>
-    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
+    <section class="window"><h3>Parties worth trying, not a proven best</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
   </div>`;
 }
 
