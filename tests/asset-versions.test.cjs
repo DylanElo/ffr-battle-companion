@@ -41,3 +41,9 @@ test('every versioned reference points at a file that exists',()=>{
   const absent=references().filter(r=>!fs.existsSync(path.join(docs,r.file))).map(r=>`${r.from} → ${r.file}`);
   assert.deepEqual(absent,[]);
 });
+
+test('the optimizer worker imports each script at the version the site loads',()=>{
+  const site=new Map(references().filter(r=>r.from!=='optimizer-worker.js').map(r=>[r.file,r.version]));
+  const stale=references().filter(r=>r.from==='optimizer-worker.js' && site.has(r.file) && site.get(r.file)!==r.version).map(r=>`${r.file}: worker ${r.version}, site ${site.get(r.file)}`);
+  assert.deepEqual(stale,[]);
+});

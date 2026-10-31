@@ -223,3 +223,41 @@ test('the search ranks parties on a few samples and scores every party it shows 
     evaluateParty:(members,{samples}={})=>{requested.push(samples);return {score:members.reduce((sum,m)=>sum+m.score,0),samples:samples ?? 'all'};}});
   assert.deepEqual([requested.includes(4),result.results.map(r=>r.evaluation.samples)],[true,['all','all','all']]);
 });
+
+test('pinned pieces restrict the search, reach the evaluator and survive the seed',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const run=(locks,extra={},evaluate=({equipment})=>({score:equipment.accessoryIds.filter(id=>id===32).length+(equipment.weaponId===10?5:0)}))=>
+    S.buildCandidates(catalog,snapshot,1,{evaluate},{...options,locks,...extra});
+  assert.ok(run({weaponId:-1}).some(c=>c.equipment.weaponId===10),'a lock without an id is ignored');
+  const armored=run({armorId:20});
+  assert.ok(armored.length>0&&armored.every(c=>c.equipment.armorId===20));
+  const weaponless=run({weaponId:10},{maxEvaluations:3});
+  assert.ok(weaponless.length>0&&weaponless.every(c=>c.equipment.weaponId===10),'seed uses the pin under a tiny budget');
+  const withAccessory=run({accessoryIds:[31]});
+  assert.ok(withAccessory.length>0&&withAccessory.every(c=>c.equipment.accessoryIds.includes(31)));
+  const vision=run({visionId:101},{visionIds:[100]});
+  assert.ok(vision.length===0,'unowned pinned Resonance cannot be satisfied');
+  snapshot.resonances.push({id:101});catalog.visions.push({id:101,name:'V'});
+  const pinnedVision=run({visionId:101},{visionIds:[100]});
+  assert.ok(pinnedVision.length>0&&pinnedVision.every(c=>c.visionId===101));
+  let seen;
+  run({skillIds:[7,8]},{},input=>{seen=input.lockedSkillIds;return {score:1};});
+  assert.deepEqual(seen,[7,8]);
+  run({},{},input=>{assert.equal('lockedSkillIds' in input,false);return {score:1};});
+});
+
+test('pinning every slot yields exactly that build; impossible pins return no candidates',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const evaluate=()=>({score:1});
+  const all=S.buildCandidates(catalog,snapshot,1,{evaluate},{...options,locks:{weaponId:10,armorId:20,accessoryIds:[30,31]}});
+  assert.equal(all.length,2,'one loadout per Resonance (owned one and none)');
+  assert.ok(all.every(c=>c.equipment.weaponId===10&&c.equipment.armorId===20&&c.equipment.accessoryIds.join()==='30,31'));
+  const twice=S.buildCandidates(catalog,snapshot,1,{evaluate},{...options,locks:{accessoryIds:[32,32]}});
+  assert.ok(twice.length>0&&twice.every(c=>c.equipment.accessoryIds.join()==='32,32'));
+  const none=locks=>S.buildCandidates(catalog,snapshot,1,{evaluate},{...options,locks});
+  assert.deepEqual(none({accessoryIds:[30,30]}),[],'only one copy of 30');
+  assert.deepEqual(none({accessoryIds:[30,31,32]}),[],'more pins than slots');
+  assert.deepEqual(none({weaponId:99}),[]);
+  assert.deepEqual(none({armorId:10}),[],'ineligible slot');
+  assert.deepEqual(none({weaponId:10}).length>0,true);
+});

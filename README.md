@@ -1,13 +1,16 @@
 # Resonance Battle Companion
 
-**The best party for your next boss in FINAL FANTASY RESONANCE, equipped in one click.**
+**Build your FINAL FANTASY RESONANCE characters one at a time, with every piece explained, and equip them in one click.**
 **https://dylanelo.github.io/ffr-battle-companion/**
 
 ![A party built for Gogmagog](docs/img/readme-party.webp)
 
 1. **Load your save.** It's in `%LOCALAPPDATA%\FFRS\Steam`, inside the numbered folder.
-2. **Pick a boss.** The page opens on your next one.
-3. **Equip in my save**, then swap the downloaded file into your save folder.
+2. **Pick a character and a goal.** Place and pin the gear and Resonance you want, add abilities, and let Build fill the rest. Each piece shows what it does.
+3. **Keep as plan**, then move on to the next character: gear you have kept is reserved.
+4. **Equip in my save**, then swap the downloaded file into your save folder.
+
+Team ideas is a shortlist of parties worth trying, not a proven best.
 
 Your save is read in your browser and never uploaded. Without a save you can still look up every boss and Resonance.
 
@@ -27,8 +30,9 @@ Evidence and limits: [model notes](docs/model-notes.md), [combat](docs/combat-ve
 
 Static files in [`docs/`](docs), no build step: `python -m http.server -d docs`. Tests: `node --test` (Node 22+); CI runs the same command. Tests that need the local desktop importer and a real save skip without it.
 
-- [`docs/app.js`](docs/app.js): the interface. Party (home), Bosses, Characters and Resonances.
+- [`docs/app.js`](docs/app.js): the interface. Characters (home), Bosses, Resonances and Team ideas.
 - [`docs/optimizer-ui.js`](docs/optimizer-ui.js) and [`docs/build-details.js`](docs/build-details.js): results as the move, gear, abilities and always-on effects; each opens to the game's description and what it adds.
+- [`docs/piece-details.js`](docs/piece-details.js), [`docs/slot-ui.js`](docs/slot-ui.js) and [`docs/abilities.js`](docs/abilities.js): the game's description of a piece, one gear or Resonance slot with its choices, and manually equipped abilities with their AP cost.
 - [`docs/core.js`](docs/core.js): stock, reservations, recommendations and mastery rules.
 - [`docs/save.js`](docs/save.js): the encrypted save format. [`docs/save-io.js`](docs/save-io.js) reads a save into a snapshot and writes plans into a copy of it, refusing a save that changed after it was loaded.
 - [`docs/damage.js`](docs/damage.js), [`docs/passives.js`](docs/passives.js) and [`docs/stats.js`](docs/stats.js): native-formula damage, supported effect rules and saved-progression stat derivation.

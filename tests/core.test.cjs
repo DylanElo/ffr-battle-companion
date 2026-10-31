@@ -136,3 +136,63 @@ test('resonance facts tag breaks, statuses and support with the right targets',(
   assert.ok(core.matchFacts(facts,{elements:['Light']}));
   assert.equal(core.matchFacts(facts,{calcs:['Magic']}),null);
 });
+
+test('emptyLocks has one unpinned entry per accessory slot',()=>{
+  assert.deepEqual(core.emptyLocks(2),{vision:false,weapon:false,armor:false,accessories:[false,false],skillIds:[]});
+  assert.deepEqual(core.emptyLocks(0).accessories,[]);
+});
+
+test('lockedPieces keeps only locked, set pieces; a locked empty slot is not a pin',()=>{
+  const plan={visionId:13001,weaponId:101,armorId:-1,accessoryIds:[301,-1],equippedSkillIds:[5,6]};
+  const locks={vision:true,weapon:true,armor:true,accessories:[false,true],skillIds:[6,9]};
+  assert.deepEqual(core.lockedPieces({...plan,locks}),{visionId:13001,weaponId:101,armorId:null,accessoryIds:[],skillIds:[6]});
+  assert.deepEqual(core.lockedPieces({...plan,accessoryIds:[301,302],locks}).accessoryIds,[302]);
+  assert.deepEqual(core.lockedPieces({...plan,locks:core.emptyLocks(2)}),{visionId:null,weaponId:null,armorId:null,accessoryIds:[],skillIds:[]});
+});
+
+test('checkLocks reports a pin whose only copy another plan holds, and passes a free item',()=>{
+  const {catalog,snapshot}=fixture();
+  const locks={...core.emptyLocks(2),weapon:true};
+  const plan=w=>({weaponId:w,armorId:-1,accessoryIds:[-1,-1],visionId:-1,locks});
+  assert.equal(core.checkLocks(catalog,snapshot,1001,plan(101),{},true),'');
+  const others={1002:{weaponId:101,armorId:-1,accessoryIds:[-1],visionId:-1}};
+  assert.equal(core.checkLocks(catalog,snapshot,1001,plan(101),others,true),'No unreserved copy of Sword.');
+});
+
+test('checkLocks works for a character with no accessory slots',()=>{
+  const {catalog,snapshot}=fixture();
+  snapshot.characters[0].equipment={...snapshot.characters[0].equipment,accessoryIds:[]};
+  const plan={weaponId:101,armorId:-1,accessoryIds:[],visionId:-1,locks:{...core.emptyLocks(0),weapon:true}};
+  assert.equal(core.checkLocks(catalog,snapshot,1001,plan,{},true),'');
+});
+
+test('withLocks adds unpinned locks without touching existing ones',()=>{
+  const b={weaponId:1,accessoryIds:[2]};
+  assert.deepEqual(core.withLocks(b,1).locks,core.emptyLocks(1));
+  const l={...core.emptyLocks(1),weapon:true};
+  assert.equal(core.withLocks({...b,locks:l},1).locks,l);
+  assert.equal(b.locks,undefined);
+});
+
+test('searchOptionsFor pins the Resonance only when it is pinned and set',()=>{
+  const plan={weaponId:101,armorId:-1,visionId:13001,accessoryIds:[-1],equippedSkillIds:[],locks:{vision:true,weapon:true,armor:false,accessories:[false],skillIds:[]}};
+  assert.deepEqual(core.searchOptionsFor(plan).visionIds,[13001]);
+  assert.equal(core.searchOptionsFor(plan).locks.weaponId,101);
+  assert.equal(core.searchOptionsFor({...plan,locks:{...plan.locks,vision:false}}).visionIds,null);
+  assert.equal(core.searchOptionsFor({...plan,visionId:-1}).visionIds,null);
+  assert.equal(core.searchOptionsFor({...plan,locks:undefined}).visionIds,null);
+});
+
+test('normalizeGoal defaults and clamps', () => {
+  const n = (raw) => core.normalizeGoal(raw, [7, 8]);
+  assert.deepEqual(n({goals: []}).goals, ['damage']);
+  assert.deepEqual(n(undefined).goals, ['damage']);
+  assert.deepEqual(n({goals: ['bogus', 'stagger']}).goals, ['stagger']);
+  assert.equal(n({enemyId: 99}).enemyId, 'general');
+  assert.equal(n({enemyId: 8}).enemyId, 8);
+  assert.equal(n({incomingDamage: -5}).incomingDamage, 0);
+  assert.equal(n({incomingDamage: 1e12}).incomingDamage, 99999999);
+  assert.equal(n({incomingDamage: '12.9'}).incomingDamage, 12);
+  assert.equal(n({}).incomingType, 'Physic');
+  assert.equal(n({incomingType: 'Magic'}).incomingType, 'Magic');
+});

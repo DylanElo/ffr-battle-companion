@@ -138,6 +138,31 @@
     if(Number(plan.visionId)>0 && (snapshot.characters || []).some(c=>c.id!==Number(id) && joined(c) && (plans[c.id] || (reserve?c.equipment:null))?.visionId===Number(plan.visionId))) return 'Resonance is reserved on another character. Release their reservation first.';
     return '';
   }
+  function emptyLocks(accessorySlots) { return {vision:false,weapon:false,armor:false,accessories:Array(accessorySlots).fill(false),skillIds:[]}; }
+  /** The build with its pins, unpinned when it has none, so builds with and without locks compare alike. */
+  function withLocks(build,accessorySlots) { return {...build,locks:build.locks ?? emptyLocks(accessorySlots)}; }
+  const pinned=(on,id)=>on && Number(id)>0 ? Number(id) : null;
+  function lockedPieces(plan) {
+    const locks=plan.locks || emptyLocks(0), equipped=new Set(plan.equippedSkillIds || []);
+    return {
+      visionId:pinned(locks.vision,plan.visionId),weaponId:pinned(locks.weapon,plan.weaponId),armorId:pinned(locks.armor,plan.armorId),
+      accessoryIds:(plan.accessoryIds || []).filter((id,i)=>pinned(locks.accessories?.[i],id)),
+      skillIds:(locks.skillIds || []).filter(id=>id>0 && equipped.has(id)),
+    };
+  }
+  /** What the build search gets from a plan's pins: the pieces to keep, and the one Resonance to build around (null = search all owned). */
+  function searchOptionsFor(plan) {
+    const locks=lockedPieces(plan);
+    return {locks,visionIds:locks.visionId?[locks.visionId]:null};
+  }
+  /** '' when the pinned pieces alone could be worn together; otherwise validPlan's reason. */
+  function checkLocks(catalog,snapshot,characterId,plan,plans={},reserve=true) {
+    const locks=plan.locks || emptyLocks(0), keep=(on,id)=>pinned(on,id) ?? -1;
+    return validPlan(catalog,snapshot,characterId,{
+      weaponId:keep(locks.weapon,plan.weaponId),armorId:keep(locks.armor,plan.armorId),visionId:keep(locks.vision,plan.visionId),
+      accessoryIds:plan.accessoryIds.map((id,i)=>keep(locks.accessories?.[i],id)),
+    },plans,reserve);
+  }
   function mastery(vision,owned,characterId) {
     const awake = Number(owned?.awakeningPoints || 0);
     const sync = Number((owned?.sync || []).find(x=>x.characterId===Number(characterId))?.points || 0);
@@ -243,7 +268,14 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,mastery,accessibleSkills,encounterOptions};
+  const GOAL_IDS=['damage','stagger','limit','durability'];
+  function normalizeGoal(raw,bossIds=[]) {
+    const goals=GOAL_IDS.filter(g=>Array.isArray(raw?.goals)&&raw.goals.includes(g));
+    const dmg=Math.trunc(Number(raw?.incomingDamage));
+    return {goals:goals.length?goals:['damage'],enemyId:raw?.enemyId!=='general'&&bossIds.includes(Number(raw?.enemyId))?Number(raw.enemyId):'general',
+      incomingDamage:Number.isFinite(dmg)?Math.max(0,Math.min(99999999,dmg)):0,incomingType:raw?.incomingType==='Magic'?'Magic':'Physic'};
+  }
+  const api={normalizeGoal,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

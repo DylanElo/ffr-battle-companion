@@ -106,15 +106,18 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
     set(p + 'EquipWeaponId', plan.weaponId); set(p + 'EquipArmorId', plan.armorId); set(p + 'equipVisionId', plan.visionId);
     if (plan.accessoryIds.length !== saved.equipment.accessoryIds.length) throw new Error(`${name('characters', id)}'s plan has the wrong number of accessories.`);
     plan.accessoryIds.forEach((a, i) => set(`${p}EquipAccessoryIdList[${i}]`, a));
-    const wanted = (plan.equippedSkillIds || []).map(Number);
-    if (!plan.equippedSkillIds?.length && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
+    const explicit = Array.isArray(plan.equippedSkillIds), wanted = (plan.equippedSkillIds || []).map(Number);
+    // A plan that lists abilities is exact (an empty list clears them); one without keeps what is on while it still fits.
+    const on = saved.equippedSkillIds.map(Number).filter(id => id > 0), want = wanted.filter(id => id > 0);
+    const same = explicit ? want.length === on.length && want.every(id => on.includes(id)) : true;
+    if (same && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
     // The plan's abilities first, then the ones already on, while they're learned and fit the slots and EquipCost budget.
     const cost = id => Number((index.skills.get(id) || index.passives.get(id) || index.masterSkills.get(id))?.equipCost || 0);
     const learn = stats.learned(catalog, snap, saved.id, plan.visionId), known = new Set([...learn.learnedPassiveIds, ...learn.learnedActiveIds, ...learn.masterSkillIds]);
     const budget = Number(stats.characterStats(catalog, snap, saved.id, plan).skillBudget), slots = saved.equippedSkillIds.length;
     const skills = [];
     let spent = 0;
-    for (const id of [...wanted, ...saved.equippedSkillIds].map(Number)) {
+    for (const id of (explicit ? wanted : [...wanted, ...saved.equippedSkillIds]).map(Number)) {
       if (!(id > 0) || skills.includes(id) || skills.length >= slots || spent + cost(id) > budget) continue;
       if (!wanted.includes(id) && !known.has(id)) continue;
       skills.push(id); spent += cost(id);

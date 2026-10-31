@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=21', 'passives.js?v=24', 'damage.js?v=6', 'stats.js?v=22', 'battle.js?v=35', 'search.js?v=27');
+importScripts('core.js?v=24', 'passives.js?v=24', 'damage.js?v=6', 'stats.js?v=22', 'battle.js?v=36', 'search.js?v=28');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
