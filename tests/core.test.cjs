@@ -182,3 +182,17 @@ test('searchOptionsFor pins the Resonance only when it is pinned and set',()=>{
   assert.equal(core.searchOptionsFor({...plan,visionId:-1}).visionIds,null);
   assert.equal(core.searchOptionsFor({...plan,locks:undefined}).visionIds,null);
 });
+
+test('normalizeGoal defaults and clamps', () => {
+  const n = (raw) => core.normalizeGoal(raw, [7, 8]);
+  assert.deepEqual(n({goals: []}).goals, ['damage']);
+  assert.deepEqual(n(undefined).goals, ['damage']);
+  assert.deepEqual(n({goals: ['bogus', 'stagger']}).goals, ['stagger']);
+  assert.equal(n({enemyId: 99}).enemyId, 'general');
+  assert.equal(n({enemyId: 8}).enemyId, 8);
+  assert.equal(n({incomingDamage: -5}).incomingDamage, 0);
+  assert.equal(n({incomingDamage: 1e12}).incomingDamage, 99999999);
+  assert.equal(n({incomingDamage: '12.9'}).incomingDamage, 12);
+  assert.equal(n({}).incomingType, 'Physic');
+  assert.equal(n({incomingType: 'Magic'}).incomingType, 'Magic');
+});

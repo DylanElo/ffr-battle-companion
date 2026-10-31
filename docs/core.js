@@ -268,7 +268,14 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
+  const GOAL_IDS=['damage','stagger','limit','durability'];
+  function normalizeGoal(raw,bossIds=[]) {
+    const goals=GOAL_IDS.filter(g=>Array.isArray(raw?.goals)&&raw.goals.includes(g));
+    const dmg=Math.trunc(Number(raw?.incomingDamage));
+    return {goals:goals.length?goals:['damage'],enemyId:raw?.enemyId!=='general'&&bossIds.includes(Number(raw?.enemyId))?Number(raw.enemyId):'general',
+      incomingDamage:Number.isFinite(dmg)?Math.max(0,Math.min(99999999,dmg)):0,incomingType:raw?.incomingType==='Magic'?'Magic':'Physic'};
+  }
+  const api={normalizeGoal,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
