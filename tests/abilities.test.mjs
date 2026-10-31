@@ -56,3 +56,32 @@ test('withAbilities drops empty slots and is stable', () => {
   assert.deepEqual(once.equippedSkillIds, [2]);
   assert.equal(JSON.stringify(withAbilities(once, saved)), JSON.stringify(once));
 });
+
+import { applyBuildResult } from '../docs/abilities.js';
+const draftOf = (locks, over = {}) => ({ weaponId: 101, armorId: 201, accessoryIds: [301, 302, 303], visionId: 13001, equippedSkillIds: [2], recommendedActionId: 0,
+  locks: { vision: false, weapon: false, armor: false, accessories: [false, false, false], skillIds: [], ...locks }, ...over });
+const found = (over = {}) => ({ equipment: { weaponId: 102, armorId: 202, accessoryIds: [311, 312, 313] }, visionId: 13002, evaluation: { equippedSkillIds: [3], skillId: 9 }, ...over });
+const fits = () => learned();
+
+test('applyBuildResult keeps pinned weapon, armor and Resonance and takes the rest from the result', () => {
+  const { draft } = applyBuildResult(draftOf({ weapon: true, vision: true }), found(), fits, indexes);
+  assert.equal(draft.weaponId, 101); assert.equal(draft.armorId, 202); assert.equal(draft.visionId, 13001);
+  assert.deepEqual(draft.accessoryIds, [311, 312, 313]); assert.equal(draft.recommendedActionId, 9);
+});
+test('applyBuildResult puts a pinned accessory back in its slot; other slots take the result fillers', () => {
+  const r = found({ equipment: { weaponId: 102, armorId: 202, accessoryIds: [311, 302, 312] } });
+  const { draft } = applyBuildResult(draftOf({ accessories: [false, true, false] }), r, fits, indexes);
+  assert.deepEqual(draft.accessoryIds, [311, 302, 312]);
+  const r2 = found({ equipment: { weaponId: 102, armorId: 202, accessoryIds: [311, 312, 303] } });
+  assert.deepEqual(applyBuildResult(draftOf({ accessories: [false, false, true] }), r2, fits, indexes).draft.accessoryIds, [311, 312, 303]);
+});
+test('applyBuildResult preserves the locks object', () => {
+  const { draft } = applyBuildResult(draftOf({ weapon: true }), found(), fits, indexes);
+  assert.deepEqual(draft.locks, { vision: false, weapon: true, armor: false, accessories: [false, false, false], skillIds: [] });
+});
+test('applyBuildResult re-adds a pinned skill the result left out when it fits, drops the pin when it does not', () => {
+  const kept = applyBuildResult(draftOf({ skillIds: [2] }), found(), fits, indexes);
+  assert.deepEqual(kept.draft.equippedSkillIds, [3, 2]); assert.deepEqual(kept.draft.locks.skillIds, [2]); assert.deepEqual(kept.dropped, []);
+  const full = applyBuildResult(draftOf({ skillIds: [2] }), found(), () => learned({ maxSkillSlots: 1 }), indexes);
+  assert.deepEqual(full.draft.equippedSkillIds, [3]); assert.deepEqual(full.draft.locks.skillIds, []); assert.deepEqual(full.dropped, [2]);
+});

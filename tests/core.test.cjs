@@ -173,3 +173,12 @@ test('withLocks adds unpinned locks without touching existing ones',()=>{
   assert.equal(core.withLocks({...b,locks:l},1).locks,l);
   assert.equal(b.locks,undefined);
 });
+
+test('searchOptionsFor pins the Resonance only when it is pinned and set',()=>{
+  const plan={weaponId:101,armorId:-1,visionId:13001,accessoryIds:[-1],equippedSkillIds:[],locks:{vision:true,weapon:true,armor:false,accessories:[false],skillIds:[]}};
+  assert.deepEqual(core.searchOptionsFor(plan).visionIds,[13001]);
+  assert.equal(core.searchOptionsFor(plan).locks.weaponId,101);
+  assert.equal(core.searchOptionsFor({...plan,locks:{...plan.locks,vision:false}}).visionIds,null);
+  assert.equal(core.searchOptionsFor({...plan,visionId:-1}).visionIds,null);
+  assert.equal(core.searchOptionsFor({...plan,locks:undefined}).visionIds,null);
+});

@@ -34,3 +34,27 @@ export function learnedForBuild(stats, catalog, snapshot, charId, build) {
   const learned = stats.learned(catalog, snapshot, charId, Number(build.visionId) > 0 ? Number(build.visionId) : -1);
   return { ...learned, skillBudget: stats.characterStats(catalog, snapshot, charId, build).skillBudget };
 }
+
+/**
+ * A Build result laid over the draft without touching its pins. Pinned Resonance, weapon, armor and accessories (each in its own slot)
+ * stay as they were; the rest comes from `result` ({equipment, visionId, evaluation}). A pinned ability the search left out is
+ * re-added when it fits (`learnedFor(newDraft)` gives the learned data), else its pin is dropped.
+ * Returns {draft, dropped: ability ids whose pin was dropped}. Does not mutate `draft`.
+ */
+export function applyBuildResult(draft, result, learnedFor, indexes) {
+  const locks = draft.locks, eq = result.equipment, pin = (on, id) => on && Number(id) > 0;
+  const fillers = [...eq.accessoryIds];
+  draft.accessoryIds.forEach((id, n) => { const at = fillers.indexOf(id); if (pin(locks.accessories[n], id) && at >= 0) fillers.splice(at, 1); });
+  const next = { ...eq, accessoryIds: draft.accessoryIds.map((id, n) => pin(locks.accessories[n], id) ? id : (fillers.shift() ?? -1)),
+    visionId: pin(locks.vision, draft.visionId) ? draft.visionId : result.visionId,
+    equippedSkillIds: (result.evaluation.equippedSkillIds || []).filter(id => id > 0), recommendedActionId: result.evaluation.skillId, locks: { ...locks, accessories: [...locks.accessories] } };
+  if (pin(locks.weapon, draft.weaponId)) next.weaponId = draft.weaponId;
+  if (pin(locks.armor, draft.armorId)) next.armorId = draft.armorId;
+  const learned = learnedFor(next), dropped = [];
+  for (const id of locks.skillIds) {
+    if (next.equippedSkillIds.includes(id)) continue;
+    if (learned && !canEquip(id, next.equippedSkillIds, learned, indexes)) next.equippedSkillIds.push(id); else dropped.push(id);
+  }
+  next.locks.skillIds = locks.skillIds.filter(id => !dropped.includes(id));
+  return { draft: next, dropped };
+}

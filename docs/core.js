@@ -150,6 +150,11 @@
       skillIds:(locks.skillIds || []).filter(id=>id>0 && equipped.has(id)),
     };
   }
+  /** What the build search gets from a plan's pins: the pieces to keep, and the one Resonance to build around (null = search all owned). */
+  function searchOptionsFor(plan) {
+    const locks=lockedPieces(plan);
+    return {locks,visionIds:locks.visionId?[locks.visionId]:null};
+  }
   /** '' when the pinned pieces alone could be worn together; otherwise validPlan's reason. */
   function checkLocks(catalog,snapshot,characterId,plan,plans={},reserve=true) {
     const locks=plan.locks || emptyLocks(0), keep=(on,id)=>pinned(on,id) ?? -1;
@@ -263,7 +268,7 @@
       return {vision:v,skills,matches,risky,weaknesses};
     }).sort((a,b)=>b.matches.length-a.matches.length || a.vision.name.localeCompare(b.vision.name));
   }
-  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,checkLocks,mastery,accessibleSkills,encounterOptions};
+  const api={clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

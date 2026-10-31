@@ -1,10 +1,10 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=4';
-import {createOptimizerController} from './optimizer-controller.js?v=47';
+import {createOptimizerController} from './optimizer-controller.js?v=48';
 import {comparison} from './optimizer-ui.js?v=43';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=5';
 import {renderSlot, renderAbilityList} from './slot-ui.js?v=2';
-import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild} from './abilities.js?v=3';
+import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=4';
 import {describeItem, describeAbility} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;
@@ -17,7 +17,7 @@ const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new'
 
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
 // enemyId is the Party page's boss, bossId the one browsed on Bosses, deepEnemyId the Characters build target.
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0, pickVision: true,
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0,
   reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'abilities', deepGoals: ['damage'], deepGeneral: true, deep: null, openSlot: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
@@ -251,13 +251,18 @@ function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; }
 function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.deepEnemyId, goals = [...ui.deepGoals];
+  const pins = C.searchOptionsFor(draft);
+  const refusal = C.checkLocks(catalog, snapshot, charId, draft, plans, ui.reserve)
+    || (pins.locks.visionId && pins.locks.weaponId && pins.locks.armorId && pins.locks.accessoryIds.length === draft.accessoryIds.length ? 'Everything is pinned, so there is nothing to fill.' : '');
+  if (refusal) { ui.deep = { error: refusal }; render(); return; }
+  const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=44', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=45', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
     else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, pick: 0, enemyId, goals }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
+    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, pick: 0, enemyId, goals, pinned }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
     render();
   };
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
@@ -265,13 +270,15 @@ function deepSearch() {
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
     options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: ui.deepIncomingDamage, incomingType: ui.deepIncomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
       perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 8000, visionSlices: true,
-      visionIds: ui.pickVision || !(Number(draft.visionId) > 0) ? null : [Number(draft.visionId)] } });
+      visionIds: pins.visionIds, locks: pins.locks } });
   render();
 }
 function applyDeep(i) {
   const r = ui.deep.results[i]; ui.deep.pick = i;
-  draft = { ...r.equipment, accessoryIds: [...r.equipment.accessoryIds], visionId: r.visionId,
-    equippedSkillIds: r.evaluation.equippedSkillIds || [], recommendedActionId: r.evaluation.skillId };
+  const learnedFor = d => { try { return learnedForBuild(globalThis.CompanionStats, catalog, snapshot, ui.charId, d); } catch { return null; } };
+  const { draft: next, dropped } = applyBuildResult(draft, r, learnedFor, index);
+  draft = next;
+  if (dropped.length) toast(`No room for pinned ${dropped.map(id => name('skills', id)).join(', ')}, so ${dropped.length > 1 ? 'they are' : 'it is'} no longer pinned.`);
 }
 
 function gearPriorities() {
@@ -365,7 +372,7 @@ function characters() {
 
 // The one build tool: Resonance (or the one you locked), gear, attack, abilities and passives, searched together.
 function deepPanel(native) {
-  const d = ui.deep || {}, busy = !!d.busy, locked = !ui.pickVision && Number(draft.visionId) > 0;
+  const d = ui.deep || {}, busy = !!d.busy, locked = draft.locks.vision && Number(draft.visionId) > 0;
   const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.deepEnemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return `<div class="deep">
     <h4>Build ${h(native.name)}</h4>
@@ -379,7 +386,6 @@ function deepPanel(native) {
       <label class="small">Hit damage <input type="number" id="deep-incoming-damage" min="0" max="99999999" step="1" value="${h(ui.deepIncomingDamage)}" ${busy ? 'disabled' : ''}></label>
       <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,ui.deepIncomingType===value)).join('')}</select></label>
     </details>
-    <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''} ${busy ? 'disabled' : ''}> Let it pick the Resonance</label>
     ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}.</p>` : ''}
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
       : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button>`}</div>
@@ -392,7 +398,7 @@ function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
-  if (!d.results.length) return `<div class="deep-result"><p>No usable attack was found against ${h(against)}.</p></div>`;
+  if (!d.results.length) return `<div class="deep-result"><p>${d.pinned ? 'Nothing fits with your pinned pieces.' : `No usable attack was found against ${h(against)}.`}</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, limits = ev.limitUses || [], outOfMp = ev.mpExhaustedRounds || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : '',
@@ -700,12 +706,12 @@ document.addEventListener('click', e => {
       if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
     }, t); return;
   }
-  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
+  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; setDraft(); }, t); return; }
   if (t.dataset.openSlot) { ui.openSlot = ui.openSlot === t.dataset.openSlot ? null : t.dataset.openSlot; render(); return; }
   if (t.dataset.pickSlot) {
     const key = t.dataset.pickSlot, id = +t.dataset.id; ui.deep = null; ui.openSlot = null;
     if (key === 'vision') {
-      draft.visionId = id; ui.pickVision = false;
+      draft.visionId = id;
       const learned = learnedFor(id);
       if (learned) {
         const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
@@ -738,7 +744,7 @@ document.addEventListener('click', e => {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.deepGeneral = false; ui.deepEnemyId = ui.bossId; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
+      setDraft(); draft.visionId = v.id; draft.locks.vision = true; ui.deepGeneral = false; ui.deepEnemyId = ui.bossId; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
     }); return;
   }
   if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
@@ -777,7 +783,6 @@ document.addEventListener('change', e => {
   else if (t.id === 'deep-incoming-damage') { ui.deepIncomingDamage = Math.max(0, Math.min(99999999, Math.trunc(Number(t.value) || 0))); cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-incoming-type') { ui.deepIncomingType = t.value === 'Magic' ? 'Magic' : 'Physic'; cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.deepEnemyId = +t.value; }
-  else if (t.id === 'pick-vision') ui.pickVision = t.checked;
   else return;
   render();
 });
