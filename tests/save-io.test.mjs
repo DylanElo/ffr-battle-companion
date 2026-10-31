@@ -129,3 +129,33 @@ test('a character without a plan gives up an item a plan needs, and the change i
   assert.deepEqual({ removed, accessories: character(await load(bytes), 1002).equipment.accessoryIds },
     { removed: [`${lasswell.name}: ${catalog.equipment.find(e => e.id === ring).name}`], accessories: [-1, -1] });
 });
+
+// Fill the saved character's skill slots by writing a plan, then use that save as the starting point.
+const costly = id => Number(catalog.skills.find(s => s.id === id)?.equipCost) > 0;
+async function withSkill() {
+  const file = await gameSave(), snapshot = await load(file);
+  const skill = stats.learned(catalog, snapshot, 1001, amelia).learnedActiveIds.find(costly);
+  const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, deps);
+  return { file: bytes, snapshot: await load(bytes), skill };
+}
+
+test('an abilities-only plan (same gear and Resonance) is written, including clearing them', async () => {
+  const { file, snapshot, skill } = await withSkill();
+  assert.deepEqual(character(snapshot, 1001).equippedSkillIds.filter(id => id > 0), [skill]);
+  const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [] } }, deps);
+  assert.deepEqual(character(await load(bytes), 1001).equippedSkillIds.filter(id => id > 0), []);
+});
+
+test('a plan identical to the save writes nothing', async () => {
+  const { file, snapshot } = await withSkill();
+  const same = { ...planFor(snapshot, 1001, {}), equippedSkillIds: [...character(snapshot, 1001).equippedSkillIds.filter(id => id > 0)] };
+  const { bytes } = await savedWithPlans(file, snapshot, { 1001: same }, deps);
+  assert.deepEqual(bytes, file);
+});
+
+test('an abilities-only plan over the AP budget is refused', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  const skill = stats.learned(catalog, snapshot, 1001, amelia).learnedActiveIds.find(costly);
+  const tight = { ...deps, stats: { ...stats, characterStats: (...args) => ({ ...stats.characterStats(...args), skillBudget: 0 }) } };
+  await assert.rejects(savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight), /planned abilities don't fit/);
+});

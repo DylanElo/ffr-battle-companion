@@ -30,3 +30,17 @@ test('free active skills are not equippable items', () => {
   assert.deepEqual(list.map(a => a.id).sort(), [2, 3, 4, 5]);
   assert.ok(!list.some(a => a.id === 1));
 });
+
+import { withAbilities, learnedForBuild } from '../docs/abilities.js';
+test('learnedForBuild takes the AP budget from the build gear, not the saved gear', () => {
+  const stats = { learned: (c, s, id, v) => ({ skillBudget: 10, seen: v }), characterStats: (c, s, id, b) => ({ skillBudget: b.weaponId === 2 ? 40 : 10 }) };
+  assert.equal(learnedForBuild(stats, {}, {}, 1, { weaponId: 1, visionId: 7 }).skillBudget, 10);
+  const swapped = learnedForBuild(stats, {}, {}, 1, { weaponId: 2, visionId: -1 });
+  assert.equal(swapped.skillBudget, 40);
+  assert.equal(swapped.seen, -1);
+});
+test('withAbilities makes an untouched draft stringify like the saved build', () => {
+  const saved = { equipment: { weaponId: 1, visionId: 2 }, equippedSkillIds: [5] };
+  assert.equal(JSON.stringify(withAbilities(saved.equipment, saved)), JSON.stringify(withAbilities(withAbilities(saved.equipment, saved), saved)));
+  assert.deepEqual(withAbilities({ weaponId: 1, equippedSkillIds: [] }, saved).equippedSkillIds, []);
+});

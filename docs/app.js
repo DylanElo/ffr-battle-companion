@@ -1,10 +1,10 @@
-import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=3';
 import {createOptimizerController} from './optimizer-controller.js?v=43';
 import {comparison} from './optimizer-ui.js?v=42';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=4';
 import {renderSlot, renderAbilityList} from './slot-ui.js?v=2';
-import {equippableAbilities, abilityLoad, canEquip, dropUnavailable} from './abilities.js?v=1';
+import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild} from './abilities.js?v=2';
 import {describeItem, describeAbility} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;
@@ -92,8 +92,8 @@ function storePlans() {
 }
 function setDraft() {
   const saved = snapshot.characters.find(c => c.id === ui.charId);
-  draft = structuredClone(plans[ui.charId] || saved?.equipment || null);
-  if (draft && !draft.equippedSkillIds) draft.equippedSkillIds = [...(saved?.equippedSkillIds || [])];
+  const build = plans[ui.charId] || saved?.equipment;
+  draft = build ? withAbilities(build, saved) : null;
   ui.openSlot = null;
 }
 
@@ -227,8 +227,9 @@ function fightDetails(enemy) {
 
 // Everything the character can use with the planned Resonance: their own abilities, level and sync
 // unlocks, and the Resonance's grants (same source the party optimizer uses).
+// The ability pool and AP budget for the draft's gear with the given Resonance.
 function learnedFor(visionId) {
-  try { return globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId); } catch { return null; }
+  try { return learnedForBuild(globalThis.CompanionStats, catalog, snapshot, ui.charId, { ...draft, visionId }); } catch { return null; }
 }
 function usableSkills(visionId) {
   try {
@@ -343,8 +344,8 @@ function characters() {
     choices: ui.openSlot === 'vision' ? [visionView(null), ...snapshot.resonances.map(r => visionView(index.visions.get(r.id)))] : [],
     changed: Number(draft.visionId) !== Number(saved.equipment.visionId) });
   const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve);
-  const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(plans[ui.charId]);
-  const changed = JSON.stringify(draft) !== JSON.stringify(plans[ui.charId] || saved.equipment);
+  const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(withAbilities(plans[ui.charId], saved));
+  const changed = JSON.stringify(draft) !== JSON.stringify(withAbilities(plans[ui.charId] || saved.equipment, saved));
 
   const equip = `<section class="window equip">
     ${deepResult()}
@@ -425,7 +426,7 @@ function equipTabs(native, v, available) {
   const term = ui.gearQ.trim().toLowerCase();
   const inv = snapshot.inventory.map(o => [o, index.equipment.get(o.id)]).filter(([o, e]) => e && o.quantity > 0
     && (!term || `${e.name} ${e.detailType} ${(e.passiveIds || []).map(id => name('passives', id)).join(' ')}`.toLowerCase().includes(term)));
-  const learned = learnedFor(draft.visionId > 0 ? draft.visionId : -1), ids = draft.equippedSkillIds || [];
+  const learned = learnedFor(draft.visionId), ids = draft.equippedSkillIds || [];
   const abilities = learned ? equippableAbilities(learned, index) : [];
   let body;
   if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: [],
@@ -703,7 +704,7 @@ document.addEventListener('click', e => {
     const key = t.dataset.pickSlot, id = +t.dataset.id; ui.deep = null; ui.openSlot = null;
     if (key === 'vision') {
       draft.visionId = id; ui.pickVision = false;
-      const learned = learnedFor(id > 0 ? id : -1);
+      const learned = learnedFor(id);
       if (learned) {
         const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
         draft.equippedSkillIds = kept;
@@ -715,7 +716,7 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if (t.dataset.abilityToggle) {
-    const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId > 0 ? draft.visionId : -1);
+    const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId);
     if (ids.includes(id)) draft.equippedSkillIds = ids.filter(x => x !== id);
     else if (learned && !canEquip(id, ids, learned, index)) draft.equippedSkillIds = [...ids, id];
     render(); return;
@@ -738,7 +739,7 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); draft = { ...structuredClone(saved.equipment), equippedSkillIds: [...(saved.equippedSkillIds || [])] }; ui.deep = null; render(); return; }
+  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); draft = withAbilities(saved.equipment, saved); ui.deep = null; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();

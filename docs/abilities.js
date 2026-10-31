@@ -25,3 +25,12 @@ export function dropUnavailable(ids, learned) {
   const ok = new Set(learnedIds(learned));
   return { kept: ids.filter(id => ok.has(id)), dropped: ids.filter(id => !ok.has(id)) };
 }
+
+/** A build with its abilities filled in (from `saved` when it has none), so builds compare and stringify alike. */
+export const withAbilities = (build, saved) => ({ ...structuredClone(build), equippedSkillIds: [...(build.equippedSkillIds ?? saved?.equippedSkillIds ?? [])] });
+
+/** `learned` for a build. The AP budget follows the build's gear (EquipCost), not the saved gear stats.learned assumes. */
+export function learnedForBuild(stats, catalog, snapshot, charId, build) {
+  const learned = stats.learned(catalog, snapshot, charId, Number(build.visionId) > 0 ? Number(build.visionId) : -1);
+  return { ...learned, skillBudget: stats.characterStats(catalog, snapshot, charId, build).skillBudget };
+}
