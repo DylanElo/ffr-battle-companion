@@ -456,7 +456,7 @@ function equipTabs(native, v, available) {
     </tbody></table>`;
   else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
 `;
-  return `${tabs('charTab', [['abilities', `Abilities (${ids.length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
+  return `${tabs('charTab', [['abilities', `Abilities (${ids.length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${h(v.name)} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
 // ---------- resonances ----------
@@ -719,7 +719,7 @@ document.addEventListener('click', e => {
   if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; setDraft(); }, t); return; }
   if (t.dataset.openSlot) { ui.openSlot = ui.openSlot === t.dataset.openSlot ? null : t.dataset.openSlot; render(); return; }
   if (t.dataset.pickSlot) {
-    const key = t.dataset.pickSlot, id = +t.dataset.id; ui.deep = null; ui.openSlot = null;
+    const key = t.dataset.pickSlot, id = +t.dataset.id; cancelDeep(); ui.deep = null; ui.openSlot = null;
     if (key === 'vision') {
       draft.visionId = id;
       const learned = learnedFor(id);
@@ -764,7 +764,7 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); const locks = draft.locks; draft = withAbilities(saved.equipment, saved); draft.locks = locks; ui.deep = null; render(); return; }
+  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); const locks = draft.locks; draft = withAbilities(saved.equipment, saved); draft.locks = locks; cancelDeep(); ui.deep = null; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();
