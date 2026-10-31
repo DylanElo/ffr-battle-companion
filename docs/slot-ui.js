@@ -16,3 +16,17 @@ export function renderSlot({ key, label, current, locked, open, choices, changed
       <strong>${h(c.name)}</strong>${c.statsText ? ` <span class="dim small">${h(c.statsText)}</span>` : ''}${c.delta ? ` <em class="delta">${h(c.delta)}</em>` : ''}${para('dim small', c.text)}${effects(c.effects)}</button>`).join('')}</div>` : ''}
   </section>`;
 }
+
+/** Learned abilities with an equip/remove toggle; equipped ones get a lock button. reasons maps id to why it cannot be added. */
+export function renderAbilityList({ abilities, equippedIds, load, lockedIds = [], reasons = {} }) {
+  const on = new Set(equippedIds), pinned = new Set(lockedIds);
+  const row = a => {
+    const equipped = on.has(a.id), why = !equipped && reasons[a.id], id = h(a.id), name = h(a.name);
+    return `<li class="ability"><div class="ability-head"><strong>${name}</strong> <span class="dim small">${h(a.cost)} AP</span>
+      ${equipped ? `<button type="button" class="ghost" data-lock="skill:${id}" aria-pressed="${pinned.has(a.id)}" title="Keep this when building">${pinned.has(a.id) ? 'Locked' : 'Lock'}</button>` : ''}
+      <button type="button" class="ghost" data-ability-toggle="${id}" data-key="ability-${id}" aria-label="${equipped ? 'Remove' : 'Equip'} ${name}"${why ? ' disabled' : ''}>${equipped ? 'Remove' : 'Equip'}</button></div>
+      ${why ? para('note small', why) : ''}${para('dim small', a.text)}</li>`;
+  };
+  return `<p class="ability-load">${h(load.used)} / ${h(load.budget)} AP · ${h(load.slots)} / ${h(load.maxSlots)} slots</p>
+    <ul class="abilities">${abilities.map(row).join('') || '<li class="dim">Nothing learned yet.</li>'}</ul>`;
+}

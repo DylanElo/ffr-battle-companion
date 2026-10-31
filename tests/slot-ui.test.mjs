@@ -36,3 +36,28 @@ test('catalog text is escaped', () => {
 test('a choice without text renders no empty paragraph', () => {
   assert.doesNotMatch(slot({ open: true }), /<p[^>]*><\/p>/);
 });
+
+import { renderAbilityList } from '../docs/slot-ui.js';
+const ab = (id, name, text = '') => ({ id, name, kind: 'active', cost: 10, text });
+const abilityList = (over = {}) => renderAbilityList({ abilities: [ab(2, 'Fira', 'Burns.'), ab(3, 'Cure')], equippedIds: [3], load: { used: 10, budget: 30, slots: 1, maxSlots: 3 }, lockedIds: [], reasons: {}, ...over });
+
+test('ability list shows the AP and slot line', () => {
+  assert.match(abilityList(), /10 \/ 30 AP/);
+  assert.match(abilityList(), /1 \/ 3 slots/);
+});
+test('an unaffordable ability is disabled with its reason', () => {
+  const html = abilityList({ reasons: { 2: 'Not enough AP (needs 20, 15 left).' } });
+  assert.match(html, /<button[^>]*data-ability-toggle="2"[^>]*disabled/);
+  assert.match(html, /Not enough AP \(needs 20, 15 left\)\./);
+});
+test('ability text is escaped', () => {
+  const html = abilityList({ abilities: [ab(2, '<u>x</u>', '<u>y</u>')] });
+  assert.doesNotMatch(html, /<u>/);
+});
+test('only equipped abilities get a lock button, and toggles name the ability', () => {
+  const html = abilityList();
+  assert.equal([...html.matchAll(/data-lock="skill:/g)].length, 1);
+  assert.match(html, /data-lock="skill:3"/);
+  assert.match(html, /aria-label="Remove Cure"/);
+  assert.match(html, /aria-label="Equip Fira"/);
+});

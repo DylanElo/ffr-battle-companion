@@ -3,8 +3,9 @@ import {createOptimizerController} from './optimizer-controller.js?v=43';
 import {comparison} from './optimizer-ui.js?v=42';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=4';
-import {renderSlot} from './slot-ui.js?v=1';
-import {describeItem} from './piece-details.js?v=1';
+import {renderSlot, renderAbilityList} from './slot-ui.js?v=2';
+import {equippableAbilities, abilityLoad, canEquip, dropUnavailable} from './abilities.js?v=1';
+import {describeItem, describeAbility} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -17,7 +18,7 @@ const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new'
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
 // enemyId is the Party page's boss, bossId the one browsed on Bosses, deepEnemyId the Characters build target.
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0, pickVision: true,
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, openSlot: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'abilities', deepGoals: ['damage'], deepGeneral: true, deep: null, openSlot: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const NOUNS = { characters: 'character', visions: 'Resonance', equipment: 'item', skills: 'ability', passives: 'ability', masterSkills: 'ability', enemies: 'enemy' };
@@ -92,6 +93,7 @@ function storePlans() {
 function setDraft() {
   const saved = snapshot.characters.find(c => c.id === ui.charId);
   draft = structuredClone(plans[ui.charId] || saved?.equipment || null);
+  if (draft && !draft.equippedSkillIds) draft.equippedSkillIds = [...(saved?.equippedSkillIds || [])];
   ui.openSlot = null;
 }
 
@@ -225,6 +227,9 @@ function fightDetails(enemy) {
 
 // Everything the character can use with the planned Resonance: their own abilities, level and sync
 // unlocks, and the Resonance's grants (same source the party optimizer uses).
+function learnedFor(visionId) {
+  try { return globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId); } catch { return null; }
+}
 function usableSkills(visionId) {
   try {
     const l = globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId);
@@ -420,15 +425,19 @@ function equipTabs(native, v, available) {
   const term = ui.gearQ.trim().toLowerCase();
   const inv = snapshot.inventory.map(o => [o, index.equipment.get(o.id)]).filter(([o, e]) => e && o.quantity > 0
     && (!term || `${e.name} ${e.detailType} ${(e.passiveIds || []).map(id => name('passives', id)).join(' ')}`.toLowerCase().includes(term)));
+  const learned = learnedFor(draft.visionId > 0 ? draft.visionId : -1), ids = draft.equippedSkillIds || [];
+  const abilities = learned ? equippableAbilities(learned, index) : [];
   let body;
-  if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
+  if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: [],
+    reasons: Object.fromEntries(abilities.filter(a => !ids.includes(a.id)).map(a => [a.id, canEquip(a.id, ids, learned, index)]).filter(([, why]) => why)) }) : '<p class="dim">Abilities unavailable.</p>';
+  else if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
   else if (ui.charTab === 'items') body = `<input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
     <table><thead><tr><th>Item</th><th>Free</th><th>Stats</th></tr></thead><tbody>
     ${inv.map(([o, e]) => `<tr class="${['weapon', 'armor', 'accessory'].some(s => C.eligible(e, native, s)) ? '' : 'dim'}"><td>${h(e.name)}</td><td>${available.get(e.id) || 0}/${o.quantity}</td><td>${h(statsText(e))}</td></tr>`).join('')}
     </tbody></table>`;
   else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
 `;
-  return `${tabs('charTab', [['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
+  return `${tabs('charTab', [['abilities', `Abilities (${ids.length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
 // ---------- resonances ----------
@@ -692,9 +701,23 @@ document.addEventListener('click', e => {
   if (t.dataset.openSlot) { ui.openSlot = ui.openSlot === t.dataset.openSlot ? null : t.dataset.openSlot; render(); return; }
   if (t.dataset.pickSlot) {
     const key = t.dataset.pickSlot, id = +t.dataset.id; ui.deep = null; ui.openSlot = null;
-    if (key === 'vision') { draft.visionId = id; ui.pickVision = false; }
+    if (key === 'vision') {
+      draft.visionId = id; ui.pickVision = false;
+      const learned = learnedFor(id > 0 ? id : -1);
+      if (learned) {
+        const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
+        draft.equippedSkillIds = kept;
+        if (dropped.length) toast(`Removed ${dropped.map(d => describeAbility(d, index)?.name ?? d).join(', ')}: not available with this Resonance.`);
+      }
+    }
     else if (key.startsWith('accessory:')) draft.accessoryIds[+key.slice(10)] = id;
     else draft[key + 'Id'] = id;
+    render(); return;
+  }
+  if (t.dataset.abilityToggle) {
+    const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId > 0 ? draft.visionId : -1);
+    if (ids.includes(id)) draft.equippedSkillIds = ids.filter(x => x !== id);
+    else if (learned && !canEquip(id, ids, learned, index)) draft.equippedSkillIds = [...ids, id];
     render(); return;
   }
   if (t.id === 'deep') { deepSearch(); return; }
@@ -715,7 +738,7 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); ui.deep = null; render(); return; }
+  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); draft = { ...structuredClone(saved.equipment), equippedSkillIds: [...(saved.equippedSkillIds || [])] }; ui.deep = null; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();
