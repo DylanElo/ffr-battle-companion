@@ -1,8 +1,10 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
 import {createOptimizerController} from './optimizer-controller.js?v=43';
 import {comparison} from './optimizer-ui.js?v=42';
-import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
+import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=4';
+import {renderSlot} from './slot-ui.js?v=1';
+import {describeItem} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -15,7 +17,7 @@ const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new'
 let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
 // enemyId is the Party page's boss, bossId the one browsed on Bosses, deepEnemyId the Characters build target.
 const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0, pickVision: true,
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, openSlot: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const NOUNS = { characters: 'character', visions: 'Resonance', equipment: 'item', skills: 'ability', passives: 'ability', masterSkills: 'ability', enemies: 'enemy' };
@@ -90,6 +92,7 @@ function storePlans() {
 function setDraft() {
   const saved = snapshot.characters.find(c => c.id === ui.charId);
   draft = structuredClone(plans[ui.charId] || saved?.equipment || null);
+  ui.openSlot = null;
 }
 
 // ---------- shared bits ----------
@@ -312,23 +315,35 @@ function characters() {
 
   const available = C.stock(snapshot, ui.charId, plans, ui.reserve);
   const savedIds = [saved.equipment.weaponId, saved.equipment.armorId, ...saved.equipment.accessoryIds];
+  const gearKey = (slot, i) => slot === 'accessory' ? `accessory:${i}` : slot;
+  const draftWith = (slot, i, id) => { const d = structuredClone(draft); if (slot === 'accessory') d.accessoryIds[i] = id; else if (slot === 'vision') d.visionId = id; else d[slot + 'Id'] = id; return d; };
+  const deltaText = d => { const base = totals(draft).stats, next = totals(d).stats;
+    return CARD_STATS.map(([k, label]) => { const c = (Number(next[k]) || 0) - (Number(base[k]) || 0); return c ? `${c > 0 ? '+' : ''}${c} ${label}` : ''; }).filter(Boolean).join(', '); };
+  const itemView = (id, delta = '') => { const item = index.equipment.get(Number(id)); return item ? { ...describeItem(item, index), statsText: statsText(item), delta }
+    : { id: -1, name: 'Empty', statsText: '', delta, text: '', effects: [] }; };
   const slotRows = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])]
     .map(([slot, label, id, i = 0], n) => {
-      const list = C.candidates(catalog, native, available, slot, goal), cur = Number(id);
-      return `<label for="slot${n}">${label}</label><select id="slot${n}" data-slot="${slot}" data-index="${i}" data-key="slot${n}" class="${cur !== Number(savedIds[n]) ? 'changed' : ''}">
-        ${opt(-1, 'Empty', cur <= 0)}${cur > 0 && !list.some(x => x.id === cur) ? opt(cur, `${name('equipment', cur)} (equipped)`, true) : ''}
-        ${list.map(x => opt(x.id, `${x.name}: ${statsText(x)}${available.get(x.id) > 1 ? ` (${available.get(x.id)} free)` : ''}`, x.id === cur)).join('')}</select>`;
+      const key = gearKey(slot, i), cur = Number(id), open = ui.openSlot === key;
+      let choices = [];
+      if (open) {
+        const list = C.candidates(catalog, native, available, slot, goal);
+        const ids = [-1, ...(cur > 0 && !list.some(x => x.id === cur) ? [cur] : []), ...list.map(x => x.id)];
+        choices = ids.map(x => itemView(x, x === cur ? '' : deltaText(draftWith(slot, i, x))));
+      }
+      return renderSlot({ key, label, current: itemView(cur), locked: false, open, choices, changed: cur !== Number(savedIds[n]) });
     }).join('');
   const v = index.visions.get(Number(draft.visionId));
+  const visionView = (r, delta = '') => r ? { id: r.id, name: r.name, statsText: '', delta, text: r.description || '', effects: [] } : { id: -1, name: 'None', statsText: '', delta, text: '', effects: [] };
+  const visionSlot = renderSlot({ key: 'vision', label: 'Resonance', current: visionView(v), locked: false, open: ui.openSlot === 'vision',
+    choices: ui.openSlot === 'vision' ? [visionView(null), ...snapshot.resonances.map(r => visionView(index.visions.get(r.id)))] : [],
+    changed: Number(draft.visionId) !== Number(saved.equipment.visionId) });
   const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve);
   const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(plans[ui.charId]);
   const changed = JSON.stringify(draft) !== JSON.stringify(plans[ui.charId] || saved.equipment);
 
   const equip = `<section class="window equip">
     ${deepResult()}
-    <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}
-      <div><label for="vision" class="dim small">Resonance</label>
-        <select id="vision" data-key="vision" class="${Number(draft.visionId) !== Number(saved.equipment.visionId) ? 'changed' : ''}">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select></div></div>
+    <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}${visionSlot}</div>
     <div class="slots">${slotRows}</div>
     ${warning ? `<p class="note">${h(warning)}</p>` : ''}
     <div class="toolbar">
@@ -674,6 +689,14 @@ document.addEventListener('click', e => {
     }, t); return;
   }
   if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
+  if (t.dataset.openSlot) { ui.openSlot = ui.openSlot === t.dataset.openSlot ? null : t.dataset.openSlot; render(); return; }
+  if (t.dataset.pickSlot) {
+    const key = t.dataset.pickSlot, id = +t.dataset.id; ui.deep = null; ui.openSlot = null;
+    if (key === 'vision') { draft.visionId = id; ui.pickVision = false; }
+    else if (key.startsWith('accessory:')) draft.accessoryIds[+key.slice(10)] = id;
+    else draft[key + 'Id'] = id;
+    render(); return;
+  }
   if (t.id === 'deep') { deepSearch(); return; }
   if (t.id === 'share-build') { shareBuild(); return; }
   if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
@@ -721,9 +744,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'deep-incoming-damage') { ui.deepIncomingDamage = Math.max(0, Math.min(99999999, Math.trunc(Number(t.value) || 0))); cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-incoming-type') { ui.deepIncomingType = t.value === 'Magic' ? 'Magic' : 'Physic'; cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.deepEnemyId = +t.value; }
-  else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.deep = null; }
   else if (t.id === 'pick-vision') ui.pickVision = t.checked;
-  else if (t.dataset.slot) { ui.deep = null; const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }
   else return;
   render();
 });

@@ -1,5 +1,5 @@
 // The game's own words for a piece of gear or an ability, looked up from the catalog indexes.
-import { description } from './build-details.js';
+import { description } from './build-details.js?v=12';
 
 const find = (indexes, kind, id) => indexes[kind]?.get(Number(id));
 

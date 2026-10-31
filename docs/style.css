@@ -162,9 +162,16 @@ summary:hover, details[open] > summary { color: var(--ink); }
 .skills li.got { border-left-color: var(--good); }
 
 /* gear */
-.slots { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 16px; align-items: center; }
-.slots label { color: var(--dim); }
-.slots select.changed { border-color: var(--gold); color: var(--gold); }
+.slots { display: grid; gap: 10px; }
+.slot { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.slot.changed { border-color: var(--gold); }
+.slot p { margin: 0; }
+.slot-head { display: flex; gap: 8px; align-items: center; }
+.slot-head > span { flex: 1; }
+.slot-head button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.slot .choices { display: grid; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.slot .choice { display: grid; gap: 2px; text-align: left; width: 100%; }
+.slot .delta { color: var(--gold); font-style: normal; }
 .statline { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0; }
 .statline span { color: var(--dim); }
 .statline b { color: var(--ink); font-weight: 700; margin-left: 4px; }
@@ -316,11 +323,9 @@ dialog form { text-align: right; margin-top: 12px; }
 .deep-num { margin-left: auto; }
 .deep-num b { font-size: 24px; font-weight: 900; color: var(--gold); }
 .vision-slot { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.vision-slot > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
-.vision-slot select { width: 100%; }
+.vision-slot > .slot { flex: 1; }
 .face.empty { display: inline-block; border: 2px dashed var(--edge); transform: rotate(45deg) scale(.7); }
 .equip .slots { margin-top: 12px; }
-.equip .slots select { width: 100%; }
 
 @media (max-width: 880px) {
   .top, main { padding-left: 16px; padding-right: 16px; }
@@ -334,8 +339,6 @@ dialog form { text-align: right; margin-top: 12px; }
   .hero { gap: 14px; }
   h2 { font-size: 24px; }
   .weak-line { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .slots { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .slots label { margin-top: 8px; }
   .top .where > div { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; }
   .chars { grid-template-columns: minmax(0, 1fr); }
   .chars > .roster, .chars > .card { position: static; }

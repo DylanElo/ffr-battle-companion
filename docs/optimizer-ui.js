@@ -1,5 +1,5 @@
 // The party builder on the Party page: a short result, and what each piece does one tap away.
-import {gearExplanation, abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
+import {gearExplanation, abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
