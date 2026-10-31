@@ -93,7 +93,7 @@ function storePlans() {
 function setDraft() {
   const saved = snapshot.characters.find(c => c.id === ui.charId);
   const build = plans[ui.charId] || saved?.equipment;
-  draft = build ? withAbilities(build, saved) : null;
+  draft = build ? C.withLocks(withAbilities(build, saved), build.accessoryIds.length) : null;
   ui.openSlot = null;
 }
 
@@ -327,6 +327,7 @@ function characters() {
     return CARD_STATS.map(([k, label]) => { const c = (Number(next[k]) || 0) - (Number(base[k]) || 0); return c ? `${c > 0 ? '+' : ''}${c} ${label}` : ''; }).filter(Boolean).join(', '); };
   const itemView = (id, delta = '') => { const item = index.equipment.get(Number(id)); return item ? { ...describeItem(item, index), statsText: statsText(item), delta }
     : { id: -1, name: 'Empty', statsText: '', delta, text: '', effects: [] }; };
+  const lk = draft.locks, slotLocked = key => key === 'vision' ? lk.vision : key === 'weapon' || key === 'armor' ? lk[key] : !!lk.accessories[+key.slice(10)];
   const slotRows = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])]
     .map(([slot, label, id, i = 0], n) => {
       const key = gearKey(slot, i), cur = Number(id), open = ui.openSlot === key;
@@ -336,16 +337,17 @@ function characters() {
         const ids = [-1, ...(cur > 0 && !list.some(x => x.id === cur) ? [cur] : []), ...list.map(x => x.id)];
         choices = ids.map(x => itemView(x, x === cur ? '' : deltaText(draftWith(slot, i, x))));
       }
-      return renderSlot({ key, label, current: itemView(cur), locked: false, open, choices, changed: cur !== Number(savedIds[n]) });
+      return renderSlot({ key, label, current: itemView(cur), locked: slotLocked(key), open, choices, changed: cur !== Number(savedIds[n]) });
     }).join('');
   const v = index.visions.get(Number(draft.visionId));
   const visionView = (r, delta = '') => r ? { id: r.id, name: r.name, statsText: '', delta, text: r.description || '', effects: [] } : { id: -1, name: 'None', statsText: '', delta, text: '', effects: [] };
-  const visionSlot = renderSlot({ key: 'vision', label: 'Resonance', current: visionView(v), locked: false, open: ui.openSlot === 'vision',
+  const visionSlot = renderSlot({ key: 'vision', label: 'Resonance', current: visionView(v), locked: lk.vision, open: ui.openSlot === 'vision',
     choices: ui.openSlot === 'vision' ? [visionView(null), ...snapshot.resonances.map(r => visionView(index.visions.get(r.id)))] : [],
     changed: Number(draft.visionId) !== Number(saved.equipment.visionId) });
   const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve);
-  const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(withAbilities(plans[ui.charId], saved));
-  const changed = JSON.stringify(draft) !== JSON.stringify(withAbilities(plans[ui.charId] || saved.equipment, saved));
+  const basis = b => JSON.stringify(C.withLocks(withAbilities(b, saved), draft.accessoryIds.length));
+  const isPlan = plans[ui.charId] && JSON.stringify(draft) === basis(plans[ui.charId]);
+  const changed = JSON.stringify(draft) !== basis(plans[ui.charId] || saved.equipment);
 
   const equip = `<section class="window equip">
     ${deepResult()}
@@ -429,7 +431,7 @@ function equipTabs(native, v, available) {
   const learned = learnedFor(draft.visionId), ids = draft.equippedSkillIds || [];
   const abilities = learned ? equippableAbilities(learned, index) : [];
   let body;
-  if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: [],
+  if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: draft.locks.skillIds,
     reasons: Object.fromEntries(abilities.filter(a => !ids.includes(a.id)).map(a => [a.id, canEquip(a.id, ids, learned, index)]).filter(([, why]) => why)) }) : '<p class="dim">Abilities unavailable.</p>';
   else if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
   else if (ui.charTab === 'items') body = `<input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
@@ -707,7 +709,7 @@ document.addEventListener('click', e => {
       const learned = learnedFor(id);
       if (learned) {
         const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
-        draft.equippedSkillIds = kept;
+        draft.equippedSkillIds = kept; draft.locks.skillIds = draft.locks.skillIds.filter(x => kept.includes(x));
         if (dropped.length) toast(`Removed ${dropped.map(d => describeAbility(d, index)?.name ?? d).join(', ')}: not available with this Resonance.`);
       }
     }
@@ -715,9 +717,16 @@ document.addEventListener('click', e => {
     else draft[key + 'Id'] = id;
     render(); return;
   }
+  if (t.dataset.lock) {
+    const key = t.dataset.lock, lk = draft.locks;
+    if (key.startsWith('skill:')) { const id = +key.slice(6); lk.skillIds = lk.skillIds.includes(id) ? lk.skillIds.filter(x => x !== id) : [...lk.skillIds, id]; }
+    else if (key.startsWith('accessory:')) lk.accessories[+key.slice(10)] = !lk.accessories[+key.slice(10)];
+    else lk[key] = !lk[key];
+    render(); return;
+  }
   if (t.dataset.abilityToggle) {
     const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId);
-    if (ids.includes(id)) draft.equippedSkillIds = ids.filter(x => x !== id);
+    if (ids.includes(id)) { draft.equippedSkillIds = ids.filter(x => x !== id); draft.locks.skillIds = draft.locks.skillIds.filter(x => x !== id); }
     else if (learned && !canEquip(id, ids, learned, index)) draft.equippedSkillIds = [...ids, id];
     render(); return;
   }
@@ -739,7 +748,7 @@ document.addEventListener('click', e => {
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); draft = withAbilities(saved.equipment, saved); ui.deep = null; render(); return; }
+  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); const locks = draft.locks; draft = withAbilities(saved.equipment, saved); draft.locks = locks; ui.deep = null; render(); return; }
   if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();

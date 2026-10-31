@@ -174,3 +174,12 @@ test('a plan whose set differs from a padded save is still written', async () =>
   const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [other] } }, deps);
   assert.deepEqual(character(await load(bytes), 1001).equippedSkillIds.filter(id => id > 0), [other]);
 });
+
+test('pins on a plan are not written to the save', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  const plan = planFor(snapshot, 1001, { weaponId: otherSword });
+  const locks = { vision: true, weapon: true, armor: false, accessories: [true, false], skillIds: [] };
+  const a = await savedWithPlans(file, snapshot, { 1001: plan }, deps);
+  const b = await savedWithPlans(file, snapshot, { 1001: { ...plan, locks } }, deps);
+  assert.deepEqual(b.bytes, a.bytes);
+});
