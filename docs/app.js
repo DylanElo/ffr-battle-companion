@@ -1,5 +1,5 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=4';
-import {createOptimizerController} from './optimizer-controller.js?v=43';
+import {createOptimizerController} from './optimizer-controller.js?v=44';
 import {comparison} from './optimizer-ui.js?v=42';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=4';
@@ -252,7 +252,7 @@ function deepSearch() {
   cancelDeep();
   const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.deepEnemyId, goals = [...ui.deepGoals];
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=41', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=42', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
