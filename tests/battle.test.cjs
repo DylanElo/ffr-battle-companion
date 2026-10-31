@@ -168,3 +168,68 @@ saveTest('current setup scores only what is equipped, and a short search still b
   assert.ok(candidates.some(c=>c.visionId===own.equipment.visionId),'the saved Resonance is always searched');
   assert.ok(Math.max(...candidates.map(c=>c.score))>=current.score);
 });
+
+// Pinned abilities: a synthetic save so these run without the desktop importer.
+function pinFixture(){
+  const equipment={weaponId:-1,armorId:-1,accessoryIds:[],visionId:-1};
+  const attack={...catalog.skills.find(s=>s.id===401010),cost:0,mag:30,breakDmg:0,criticalHitRate:0,equipCost:10};
+  const active={...attack,id:900110,name:'Pinned active fixture',relation:'Self',mag:0,effects:[],effectBundles:[],equipCost:40};
+  const blank=(id,equipCost)=>({id,name:`Pinned passive ${id}`,equipCost,effectBundles:[]});
+  const passives=[blank(900101,30),blank(900102,80),...Array.from({length:9},(_,i)=>blank(900120+i,1))];
+  const native={id:1001,name:'Rain',levelParamId:1,stats:{HitPoint:1000,MagicPoint:1000,Attack:100,Intelligence:100,Mind:20,Defence:20,Agility:50},baseSkillEquipCost:100,passiveIds:[]};
+  const cat={...catalog,characters:[native],statGrowth:{1:{rows:[{level:1,requiredExperience:0,adds:{},skillIds:[active.id,...passives.map(p=>p.id)]}]}},
+    visions:[],equipment:[],artifacts:[],masterSkills:[],skills:[attack,active],passives:[...catalog.passives,...passives]};
+  const save={characters:[{id:1001,joinStatus:'Join',usable:true,experience:0,baseParameters:[],activeSkillIds:[attack.id],equippedSkillIds:Array(8).fill(-1),equipment}],resonances:[],inventory:[],party:[1001],player:{difficulty:'Normal'}};
+  const target={id:3,name:'Target',level:1,stats:{MaxHitPoint:1e12,MaxBreakPoint:1e12,Agility:0,Defence:1,Mind:1},resistances:{},passiveIds:[]};
+  const model=()=>B.createModel(cat,save,target,{goals:['damage'],rounds:1,includeSupportOptions:false});
+  return {run:lockedSkillIds=>model().evaluate({characterId:1001,visionId:-1,equipment,...(lockedSkillIds?{lockedSkillIds}:{})}),attack,active};
+}
+// Functions are not comparable by deepEqual; compare the serialisable result.
+const plain=value=>JSON.parse(JSON.stringify(value));
+
+test('a pinned passive is equipped even when it adds no value, within budget and slots',()=>{
+  const {run}=pinFixture();
+  const free=run(),pinned=run([900101]);
+  assert.equal(free.valid,true);
+  assert.equal(free.equippedSkillIds.includes(900101),false);
+  assert.equal(pinned.valid,true);
+  assert.ok(pinned.equippedSkillIds.includes(900101));
+  assert.equal(pinned.skillCost,free.skillCost+30);
+  assert.ok(pinned.skillCost<=pinned.skillBudget);
+  assert.ok(pinned.equippedSkillIds.length<=pinned.maxSkillSlots);
+});
+
+test('a pinned active is charged and carried without changing the chosen attack',()=>{
+  const {run,attack,active}=pinFixture();
+  const free=run(),pinned=run([active.id]);
+  assert.equal(pinned.skillId,free.skillId);
+  assert.equal(pinned.skillId,attack.id);
+  assert.ok(pinned.equippedSkillIds.includes(active.id));
+  assert.equal(pinned.skillCost,free.skillCost+40);
+});
+
+test('pins that alone exceed the ability budget or slot count make the build invalid',()=>{
+  const {run}=pinFixture();
+  assert.equal(run([900101,900102]).valid,false);
+  assert.equal(run(Array.from({length:9},(_,i)=>900120+i)).valid,false);
+});
+
+test('no pins, or an empty pin list, leaves the evaluation unchanged',()=>{
+  const {run}=pinFixture();
+  const base=plain(run());
+  assert.deepEqual(plain(run([])),base);
+  assert.deepEqual(plain(run(undefined)),base);
+});
+
+test('a pinned free ability costs nothing and an unknown pin is ignored',()=>{
+  const {run,attack}=pinFixture();
+  const base=plain(run());
+  const freePin=run([attack.id]);
+  assert.equal(freePin.valid,true);
+  assert.equal(freePin.skillCost,base.skillCost);
+  assert.deepEqual(freePin.equippedSkillIds,base.equippedSkillIds);
+  const unknown=run([987654321]);
+  assert.equal(unknown.valid,true);
+  assert.equal(unknown.skillCost,base.skillCost);
+  assert.deepEqual(unknown.equippedSkillIds,base.equippedSkillIds);
+});
