@@ -12,6 +12,16 @@
 
 Team ideas is a shortlist of parties worth trying, not a proven best.
 
+Search abilities by name or description, filter by type, or show only those you can equip now. Equipped abilities and the AP/slot meter stay visible.
+
+After Build, open its details to compare with your exact pre-Build draft under the same fight conditions. **Restore pre-Build draft** brings back its gear, abilities and pins; **Try selected result** reapplies the recommendation.
+
+When loading a newer save, use **Continue plans from another save** to select your previous workspace. Valid plans, pins and goals carry forward after checking current ownership, learned abilities and shared gear. Existing plans and unsaved edits are preserved; rejected plans remain in the original workspace with their conflicts listed.
+
+Build details include **Assumptions and model limits**: the actual fight settings, relevant unsupported or deferred effects, resource warnings and evidence links. Arithmetic checks do not establish live-fight accuracy or prove a globally best build.
+
+**Find useful unlocks** compares the next unlearned ability milestone on each owned Resonance's Sync track for the selected character and goal. Gear and equipped Resonance stay fixed, pinned abilities are retained, and both sides optimize the remaining abilities. Each recommendation shows recorded/required Sync points, all crossed rewards, total estimated gain and the target milestone's own gain beyond earlier rewards. These previews never unlock or equip future abilities. Awakening upgrades and unowned Resonances are outside this comparison.
+
 Your save is read in your browser and never uploaded. Without a save you can still look up every boss and Resonance.
 
 Fan-made, not affiliated with Square Enix. Something wrong? [Open an issue](https://github.com/DylanElo/ffr-battle-companion/issues/new).
@@ -34,6 +44,9 @@ Static files in [`docs/`](docs), no build step: `python -m http.server -d docs`.
 - [`docs/optimizer-ui.js`](docs/optimizer-ui.js) and [`docs/build-details.js`](docs/build-details.js): results as the move, gear, abilities and always-on effects; each opens to the game's description and what it adds.
 - [`docs/piece-details.js`](docs/piece-details.js), [`docs/slot-ui.js`](docs/slot-ui.js) and [`docs/abilities.js`](docs/abilities.js): the game's description of a piece, one gear or Resonance slot with its choices, and manually equipped abilities with their AP cost.
 - [`docs/core.js`](docs/core.js): stock, reservations, recommendations and mastery rules.
+- [`docs/workspace.js`](docs/workspace.js): discovery of previous browser plans and validation when carrying them into another save.
+- [`docs/result-explanations.js`](docs/result-explanations.js): player-facing scenario assumptions, passive coverage and evidence limits.
+- [`docs/unlock-recommendations.js`](docs/unlock-recommendations.js) and [`docs/unlock-ui.js`](docs/unlock-ui.js): isolated future Sync comparisons and their preview cards.
 - [`docs/save.js`](docs/save.js): the encrypted save format. [`docs/save-io.js`](docs/save-io.js) reads a save into a snapshot and writes plans into a copy of it, refusing a save that changed after it was loaded.
 - [`docs/damage.js`](docs/damage.js), [`docs/passives.js`](docs/passives.js) and [`docs/stats.js`](docs/stats.js): native-formula damage, supported effect rules and saved-progression stat derivation.
 - [`docs/battle.js`](docs/battle.js) and [`docs/search.js`](docs/search.js): legal loadouts and the shared-inventory party search, in a Web Worker. Every character gets a share of the candidate time budget before teams are ranked. The beam ranks parties on a few reproducible samples (members' own scores after its deadline), and every party shown is re-scored on all of them.

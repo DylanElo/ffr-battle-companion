@@ -5,6 +5,62 @@ const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../docs/optimizer-worker.js'),'utf8');
 
+test('single worker completes equipment alternatives before ranking and deduplicating attacks',async()=>{
+  const messages=[],finalized=[];
+  const candidates=[{visionId:100,equipment:{weaponId:10},score:100,evaluation:{skillId:1}},
+    {visionId:100,equipment:{weaponId:11},score:99,evaluation:{skillId:1}},
+    {visionId:101,equipment:{weaponId:10},score:98,evaluation:{skillId:1}}];
+  const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
+    self:{postMessage:m=>messages.push(m)},CompanionBattle:{GENERAL_ENEMY_ID:'general',createModel:()=>({evaluate:()=>({valid:true}),explainAbilities:()=>[],
+      scenario:{rounds:7},evidence:{formula:'Native arithmetic'},globalWarnings:['Active artifact effects are not modeled.']})},
+    CompanionSearch:{buildCandidates:()=>candidates,finalizeBuilds:(c,s,[x])=>{
+      finalized.push(x.equipment.weaponId);return [{...x,score:x.equipment.weaponId===11?199:x.score}];
+    }}};
+  vm.runInNewContext(source,context);
+  await context.self.onmessage({data:{id:1,mode:'single',catalog:{enemies:[{id:1}]},
+    snapshot:{characters:[{id:1,equipment:{visionId:100}}]},characterId:1,enemyId:1,available:[],options:{}}});
+  const response=messages.find(m=>m.type==='result').result, rows=response.results;
+  assert.ok(finalized.includes(11));
+  assert.equal(rows[0].equipment.weaponId,11);
+  assert.equal(rows[0].score,199);
+  assert.equal(rows.filter(c=>c.visionId===100 && c.evaluation.skillId===1).length,1);
+  assert.equal(response.scenario.rounds,7);
+  assert.equal(response.modelEvidence.formula,'Native arithmetic');
+  assert.ok(rows[0].evaluation.warnings.includes('Active artifact effects are not modeled.'));
+});
+
+test('single worker compares the pre-Build draft with its exact fixed abilities under the same model',async()=>{
+  const messages=[],evaluated=[];
+  const model={evaluate:args=>{evaluated.push(args);return {valid:true,damage:args.equipment.weaponId};},explainAbilities:()=>[]};
+  const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
+    self:{postMessage:m=>messages.push(m)},CompanionBattle:{createModel:()=>model},
+    CompanionSearch:{buildCandidates:()=>[],finalizeBuilds:()=>[]}};
+  vm.runInNewContext(source,context);
+  const baseline={weaponId:77,visionId:100,accessoryIds:[3],equippedSkillIds:[8,9]};
+  await context.self.onmessage({data:{id:1,mode:'single',catalog:{enemies:[{id:1}]},
+    snapshot:{characters:[{id:1,equipment:{weaponId:10,visionId:100}}]},characterId:1,enemyId:1,available:[],baseline,options:{goals:['stagger']}}});
+  const result=messages.find(m=>m.type==='result').result;
+  assert.equal(result.before.damage,77); assert.equal(result.current.damage,10);
+  const call=evaluated.find(args=>args.equipment.weaponId===77);
+  assert.equal(call.current,true); assert.deepEqual(call.equippedSkillIds,[8,9]);
+  assert.equal(call.equipment,baseline);
+});
+
+test('unlock worker routes an isolated preview without invoking the ordinary build search',async()=>{
+  const messages=[],build={visionId:100,weaponId:10},snapshot={characters:[]},catalog={enemies:[{id:1}]};
+  const output={results:[{required:95}],checked:1,total:1};
+  const context={importScripts:()=>{},fetch:async()=>({ok:true,json:async()=>({})}),self:{postMessage:m=>messages.push(m)},
+    Companion:{},CompanionStats:{},CompanionBattle:{},CompanionUnlocks:{recommend:(c,s,id,b,e,options,deps,progress)=>{
+      assert.equal(c,catalog);assert.equal(s,snapshot);assert.equal(b,build);assert.equal(id,1001);assert.equal(e.id,1);
+      assert.equal(options.goals[0],'stagger');assert.equal(deps.core,context.Companion);
+      progress('Checking one milestone');return output;
+    }}};
+  vm.runInNewContext(source,context);
+  await context.self.onmessage({data:{id:7,mode:'unlocks',catalog,snapshot,characterId:1001,build,enemyId:1,options:{goals:['stagger']}}});
+  assert.equal(messages.find(m=>m.type==='result').result,output);
+  assert.equal(messages.find(m=>m.type==='progress').message,'Checking one milestone');
+});
+
 async function run({party=[1,2,3,4],invalid=[],partySize=4,partyState={}}={}){
   const messages=[],compared=[];
   const model={
