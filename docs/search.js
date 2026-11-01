@@ -6,6 +6,8 @@
   // Completed builds use the same tie rule in search, previews and final results.
   const compareCandidates = (a,b) => b.score-a.score ||
     (Number(a.evaluation?.skillCost)||0)-(Number(b.evaluation?.skillCost)||0) ||
+    C.equipmentIds(b.equipment || {}).length-C.equipmentIds(a.equipment || {}).length ||
+    (Number(b.evaluation?.durability)||0)-(Number(a.evaluation?.durability)||0) ||
     String(a.key || '').localeCompare(String(b.key || ''));
   const countsOf = ids => {
     const counts = new Map();
@@ -182,13 +184,31 @@
     if (positive(locks.visionId) && !owned.has(Number(locks.visionId))) return [];
     const pool=[...(positive(locks.visionId)?[Number(locks.visionId)]:options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
       .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
-    const seeds=new Map(pool.map(id=>[id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id},true)]));
+    const seeds=new Map(pool.map(id=>{
+      if(!options.jointOptimization)return [id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id},true)];
+      const complete={...base,accessoryIds:base.accessoryIds.slice(),visionId:id},remaining=new Map(available);
+      for(const usedId of C.equipmentIds(complete))remaining.set(usedId,(remaining.get(usedId)||0)-1);
+      const priority=equipmentOrdering(catalog,native,id,options);
+      const defense=C.priorityGoal(catalog,['HitPoint','MaxHitPoint','PhysicalDefense','MagicalDefense','Defence','Mind']);
+      const fill=slot=>catalog.equipment.filter(item=>C.eligible(item,native,slot) && (remaining.get(item.id)||0)>0)
+        .sort((a,b)=>priority(b)-priority(a) || C.score(b,defense)-C.score(a,defense) ||
+          (a.passiveIds || []).length-(b.passiveIds || []).length || a.id-b.id)[0];
+      for(const slot of ['weapon','armor'])if(!(complete[slot+'Id']>0)){
+        const item=fill(slot);if(item){complete[slot+'Id']=item.id;remaining.set(item.id,remaining.get(item.id)-1);}
+      }
+      for(let n=0;n<slots;n++)if(!(complete.accessoryIds[n]>0)){
+        const item=fill('accessory');if(item){complete.accessoryIds[n]=item.id;remaining.set(item.id,remaining.get(item.id)-1);}
+      }
+      // Publish scored gear before the expensive walk; never append unscored filler after time expires.
+      const seed=evaluateOne(state,callbacks,saved.id,id,complete,true) || evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id},true);
+      return [id,seed];
+    }));
     const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || (seeds.get(b)?.score ?? -Infinity)-(seeds.get(a)?.score ?? -Infinity));
     const all=new Map([...seeds.values()].filter(Boolean).map(c=>[c.key,c]));
     for (const [n,visionId] of visions.entries()) {
       const local=new Map();
       // Native timing checks can exhaust the budget during seeding; retain that completed comparison.
-      if(seeds.get(visionId))local.set(keyOf(base),seeds.get(visionId));
+      if(seeds.get(visionId))local.set(keyOf(seeds.get(visionId).equipment),seeds.get(visionId));
       let attempts=0;
       let best=seeds.get(visionId);
       const fairShare=1/(visions.length-n);
@@ -208,6 +228,7 @@
         return true;
       };
       // Seed the saved loadout before pruning so a search budget never hides its comparison.
+      if(options.jointOptimization && best)consider(best.equipment.weaponId,best.equipment.armorId,best.equipment.accessoryIds);
       consider(base.weaponId,base.armorId,base.accessoryIds);
       consider(emptyGear.weaponId,emptyGear.armorId,emptyGear.accessoryIds);
       const priority=equipmentOrdering(catalog,native,visionId,options),priorityOf=id=>priority(equipment.get(id));
@@ -327,8 +348,6 @@
     const unmodeled=(evaluation,item)=>[...(evaluation.passiveAnalysis?.unsupported || []),...(evaluation.passiveAnalysis?.deferred || [])]
       .filter(effect=>(item?.passiveIds || []).includes(effect.passiveId));
     const fillState=state || stateFor(defaults(callbacks.options || {}));
-    const damageOnly=fillState.options.goals?.length===1 && fillState.options.goals[0]==='damage';
-    const pinnedAccessories=countsOf(fillState.options.locks?.accessoryIds || []);
     const slotsOf=equipment=>[['weapon',0,e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',0,e=>e.armorId,(e,id)=>({...e,armorId:id})],
       ...equipment.accessoryIds.map((_,i)=>['accessory',i,e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
     const out=members.slice();
@@ -342,19 +361,6 @@
       const member=out[memberIndex];
       const native=catalog.characters.find(c=>c.id===member.characterId);
       let best=member;
-      if(damageOnly)for(let i=0;i<best.equipment.accessoryIds.length;i++){
-        if(stopped(fillState))break;
-        const id=best.equipment.accessoryIds[i],counts=countsOf(best.equipment.accessoryIds);
-        if(!(id>0) || (counts.get(id)||0)<=(pinnedAccessories.get(id)||0))continue;
-        const equipment={...best.equipment,accessoryIds:best.equipment.accessoryIds.map((value,n)=>n===i?-1:value)};
-        const without=evaluateOne(fillState,callbacks,member.characterId,member.visionId,equipment);
-        if(!without || without.score<best.score || !best.roles.every(role=>without.roles.includes(role)))continue;
-        const next=out.slice();next[memberIndex]=without;
-        const before=partyScore(out),after=partyScore(next);
-        if(!Number.isFinite(before) || !Number.isFinite(after) || after<before)continue;
-        if(after===before && without.score===best.score && abilityCost(without)>abilityCost(best))continue;
-        used.set(id,(used.get(id)||0)-1);best=without;out[memberIndex]=best;
-      }
       for (const [slot,index,get,set] of slotsOf(best.equipment)) {
         if(stopped(fillState))break;
         if (Number(get(best.equipment))>0) continue;
@@ -370,7 +376,6 @@
           const nextPartyScore=partyScore(next);
           if (!Number.isFinite(nextPartyScore) || nextPartyScore<previousPartyScore) continue;
           if(nextPartyScore===previousPartyScore && c.score===best.score && abilityCost(c)>abilityCost(best))continue;
-          if (damageOnly && slot==='accessory' && nextPartyScore<=previousPartyScore) continue;
           if (!pick || nextPartyScore>pick.partyScore || (nextPartyScore===pick.partyScore && (c.score>pick.c.score || c.score===pick.c.score &&
             (abilityCost(c)<abilityCost(pick.c) || abilityCost(c)===abilityCost(pick.c) && worth(item.id)>worth(pick.id)))))pick={c,id:item.id,partyScore:nextPartyScore};
         }

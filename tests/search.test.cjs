@@ -221,14 +221,14 @@ test('single-character finalization fills neutral accessories left empty by a sc
   assert.equal(S.validateParty(catalog,snapshot,[result],{partySize:1}),'');
 });
 
-test('damage builds replace neutral accessories with damage upgrades and leave remaining neutral slots empty',()=>{
+test('damage builds retain neutral accessories while filling remaining slots with damage upgrades',()=>{
   const {catalog,snapshot}=fixture(1);
   const callbacks={options:{goals:['damage']},evaluate:({equipment})=>({score:10+equipment.accessoryIds.filter(id=>id===32).length*4})};
   const stock=new Map([[30,1],[32,1]]);
   const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,{...options,visionIds:[100],maxEvaluations:1},stock)[0];
   candidate.equipment.accessoryIds=[30,-1];
   const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],stock,callbacks);
-  assert.deepEqual(result.equipment.accessoryIds,[32,-1]);
+  assert.deepEqual(result.equipment.accessoryIds,[30,32]);
   assert.equal(result.score,14);
   const pinned={...callbacks,options:{goals:['damage'],locks:{accessoryIds:[30]}}};
   const [kept]=S.finalizeBuilds(catalog,snapshot,[candidate],stock,pinned);
