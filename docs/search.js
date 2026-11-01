@@ -504,10 +504,10 @@
       const bound=new Map(teams.map(team=>[team,team.reduce((sum,id)=>sum+Math.max(0,...candidatesFor(id,inventory(snapshot)).map(c=>c.score)),0)]));
       teams.sort((a,b)=>bound.get(b)-bound.get(a));
     }
-    // A full party simulation costs tens to hundreds of milliseconds. After this deadline the beam ranks the
+    // MP-dependent state can make full party scoring expensive; reserve time for refinement and final scoring. After this deadline the beam ranks the
     // remaining parties by their members' own scores, so every team is still compared and the search ends.
     const partyBudget=options.partyTimeMs ?? options.timeMs,partyDeadline=Math.min(globalDeadline,deadlineAfter(partyBudget));
-    const comparisonDeadline=partyDeadline-(options.jointOptimization && partyBudget>0?Math.min(3000,partyBudget*.5):0);
+    const comparisonDeadline=partyDeadline-(options.jointOptimization && partyBudget>0?Math.min(4000,partyBudget*2/3):0);
     const rank=members=>{
       if(Date.now()<comparisonDeadline)return {...(partyScore(members,QUICK_SAMPLES,comparisonDeadline) || sumOf(members)),estimated:true};
       state.truncated=true;state.reasons.add('party time budget');

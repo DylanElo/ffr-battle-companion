@@ -8,6 +8,65 @@ const skillRules=JSON.parse(fs.readFileSync(path.join(__dirname,'../docs/skill-r
 const skill={id:400100,dmgType:'Physic',attr:'Ability',element:'None'};
 const context={skill,hpPercent:100,mpPercent:100,lbPercent:0,commandId:1,broken:false,critical:false,extraPhase:false,statusIds:[],targetStatusIds:[]};
 const passiveFor=effectId=>catalog.passives.find(p=>p.effects.includes(effectId)).id;
+const nativeScionArea=require('./fixtures/native-scion-area.json');
+
+test('Scion occurrence products match native getter/aggregate execution fixtures',()=>{
+  for(const row of nativeScionArea.scion){
+    const activeEffectIds=Array(row.instances).fill(19012);
+    assert.equal(P.analyze(catalog,[],{...context,activeEffectIds}).modifiers.skillHistoryMultiplier,row.multiplier);
+  }
+});
+
+test('Scion Sorceress scales both Skill Flow increments and its cap regardless of passive order',()=>{
+  const ctx={...context,currentSkillIds:[1,2,3,4,5,6],skillHistory:[]};
+  const a=P.analyze(catalog,[1464,1441],ctx),b=P.analyze(catalog,[1441,1464],ctx);
+  assert.equal(a.modifiers.skillHistoryMultiplier,1.5000001192092896);
+  assert.ok(Math.abs(a.modifiers.damagePercent-75)<.0001);
+  assert.ok(Math.abs(a.modifiers.breakPercent-75)<.0001);
+  assert.equal(a.modifiers.damagePercent,b.modifiers.damagePercent);
+  const three=P.analyze(catalog,[1464,1441],{...ctx,currentSkillIds:[1,2,3]});
+  assert.ok(Math.abs(three.modifiers.damagePercent-45)<.0001);
+});
+
+test('Scion multiplies known physical instances without duplicating ordinary semantic references',()=>{
+  assert.equal(P.analyze(catalog,[1441,1441],context).modifiers.skillHistoryMultiplier,1.5000001192092896);
+  const twice=P.analyze(catalog,[1441],{...context,passiveIdOccurrences:[1441,1441]});
+  assert.equal(twice.modifiers.skillHistoryMultiplier,2.250000476837158);
+  assert.equal(twice.deferred.length,0);
+  assert.equal(P.analyze(catalog,[],{...context,activeEffectIds:[19012,19012]}).modifiers.skillHistoryMultiplier,2.250000476837158);
+});
+
+test('Area Effect Adept exposes an idempotent reduction bypass and delegates MP cost to the resource model',()=>{
+  const result=P.analyze(catalog,[1351],context);
+  assert.equal(result.modifiers.ignoreAreaReduction,true);
+  assert.equal(result.damageFactor,1);
+  assert.ok(result.deferred.some(effect=>effect.effectId===61001 && /separately/.test(effect.reason)));
+  assert.ok(!result.unsupported.some(effect=>effect.effectId===61001));
+  const twice=P.analyze(catalog,[],{...context,activeEffectIds:[19002,19002]});
+  assert.equal(twice.modifiers.ignoreAreaReduction,true);
+  assert.equal(twice.deferred.length,0);
+});
+
+test('Scion and area bypass reject unrecognized native parameter layouts',()=>{
+  for(const id of [19012,19002]){
+    const effect=catalog.effects.find(effect=>effect.id===id),params=effect.params.slice();params[4]=3;
+    assert.ok(P.decode({...effect,params}).unsupported);
+  }
+});
+
+test('only verified auto-MP recovery rows decode and stay deferred outside ActionBegin',()=>{
+  for(const [id,kind,value] of [[1282,'mpRecoveryFlat',5],[1283,'mpRecoveryPercent',3],[1284,'mpRecoveryPercent',5]]){
+    const effect=catalog.effects.find(effect=>effect.id===id),decoded=P.decode(effect);
+    assert.equal(decoded.kind,kind);assert.equal(decoded.value,value);assert.equal(decoded.eventTiming,'ActionBegin');
+    const result=P.analyze(catalog,[],{...context,activeEffectIds:[id]});
+    assert.equal(result.applied.length,0);assert.match(result.deferred[0].reason,/ActionBegin/);
+    const event=P.analyze(catalog,[],{...context,activeEffectIds:[id],eventTimings:['ActionBegin']});
+    assert.equal(event.modifiers[kind],value);assert.equal(event.modifiers.damagePercent,0);
+    assert.ok(P.decode({...effect,id:999999}).unsupported);
+    assert.ok(P.decode({...effect,applyTiming:'DamageCalculation'}).unsupported);
+    assert.ok(P.decode({...effect,params:effect.params.map((value,index)=>index===4?1:value)}).unsupported);
+  }
+});
 
 test('native physical and magic damage passives filter by damage type and stack in one additive bucket',()=>{
   const physical=passiveFor(16001),magic=passiveFor(16011);

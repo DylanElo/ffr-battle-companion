@@ -8,6 +8,8 @@
   const damageTypes=['None','Physic','Magic'];
   const resistances=['None','Weakness','Halved','Invalid','Absorb','Reflect'];
   const resistancePriority={None:0,Weakness:25,Halved:50,Invalid:75,Absorb:100};
+  const f=Math.fround,EPS=f(2**-23);
+  const instanceStackingTypes=new Set(['DamageMultiplier','DmgMulSkillNumUp','IgnoreAllMagicReduction']);
   const utilityTypes=new Set(['ExperienceUp','ExperienceUpCap','MoneyUp','MoneyUpCap','APUp','APUpCap','ItemDropUp','EncountRatio','Preemtive','StealRate','StealRareRate']);
   const catalogCache=new WeakMap(),effectCache=new WeakMap();
   const evidence={
@@ -42,6 +44,10 @@
     const requireValue=(key,value,comparison='equal')=>term.tests.push({key,value,comparison});
     const reject=reason=>({unsupported:reason});
     const allDefault=(start,allowed=-1)=>p.slice(start).every(n=>Number(n)===allowed);
+    if(type==='ParameterVariation' && [1282,1283,1284].includes(Number(effect.id))){
+      if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || Number(p[1])!==2 || ![0,2].includes(Number(p[2])) || Number(p[3])!==-1 || Number(p[4])!==0 || !allDefault(5) || clean(effect.applyTiming)!=='ActionBegin' || clean(effect.proceedTiming)!=='ActionBegin' || Number(effect.duration)!==-1)return reject('Unrecognized action-begin MP recovery layout.');
+      return {...term,kind:Number(p[2])===0?'mpRecoveryFlat':'mpRecoveryPercent',value:Number(p[0]),eventTiming:'ActionBegin'};
+    }
     if(type==='ParameterContinuousVariation'){
       if(!parameters[p[1]] || ![0,1,2,3].includes(p[2]) || !p.slice(3,6).every(n=>Number(n)===0) || !allDefault(6))return reject('Unrecognized continuous parameter layout.');
       term.kind=[0,1].includes(p[2])?'statFlat':'statPercent';term.parameter=parameters[p[1]];term.value=Number(p[0])*([1,3].includes(p[2])?-1:1);return term;
@@ -180,6 +186,14 @@
       requireValue('skill.target',['Group','All'],'oneOf');requireValue('targetCount',1,'exact');
       return {...term,kind:'damagePercent',value:Number(p[0])};
     }
+    if(type==='DmgMulSkillNumUp'){
+      if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || !allDefault(1))return reject('Unrecognized skill-history scale layout.');
+      return {...term,kind:'skillHistoryMultiplier',value:Number(p[0])};
+    }
+    if(type==='IgnoreAllMagicReduction'){
+      if(p.length!==15 || !allDefault(0))return reject('Unrecognized area-reduction bypass layout.');
+      return {...term,kind:'ignoreAreaReduction',value:true};
+    }
     if(type==='DmgMulSkillNum'){
       const timing=clean(effect.applyTiming);
       if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || !Number.isFinite(Number(p[1])) || Number(p[1])<0 || !Number.isInteger(Number(p[2])) || Number(p[2])<0 || Number(p[2])>128 || !allDefault(3) || !['DamageCalculation','DamageCalculationOnBreak','BreakDmgCalculation'].includes(timing))return reject('Unrecognized skill-history multiplier layout.');
@@ -201,6 +215,8 @@
     const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0,gambleShot:false,accuracyBonus:0};
     modifiers.incomingPhysicalNullifyChance=0;
     modifiers.bonusPhaseChancePercent=0;
+    modifiers.skillHistoryMultiplier=1;modifiers.ignoreAreaReduction=false;
+    modifiers.mpRecoveryFlat=0;modifiers.mpRecoveryPercent=0;
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     // An occurrence list replaces semantic references; it never adds a second copy of the reference list.
@@ -225,8 +241,9 @@
           if(evaluated.state==='no'){result.inactive.push({...record,reason:'Activation condition does not match.'});blocked=true;break;}
         }
         if(blocked)continue;
+        if(['CostVariation','IgnoreCostChange'].includes(record.type)){result.deferred.push({...record,reason:'Resource cost is evaluated separately for the selected command.'});continue;}
         if(Number(effect.prob??100)!==100 || Number(effect.activationProbability??100)!==100){result.deferred.push({...record,reason:'Random activation requires a stochastic/event model.',probability:effect.prob,activationProbability:effect.activationProbability});continue;}
-        if(seenEffects.has(effect.id) && !(occurrences && record.type==='DamageMultiplier')){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
+        if(seenEffects.has(effect.id) && !(occurrences && instanceStackingTypes.has(record.type))){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
         seenEffects.add(effect.id);
         let term=effectCache.get(effect);
         if(!term){term=decode(effect);effectCache.set(effect,term);}
@@ -240,11 +257,12 @@
       const effect=byEffect.get(Number(id)),record={effectId:Number(id),source:'activeEffect'};
       result.coverage.effects++;
       if(!effect){result.unsupported.push({...record,reason:'Unknown active effect ID.'});continue;}
-      if(seenEffects.has(effect.id) && clean(effect.type)!=='DamageMultiplier'){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
+      if(seenEffects.has(effect.id) && !instanceStackingTypes.has(clean(effect.type))){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
       seenEffects.add(effect.id);
       const gate=condition(effect.condition,context);
       if(gate.state==='unknown'){result.deferred.push({...record,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(record);continue;}
+      if(['CostVariation','IgnoreCostChange'].includes(clean(effect.type))){result.deferred.push({...record,type:clean(effect.type),reason:'Resource cost is evaluated separately for the selected command.'});continue;}
       if(Number(effect.activationProbability??100)!==100){result.deferred.push({...record,reason:'Random activation requires a stochastic/event model.'});continue;}
       let term=effectCache.get(effect);
       if(!term){term=decode(effect);effectCache.set(effect,term);}
@@ -271,7 +289,15 @@
       for(const term of potential){modifiers.imbues.push({element:term.element,whenNoneOnly:term.whenNoneOnly,effectId:term.effectId});result.applied.push(term);result.terms.push(term);}
     }
     modifiers.element=context.element;
-    for(const term of candidates.filter(t=>t.kind!=='imbue')){
+    // Native Skill Flow reads this product for both its value and cap, independent of effect-list order.
+    for(const term of candidates.filter(t=>t.kind==='skillHistoryMultiplier')){
+      modifiers.skillHistoryMultiplier=f(modifiers.skillHistoryMultiplier*f(f(f(term.value)*f(.01))+EPS));
+      result.applied.push(term);result.terms.push(term);
+    }
+    for(const term of candidates.filter(t=>!['imbue','skillHistoryMultiplier'].includes(t.kind))){
+      if(term.eventTiming && !(Array.isArray(context.eventTimings) && context.eventTimings.some(t=>clean(t)===term.eventTiming))){
+        result.deferred.push({...term,reason:`Requires passive event ${term.eventTiming}.`});continue;
+      }
       if(term.skillIds && (!context.skill || !term.skillIds.includes(Number(context.skill.id)))){
         if(!context.skill)result.deferred.push({...term,reason:'Requires skill ID context.'});else result.inactive.push(term);
         continue;
@@ -317,7 +343,10 @@
         }
         const previous=term.historyTurns?history.slice(-term.historyTurns):[];
         const skillCount=new Set([...current,...previous.flat()]).size;
-        const value=Math.min(term.cap,skillCount*term.value);
+        const scale=modifiers.skillHistoryMultiplier;
+        const percent=value=>f(f(f(value)*f(.01))+EPS);
+        const value=scale===1?Math.min(term.cap,skillCount*term.value):
+          Math.max(0,Math.min(f(scale*percent(term.cap)),f(scale*percent(skillCount*term.value))))*100;
         modifiers[term.kind==='damagePerSkill'?'damagePercent':'breakPercent']+=value;
         result.applied.push({...term,value,skillCount});result.terms.push({...term,value,skillCount});continue;
       }
@@ -333,7 +362,7 @@
         if(!known(resistancePriority[term.resistance])){result.unsupported.push({...term,reason:'Resistance priority is not defined in current battle rules.'});continue;}
         if(resistancePriority[term.resistance]>resistancePriority[old])modifiers.resistances[term.element]=term.resistance;
       }else if(term.kind==='statusResistance')add(modifiers.statusResists,term.statusId,term.value);
-      else if(['damageCapRaised','dominantPower','dominantDefence'].includes(term.kind))modifiers[term.kind]=true;
+      else if(['damageCapRaised','dominantPower','dominantDefence','ignoreAreaReduction'].includes(term.kind))modifiers[term.kind]=true;
       else if(term.kind!=='utility')modifiers[term.kind]+=term.value;
       result.applied.push(term);result.terms.push(term);
     }

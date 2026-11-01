@@ -1,0 +1,15 @@
+{
+  "evidence": "Static native algebra, not a live combat recording: 1451153FD-145115414 float32 percentage + 2^-23; 145238963 iterative float32 multiplication; 145149DEC-145149E09 zero bypass, multiply, minimum 1, truncate.",
+  "cases": [
+    {"raw":0,"percentages":[50,150],"cost":0},
+    {"raw":1,"percentages":[50],"cost":1},
+    {"raw":3,"percentages":[50],"cost":1},
+    {"raw":5,"percentages":[50],"cost":2},
+    {"raw":15,"percentages":[150],"cost":22},
+    {"raw":19,"percentages":[150],"cost":28},
+    {"raw":19,"percentages":[50],"cost":9},
+    {"raw":19,"percentages":[50,150],"cost":14},
+    {"raw":19,"percentages":[50,50],"cost":4},
+    {"raw":19,"percentages":[50,150,150],"cost":21}
+  ]
+}
