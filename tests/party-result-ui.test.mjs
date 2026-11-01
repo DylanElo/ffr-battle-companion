@@ -43,3 +43,10 @@ test('the picture shape toggle sits next to Copy image and marks the chosen shap
     {characterId:2,equipment:{accessoryIds:[]},evaluation:{skillId:500,damage:1234}}],evaluation:{damage:1234}}]}});
   assert.match(html,/Copy image<\/button><span class="shape" role="group" aria-label="Picture shape"><button type="button" class="chip" data-picture="wide" aria-pressed="false">Wide<\/button><button type="button" class="chip" data-picture="square" aria-pressed="true">Square<\/button>/);
 });
+
+test('party member passive coverage stays in a compact disclosure and distinguishes partial search',()=>{
+  const html=renderOptimizer({catalog,snapshot,result:{results:[{members:[{characterId:2,equipment:{accessoryIds:[]},evaluation:{skillId:500,damage:1234,
+    jointPassiveCoverage:{eligibleIds:[1,2],triedIds:[1],complete:false}}}],evaluation:{damage:1234}}]}});
+  assert.match(card(html,'Fina'),/<summary>Passive search: 1 \/ 2 sources<\/summary>/);
+  assert.match(html,/Search budget limited coverage/);assert.match(html,/does not guarantee optimal combinations/);
+});

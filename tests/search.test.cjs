@@ -43,6 +43,104 @@ function fixture(n=4) {
       resonances:Array.from({length:n},(_,i)=>({id:100+i})),party:Array.from({length:Math.min(4,n)},(_,i)=>i+1)}
   };
 }
+
+function refinementFixture(){
+  const f=fixture(2);f.catalog.equipment=[];f.snapshot.inventory=[];
+  const evaluate=({characterId})=>({valid:true,score:10,skillId:401010,equippedSkillIds:[],turn:{leaves:[{skillId:401010}],steps:[{skillId:401010}]},canHeal:characterId===1});
+  return {...f,evaluate,options:{partySize:2,fixedCharacterIds:[1,2],maxResults:1,maxEvaluations:200,perLoadoutBudget:0,
+    timeMs:1000,partyTimeMs:1000,jointOptimization:true,minHealers:1,minProtectors:0}};
+}
+
+test('joint party refinement rejects individual gains that lose a required role or lower the complete party score',()=>{
+  const f=refinementFixture(),calls=[],checkpoints=[];
+  const result=S.rankParties(f.catalog,f.snapshot,{options:f.options,evaluate:f.evaluate,refine:args=>{
+    calls.push(args);
+    return {...f.evaluate(args),score:20,canHeal:false,upgraded:true};
+  },evaluateParty:members=>({score:members.some(m=>m.evaluation.upgraded)?5:20}),checkpoint:r=>checkpoints.push(r)});
+  assert.equal(calls.length,2);
+  assert.equal(result.results[0].score,20);
+  assert.ok(result.results[0].members.every(m=>!m.evaluation.upgraded));
+  assert.deepEqual(calls.find(call=>call.characterId===1).supportRoles,['healer']);
+  assert.deepEqual(calls.find(call=>call.characterId===2).supportRoles,[]);
+  assert.ok(checkpoints.length>0);
+  assert.ok(checkpoints.every(r=>r.results[0].score===20));
+});
+
+test('joint party refinement accepts a lower individual score when complete party throughput improves',()=>{
+  const f=refinementFixture();
+  const result=S.rankParties(f.catalog,f.snapshot,{options:f.options,evaluate:f.evaluate,refine:args=>({
+    ...f.evaluate(args),score:args.characterId===2?5:10,upgraded:args.characterId===2}),
+    evaluateParty:members=>({score:members.some(m=>m.evaluation.upgraded)?30:20})});
+  const best=result.results[0];
+  assert.equal(best.score,30);
+  assert.equal(best.members.find(member=>member.characterId===2).score,5);
+  assert.equal(S.validateParty(f.catalog,f.snapshot,best.members,f.options),'');
+});
+
+test('quick party refinement proposals are rolled back if the full party objective declines',()=>{
+  const f=refinementFixture(),checkpoints=[];
+  const result=S.rankParties(f.catalog,f.snapshot,{options:f.options,evaluate:f.evaluate,
+    refine:args=>({...f.evaluate(args),upgraded:args.characterId===2}),
+    evaluateParty:(members,{samples}={})=>({score:members.some(member=>member.evaluation.upgraded)?samples===4?30:5:20}),
+    checkpoint:result=>checkpoints.push(result)});
+  assert.equal(result.results[0].score,20);
+  assert.ok(result.results[0].members.every(member=>!member.evaluation.upgraded));
+  assert.ok(checkpoints.every(result=>result.results[0].score===20));
+});
+
+test('leading party refinement gives every member a trial before further expensive full finalist scoring',()=>withClock(tick=>{
+  const f=refinementFixture(),tried=[];
+  const result=S.rankParties(f.catalog,f.snapshot,{options:{...f.options,deadline:6100,timeMs:100,partyTimeMs:6000},
+    evaluate:args=>{tick(1);return f.evaluate(args);},
+    refine:args=>{tried.push(args.characterId);tick(args.evaluationTimeMs);return f.evaluate(args);},
+    evaluateParty:(members,{samples}={})=>{tick(samples===4?25:2000);return {score:20};}});
+  assert.deepEqual(tried.slice().sort(),[1,2]);
+  assert.equal(result.results[0].score,20);
+}));
+
+test('party refinement trims redundant paid role support while preserving the required healer and checkpointing lower AP',()=>{
+  const f=refinementFixture(),checkpoints=[];
+  const evaluate=args=>({...f.evaluate(args),canHeal:true,skillCost:10});
+  const result=S.rankParties(f.catalog,f.snapshot,{options:f.options,evaluate,
+    refine:args=>({...evaluate(args),canHeal:args.supportRoles.includes('healer'),skillCost:args.supportRoles.includes('healer')?10:0}),
+    evaluateParty:()=>({score:20}),checkpoint:result=>checkpoints.push(result)});
+  const best=result.results[0];
+  assert.equal(best.members.filter(member=>member.roles.includes('healer')).length,1);
+  assert.equal(best.members.reduce((sum,member)=>sum+member.evaluation.skillCost,0),10);
+  assert.equal(checkpoints.at(-1).results[0].members.reduce((sum,member)=>sum+member.evaluation.skillCost,0),10);
+});
+
+test('party startup fallback cannot overwrite a stronger completed joint candidate on the same gear',()=>{
+  const {catalog,snapshot}=fixture(1);catalog.equipment=[];snapshot.inventory=[];
+  catalog.visions=[];snapshot.resonances=[];snapshot.characters[0].equipment.visionId=-1;
+  const result=S.rankParties(catalog,snapshot,{options:{partySize:1,maxResults:1,jointOptimization:true,
+    timeMs:1000,partyTimeMs:1000,seedEvaluationTimeMs:80,evaluationTimeMs:500,perLoadoutBudget:4,maxEvaluations:100},
+    evaluate:({evaluationTimeMs})=>({score:evaluationTimeMs>80?30:10,equippedSkillIds:[]})});
+  assert.equal(result.results[0].score,30);
+});
+
+test('a fully fixed party checkpoints its saved gear before option generation and never searches other characters',()=>{
+  const {catalog,snapshot}=fixture(4),calls=[],checkpoints=[];
+  snapshot.characters[0].equipment.weaponId=10;
+  const result=S.rankParties(catalog,snapshot,{options:{partySize:2,fixedCharacterIds:[1,2],minHealers:1,
+    jointOptimization:true,maxResults:1,timeMs:1000,partyTimeMs:1000,seedEvaluationTimeMs:80,evaluationTimeMs:500},
+    evaluate:args=>{calls.push(args);return {score:10,canHeal:args.characterId===1};},
+    evaluateParty:()=>({score:20}),checkpoint:result=>checkpoints.push({result,calls:calls.length})});
+  assert.equal(checkpoints[0].calls,2);
+  assert.deepEqual(calls.slice(0,2).map(call=>call.equipment.weaponId),[10,-1]);
+  assert.ok(calls.every(call=>[1,2].includes(call.characterId)));
+  assert.equal(result.results[0].score,20);
+});
+
+test('an early fully scored party survives global expiry before the expensive option sweep',()=>withClock(tick=>{
+  const f=refinementFixture(),checkpoints=[];
+  const result=S.rankParties(f.catalog,f.snapshot,{options:{...f.options,deadline:50,timeMs:10,partyTimeMs:40},
+    evaluate:args=>{tick(1);return f.evaluate(args);},evaluateParty:(members,{deadline})=>{
+      assert.ok(deadline<=50);tick(100);return {score:20};},checkpoint:result=>checkpoints.push(result)});
+  assert.ok(checkpoints.length>0);
+  assert.equal(result.results[0].score,20);
+  assert.equal(S.validateParty(f.catalog,f.snapshot,result.results[0].members,f.options),'');
+}));
 const options={timeMs:0,maxEvaluations:100000,perLoadoutBudget:10000,candidatesPerVision:6,beamWidth:100,maxResults:3};
 
 test('a budget exhausted by initial evaluations still returns the saved Resonance seed',()=>{

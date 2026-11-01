@@ -77,6 +77,17 @@ test('pure damage completion excludes unrelated healing and protection but prese
   assert.ok(pinned.skillCost<=pinned.skillBudget);
   assert.equal(pinned.canHeal,true);
   assert.equal(pinned.canProtect,true);
+  const partyOptions={...options,fillAbilitySlots:false,minHealers:1,minProtectors:0};
+  const roleModel=B.createModel(catalog,snapshot,enemy,partyOptions);
+  const needed=roleModel.evaluate(input);
+  assert.ok(needed.equippedSkillIds.includes(400550));
+  assert.ok(!needed.equippedSkillIds.includes(400640));
+  const noRoles=B.createModel(catalog,snapshot,enemy,{...partyOptions,minHealers:0}).evaluate(input);
+  assert.deepEqual(noRoles.equippedSkillIds,[]);
+  const redundant=roleModel.evaluate({...input,supportRoles:[]});
+  assert.deepEqual(redundant.equippedSkillIds,[]);
+  const pinnedRedundant=roleModel.evaluate({...input,supportRoles:[],lockedSkillIds:utility});
+  assert.ok(utility.every(id=>pinnedRedundant.equippedSkillIds.includes(id)));
 });
 
 test('damage completion retains paid action dependencies that improve the scored recipe', () => {

@@ -46,6 +46,8 @@ Exceptional action restrictions, state-specific ultimate actions, enemy turn scr
 
 The character builder compares learned passive and Spirit sources in complete action recipes, subject to its time and assignment budgets. Result details report which sources reached a completed trial for the selected recipe. A source reaching a trial does not mean every combination was searched or every effect on that source is supported.
 
+The party builder uses the same joint gear/passive search and exact-recipe member refinement. Proposed member changes must preserve inventory quantities, distinct Resonances and required roles. A revised party is retained only after a full-party score comparison; a higher individual damage score alone is insufficient. Candidate search uses ten seconds and party comparison/refinement uses six seconds within a shared deadline. A twenty-second UI safeguard retains the best completed legal party if the worker stalls. Stop does the same. Unverified or rejected changes leave the last fully scored party intact.
+
 Known unsupported damage-related effects include Scion Sorceress's Skill Flow enhancement, Dark Rite's HP scaling, Area Effect Adept's area penalty change, Aggravation, Improvement and Versatility. Passive MP cost changes such as Half MP Cost and Unlock Magic also need verified native handling. These omissions can change the real best damage build; the search does not assign invented bonuses to them.
 
 ## Validation and handoff
