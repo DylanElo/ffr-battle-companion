@@ -1178,7 +1178,8 @@
           for(const action of affordable){
             const alreadyFree=packageFree.has(action.id) || activeSelected.includes(action.id) || selected.includes(action.id);
             if(!alreadyFree && !prepared.learn.learnedActiveIds.includes(action.id))continue;
-            if((prepared.fixed || !options.includeSupportOptions) && !alreadyFree)continue;
+            const unscoredRole=options.fillAbilitySlots && ['healer','protector'].includes(role);
+            if((prepared.fixed || !options.includeSupportOptions || unscoredRole) && !alreadyFree)continue;
             const extra=alreadyFree?0:number(action.equipCost),extraSlots=alreadyFree?0:1;
             if(supportCost+extra>calculated.skillBudget || slotsUsed+extraSlots>calculated.maxSkillSlots)continue;
             if(extraSlots){activeSelected.push(action.id);supportCost+=extra;slotsUsed++;}
@@ -1194,14 +1195,7 @@
           clean(callBundle?.conditionData?.Condition || 'None')==='None' && clean(callEffect?.type)==='AddExPhase' && number(callEffect?.params?.[0])===100 &&
           number(callEffect?.prob,100)===100 && number(callEffect?.activationProbability,100)===100 && clean(callEffect?.condition?.Condition || 'None')==='None';
         if(callSupported)ensureSupport([call],'bonusPhase');
-        // Extra learned actions broaden the completed loadout without changing the scored attack or its passives.
-        if(options.fillAbilitySlots && !prepared.fixed)for(const action of prepared.skills.slice().sort((a,b)=>number(a.equipCost)-number(b.equipCost) || a.id-b.id)){
-          if(slotsUsed>=calculated.maxSkillSlots)break;
-          if(!prepared.legal.has(action.id) || !prepared.learn.learnedActiveIds.includes(action.id) || packageFree.has(action.id) || activeSelected.includes(action.id) || selected.includes(action.id))continue;
-          const cost=number(action.equipCost);
-          if(supportCost+cost>calculated.skillBudget)continue;
-          activeSelected.push(action.id);supportCost+=cost;slotsUsed++;
-        }
+        // Empty slots are preferable to neutral commands; scored recipes reserve their actual dependencies.
         const legalSkills=new Set([...packageFree,...activeSelected,...selected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
         if(callSupported && legalSkills.has(call.id) && number(call.cost)<=availableMp)supportActions.push({skillId:call.id,name:call.name,kind:'bonusPhase',mpCost:number(call.cost),rootRelation:'Friendlies',rootTarget:'Single',effectId:54105,probability:100,activationProbability:100});

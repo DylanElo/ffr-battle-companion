@@ -18,26 +18,28 @@ function fixture(budget = 80) {
   return {catalog, snapshot, enemy, input: {characterId: 1, visionId: -1, equipment}};
 }
 
-test('Build fills affordable empty slots with learned alternatives without weakening the chosen attack', () => {
+test('damage Build leaves slots empty instead of purchasing neutral alternative attacks', () => {
   const {catalog, snapshot, enemy, input} = fixture(), before = JSON.stringify(snapshot);
   const options = {goals: ['damage'], rounds: 1, includeSupportOptions: true};
   const baseline = B.createModel(catalog, snapshot, enemy, options).evaluate(input);
   const result = B.createModel(catalog, snapshot, enemy, {...options, fillAbilitySlots: true}).evaluate(input);
   assert.equal(result.valid, true);
-  assert.equal(result.equippedSkillIds.length, 8);
-  assert.equal(new Set(result.equippedSkillIds).size, 8);
-  assert.equal(result.skillCost, 80);
+  assert.deepEqual(result.equippedSkillIds, []);
+  assert.equal(result.skillCost, 0);
   assert.equal(result.skillId, baseline.skillId);
   assert.equal(result.fightDamage, baseline.fightDamage);
   assert.equal(JSON.stringify(snapshot), before);
 });
 
-test('Build leaves slots empty only when no remaining learned action fits the AP budget', () => {
-  const {catalog, snapshot, enemy, input} = fixture(15);
-  const result = B.createModel(catalog, snapshot, enemy, {goals: ['damage'], rounds: 1, fillAbilitySlots: true}).evaluate(input);
+test('damage Build spends its AP on a jointly scored passive instead of neutral actions', () => {
+  const {catalog, snapshot, enemy, input} = fixture(20);
+  catalog.passives=[{...native.passives.find(p=>p.id===1308),id:910001,equipCost:20}];
+  catalog.statGrowth[1].rows[0].skillIds.push(910001);
+  const result = B.createModel(catalog, snapshot, enemy, {goals: ['damage'], rounds: 1, fillAbilitySlots: true,jointOptimization:true}).evaluate(input);
   assert.equal(result.valid, true);
   assert.equal(result.equippedSkillIds.length, 1);
-  assert.equal(result.skillCost, 10);
+  assert.deepEqual(result.equippedSkillIds,[910001]);
+  assert.equal(result.skillCost, 20);
   assert.ok(result.skillCost <= result.skillBudget);
 });
 
@@ -45,9 +47,47 @@ test('completion preserves pinned abilities and does not fill an explicitly fixe
   const {catalog, snapshot, enemy, input} = fixture();
   const model = B.createModel(catalog, snapshot, enemy, {goals: ['damage'], rounds: 1, fillAbilitySlots: true});
   const pinned = model.evaluate({...input, lockedSkillIds: [900009]});
-  assert.equal(pinned.equippedSkillIds.length, 8);
-  assert.ok(pinned.equippedSkillIds.includes(900009));
+  assert.deepEqual(pinned.equippedSkillIds,[900009]);
   const fixed = model.evaluate({...input, equippedSkillIds: []});
   assert.equal(fixed.valid, true);
   assert.deepEqual(fixed.equippedSkillIds, []);
+});
+
+test('pure damage completion excludes unrelated healing and protection but preserves explicit pins', () => {
+  const {catalog,snapshot,enemy,input}=fixture(80);
+  const utility=[400550,400640]; // Native First Aid and Guard.
+  catalog.skills.push(...utility.map(id=>native.skills.find(skill=>skill.id===id)));
+  catalog.statGrowth[1].rows[0].skillIds.push(...utility);
+  const options={goals:['damage'],rounds:1,fillAbilitySlots:true,includeSupportOptions:true,jointOptimization:true};
+  const result=B.createModel(catalog,snapshot,enemy,options).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.deepEqual(result.equippedSkillIds,[]);
+  assert.equal(result.skillCost,0);
+  assert.equal(result.canHeal,false);
+  assert.equal(result.canProtect,false);
+  const incoming=B.createModel(catalog,snapshot,enemy,{...options,goals:['damage','stagger'],incomingDamage:100}).evaluate(input);
+  assert.equal(incoming.valid,true);
+  assert.deepEqual(incoming.equippedSkillIds,[]);
+  assert.equal(incoming.canHeal,false);
+  assert.equal(incoming.canProtect,false);
+  const pinned=B.createModel(catalog,snapshot,enemy,options).evaluate({...input,lockedSkillIds:utility});
+  assert.equal(pinned.valid,true);
+  assert.deepEqual(pinned.equippedSkillIds.slice().sort((a,b)=>a-b),utility);
+  assert.equal(pinned.skillCost,25);
+  assert.ok(pinned.skillCost<=pinned.skillBudget);
+  assert.equal(pinned.canHeal,true);
+  assert.equal(pinned.canProtect,true);
+});
+
+test('damage completion retains paid action dependencies that improve the scored recipe', () => {
+  const {catalog,snapshot,enemy,input}=fixture(80);
+  catalog.skills.push(native.skills.find(skill=>skill.id===400650));
+  catalog.statGrowth[1].rows[0].skillIds.push(400650);
+  const result=B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1,fillAbilitySlots:true,
+    includeSupportOptions:true,jointOptimization:true}).evaluate(input);
+  assert.equal(result.valid,true);
+  assert.deepEqual(result.equippedSkillIds,[400650]);
+  assert.equal(result.actionCount,2);
+  assert.ok(result.recipeSteps.some(step=>step.skillId===400650));
+  assert.equal(result.skillCost,60);
 });

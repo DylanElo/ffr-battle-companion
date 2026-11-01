@@ -17,13 +17,14 @@ test('single worker checkpoints only improving owned, unreserved completed candi
   const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
     self:{postMessage:message=>messages.push(message)},CompanionBattle:{createModel:(c,s,e,options)=>{modelOptions=options;return model;}},
     CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:(c,s,id,callbacks)=>{
+      assert.equal(modelOptions.deadline-callbacks.options.deadline,1000,'Reserve completion time inside the original budget');
       for(const candidate of candidates){callbacks.candidate(candidate);assert.equal(evaluated,0,'A checkpoint cannot trigger another model evaluation');}
       return [];
     },finalizeBuilds:()=>[]}};
   vm.runInNewContext(source,context);
   await context.self.onmessage({data:{id:77,mode:'single',catalog:{enemies:[{id:1}]},
     snapshot:{characters:[{id:1,equipment:{visionId:100}}],resonances:[{id:100},{id:101},{id:102}]},
-    characterId:1,enemyId:1,taken:[101],available:[],options:{timeMs:1}}});
+    characterId:1,enemyId:1,taken:[101],available:[],options:{timeMs:8000}}});
   const checkpoints=messages.filter(message=>message.type==='checkpoint');
   assert.deepEqual(checkpoints.map(message=>message.result.results[0].score),[10,10,11,12]);
   assert.deepEqual(checkpoints.map(message=>message.result.results[0].visionId),[100,100,102,-1]);
