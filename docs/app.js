@@ -5,7 +5,7 @@ import {shareCard, partyImage} from './share-image.js?v=6';
 import {renderSlot, renderPicker, renderAbilityList, renderAbilityPicker} from './slot-ui.js?v=7';
 import {equippableAbilities, abilityLoad, canEquip, validateAbilities, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=5';
 import {describeItem, describeAbility} from './piece-details.js?v=2';
-import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=1';
+import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=2';
 import {renderResultExplanations} from './result-explanations.js?v=2';
 import {renderUnlockRecommendations} from './unlock-ui.js?v=2';
 
@@ -118,7 +118,7 @@ function transferWorkspace() {
   const incoming = readWorkspace(browserStorage(), source.hash);
   const saved = snapshot.characters.find(c => c.id === ui.charId);
   const kept = plans[ui.charId] || saved?.equipment;
-  const dirtyDraft = draft && kept && JSON.stringify(draft) !== JSON.stringify(C.withLocks(withAbilities(kept, saved), kept.accessoryIds.length));
+  const dirtyDraft = draft && kept && JSON.stringify(C.withLocks(withAbilities(draft, saved), kept.accessoryIds.length)) !== JSON.stringify(C.withLocks(withAbilities(kept, saved), kept.accessoryIds.length));
   const edited = dirtyDraft ? structuredClone(draft) : null;
   // Existing character plans win; copying never discards work already kept in this workspace.
   const merged = revalidateWorkspace({plans: {...incoming.plans, ...plans}, goals: {...incoming.goals, ...goals}},
