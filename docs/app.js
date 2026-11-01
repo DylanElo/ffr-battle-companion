@@ -1,5 +1,5 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
-import {createOptimizerController} from './optimizer-controller.js?v=57';
+import {createOptimizerController} from './optimizer-controller.js?v=58';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=13';
 import {shareCard, partyImage} from './share-image.js?v=6';
 import {renderSlot, renderPicker, renderAbilityList, renderAbilityPicker} from './slot-ui.js?v=7';
@@ -323,7 +323,7 @@ function findUnlocks() {
   if (refusal) { ui.unlocks = {error: refusal}; render(); return; }
   const id = unlockRun, charId = ui.charId, g = goalFor(charId);
   ui.unlocks = {busy: true, progress: 'Checking your owned Resonances…'};
-  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=54', import.meta.url));
+  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=55', import.meta.url));
   worker.onmessage = e => {
     if (id !== unlockRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.unlocks.progress = e.data.message;
@@ -350,7 +350,7 @@ function deepSearch() {
     || validateAbilities(before.equippedSkillIds || [], learnedFor(before.visionId), index);
   const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=54', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=55', import.meta.url));
   let checkpoint = null;
   const finish = result => {
     ui.deep = { results: result.results, current: result.current, before, beforeReason, beforeEvaluation: result.before,

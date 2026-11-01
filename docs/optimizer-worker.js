@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=41', 'search.js?v=33', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=42', 'search.js?v=34', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -23,7 +23,8 @@ self.onmessage = async event => {
     }
     options.deadline=Date.now()+(options.timeMs>0?options.timeMs:10000);
     options.evaluationTimeMs=500;
-    const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:true,fillAbilitySlots:event.data.mode==='single'});
+    if(event.data.mode==='single'){options.seedEvaluationTimeMs=80;options.jointOptimization=true;}
+    const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:true,fillAbilitySlots:event.data.mode==='single',jointOptimization:event.data.mode==='single'});
     const start=performance.now();
     if(event.data.mode==='single'){
       // One character: Resonance, gear, and the best attack with its abilities/passives, for damage or stagger.

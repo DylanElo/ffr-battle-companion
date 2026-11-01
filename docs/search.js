@@ -34,10 +34,14 @@
       reserveNonParty:false,...options};
   }
   const deadlineAfter = ms => ms>0?Date.now()+ms:Infinity;
+  const evaluationCap=(options,baseline=false)=>{
+    const cap=baseline?(options.seedEvaluationTimeMs ?? options.evaluationTimeMs):options.evaluationTimeMs;
+    return Number.isFinite(cap) && cap>0?cap:Infinity;
+  };
   // Party simulations while searching use the first few of their reproducible paths; every party shown is re-scored on all of them.
   const QUICK_SAMPLES = 4;
   function stateFor(options) {
-    return {evaluations:0,cache:new Map(),truncated:false,reasons:new Set(),
+    return {evaluations:0,cache:new Map(),cacheBudgets:new Map(),truncated:false,reasons:new Set(),
       started:Date.now(),deadline:Number.isFinite(options.deadline)?options.deadline:deadlineAfter(options.timeMs),options};
   }
   function stopped(state) {
@@ -49,49 +53,63 @@
   }
   function evaluateOne(state, callbacks, characterId, visionId, equipment, baseline=false) {
     const key = `${characterId}:${visionId}:${keyOf(equipment)}`;
-    if (state.cache.has(key)) return state.cache.get(key);
-    if (stopped(state) && !(baseline && state.evaluations===0 && state.options.maxEvaluations>0)) return null;
+    const requestedCap=evaluationCap(state.options,baseline),cached=state.cache.get(key);
+    state.cacheBudgets ||= new Map();
+    if (state.cache.has(key) && (state.cacheBudgets.get(key) ?? Infinity)>=requestedCap) return cached;
+    if (stopped(state) && !(baseline && state.evaluations===0 && state.options.maxEvaluations>0)) return cached || null;
     state.evaluations++;
+    // A larger-cap attempt replaces the cache fidelity even if it fails; retain any earlier legal incumbent.
+    state.cacheBudgets.set(key,requestedCap);
     const evaluation = callbacks.evaluate({characterId,visionId,equipment,enemy:callbacks.enemy,options:state.options,
+      ...(Number.isFinite(requestedCap)?{evaluationTimeMs:requestedCap}:{}),
       ...(state.options.locks?.skillIds?.length?{lockedSkillIds:state.options.locks.skillIds}:{})});
     if (!evaluation || evaluation.valid===false || !Number.isFinite(Number(evaluation.score))) {
+      if(cached)return cached;
       state.cache.set(key,null);return null;
     }
     const candidate={characterId,visionId,equipment:{...equipment,accessoryIds:equipment.accessoryIds.slice()},
       score:Number(evaluation.score),evaluation,roles:rolesOf(evaluation),key};
+    if(cached && cached.score>candidate.score)return cached;
     state.cache.set(key,candidate);
     callbacks.candidate?.(candidate);
     return candidate;
   }
-  // Count legal suffixes once; unrank only the combinations the bounded search actually visits.
-  function accessorySets(items, slots, available, locked=[]) {
-    const remaining=new Map(available),memo=new Map(),freeSlots=slots-locked.length;
+  // Prune only exact combat equivalents. Stat tradeoffs and every distinct passive signature stay in the pool.
+  function accessoryPool(ids,equipment,available,protectedIds,slots,partySize){
+    const groups=new Map(),keep=new Set(),protectedSet=new Set(protectedIds);
+    for(const id of ids){
+      const item=equipment.get(id),stats=Object.entries(item.stats || {}).sort(([a],[b])=>a.localeCompare(b));
+      const passives=item.passiveIds || [];
+      const comparable=stats.every(([,value])=>typeof value==='number' && Number.isFinite(value)) && Array.isArray(passives) && passives.every(id=>Number.isInteger(id) && id>0);
+      const key=comparable?JSON.stringify([item.type,item.detailType,item.sexLimit,stats,passives.slice().sort((a,b)=>a-b)]):`unknown:${id}`;
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push(id);
+    }
+    const needed=slots*Math.max(1,partySize);
+    for(const group of groups.values()){
+      group.sort((a,b)=>Number(protectedSet.has(b))-Number(protectedSet.has(a)) || b-a);
+      let copies=0;
+      for(const id of group)if(protectedSet.has(id) || copies<needed){keep.add(id);copies+=available.get(id)||0;}
+    }
+    return [...keep];
+  }
+  // Canonical free-slot order prevents mirrored permutations; locked copies are removed before descending.
+  function* accessorySets(items,slots,available,locked,stop){
+    const remaining=new Map(available),chosen=locked.slice();
     for(const id of locked)remaining.set(id,(remaining.get(id)||0)-1);
-    const copies=(i,left)=>Math.min(left,items[i]>0?(remaining.get(items[i])||0):left);
-    const count=(i,left)=>{
-      if(!left)return 1;
-      if(i===items.length)return 0;
-      const key=`${i}:${left}`;
-      if(!memo.has(key)){
-        let n=0;
-        for(let take=0;take<=copies(i,left);take++)n+=count(i+1,left-take);
-        memo.set(key,n);
+    function* visit(start){
+      if(stop())return;
+      if(chosen.length===slots){yield [...locked,...chosen.slice(locked.length).sort((a,b)=>a-b)];return;}
+      for(let i=start;i<items.length;i++){
+        if(stop())return;
+        const id=items[i];
+        if(id>0 && !(remaining.get(id)>0))continue;
+        chosen.push(id);if(id>0)remaining.set(id,remaining.get(id)-1);
+        yield* visit(i);
+        chosen.pop();if(id>0)remaining.set(id,remaining.get(id)+1);
       }
-      return memo.get(key);
-    };
-    return {
-      get length(){return count(0,freeSlots);},
-      at(rank){
-        const chosen=[...locked];let left=freeSlots;
-        for(let i=0;i<items.length && left;i++)for(let take=copies(i,left);take>=0;take--){
-          const size=count(i+1,left-take);
-          if(rank>=size){rank-=size;continue;}
-          chosen.push(...Array(take).fill(items[i]));left-=take;break;
-        }
-        return chosen;
-      },
-      *[Symbol.iterator](){for(let rank=0;rank<this.length;rank++)yield this.at(rank);},
-    };
+    }
+    yield* visit(0);
   }
   function buildCandidates(catalog,snapshot,characterId,callbacks,options={},availableArg,stateArg) {
     options=defaults(options);
@@ -110,12 +128,11 @@
       lockedAcc.some(id=>!legal(id,'accessory')) || [...lockedCounts].some(([id,n])=>n>(available.get(id)||0))) return [];
     const weaponIds=positive(locks.weaponId)?[Number(locks.weaponId)]:[-1,...catalog.equipment.filter(e=>legal(e.id,'weapon')).map(e=>e.id)];
     const armorIds=positive(locks.armorId)?[Number(locks.armorId)]:[-1,...catalog.equipment.filter(e=>legal(e.id,'armor')).map(e=>e.id)];
-    const accessoryIds=[-1,...catalog.equipment.filter(e=>legal(e.id,'accessory')).map(e=>e.id)].sort((a,b)=>a-b);
+    const accessoryIds=catalog.equipment.filter(e=>legal(e.id,'accessory')).map(e=>e.id);
     const slots=(saved.equipment.accessoryIds || []).length;
     if (slots>4) throw new Error('Unsupported accessory slot count.');
     if (lockedAcc.length>slots) return [];
     const holdsLocks=set=>{const have=countsOf(set);return [...lockedCounts].every(([id,n])=>(have.get(id)||0)>=n);};
-    const accessories=accessorySets(accessoryIds,slots,available,lockedAcc);
     const base={weaponId:positive(locks.weaponId)?Number(locks.weaponId):legal(saved.equipment.weaponId,'weapon')?saved.equipment.weaponId:-1,
       armorId:positive(locks.armorId)?Number(locks.armorId):legal(saved.equipment.armorId,'armor')?saved.equipment.armorId:-1,
       accessoryIds:(saved.equipment.accessoryIds || []).map(id=>legal(id,'accessory')?id:-1)};
@@ -127,9 +144,12 @@
       while (base.accessoryIds.length<slots) base.accessoryIds.push(-1);
     }
     if (!fits(base,available)) base.accessoryIds=[...lockedAcc,...Array(slots-lockedAcc.length).fill(-1)];
+    const accessoryCandidates=accessoryPool(accessoryIds,equipment,available,[...lockedAcc,...base.accessoryIds],slots,options.partySize);
+    const emptyGear={weaponId:positive(locks.weaponId)?Number(locks.weaponId):-1,armorId:positive(locks.armorId)?Number(locks.armorId):-1,
+      accessoryIds:[...lockedAcc,...Array(slots-lockedAcc.length).fill(-1)]};
     const owned=new Set((snapshot.resonances || []).map(v=>v.id));
-    // Try every Resonance with the saved gear first, then search the strongest first, each with an equal share of the
-    // remaining time, so a time budget can't end the search before the best (or the saved) Resonance is tried.
+    // Seed owned Resonances with saved gear before walking loadouts. Joint mode gives the leading seeds longer walks;
+    // legacy mode keeps equal remaining shares, and the saved Resonance always retains its first comparison.
     if (positive(locks.visionId) && !owned.has(Number(locks.visionId))) return [];
     const pool=[...(positive(locks.visionId)?[Number(locks.visionId)]:options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
       .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
@@ -142,11 +162,14 @@
       if(seeds.get(visionId))local.set(keyOf(base),seeds.get(visionId));
       let attempts=0;
       let best=seeds.get(visionId);
-      const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())/(visions.length-n):Infinity;
+      const fairShare=1/(visions.length-n);
+      const sliceShare=options.jointOptimization && n<3?Math.max(.5,fairShare):fairShare;
+      const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())*sliceShare:Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
         if ((positive(locks.weaponId) && weaponId!==weaponIds[0]) || (positive(locks.armorId) && armorId!==armorIds[0]) || !holdsLocks(accessoryIds)) return true;
         const equip={weaponId,armorId,accessoryIds,visionId},key=keyOf(equip);
-        if (local.has(key)) return true;
+        const cachedCap=state.cacheBudgets?.get(`${saved.id}:${visionId}:${key}`) ?? Infinity;
+        if (local.has(key) && cachedCap>=evaluationCap(state.options)) return true;
         if (attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd) return false;
         if (!fits(equip,available)) return true;
         attempts++;
@@ -157,49 +180,36 @@
       };
       // Seed the saved loadout before pruning so a search budget never hides its comparison.
       consider(base.weaponId,base.armorId,base.accessoryIds);
-      consider(-1,-1,Array(slots).fill(-1));
-      const total=weaponIds.length*armorIds.length*accessories.length;
-      if (total>options.perLoadoutBudget) {
-        // Give every editable slot a share before a large accessory list can spend the whole budget.
-        const probes=[];
-        if (!positive(locks.weaponId)) probes.push({ids:weaponIds,set:(e,id)=>({...e,weaponId:id})});
-        if (!positive(locks.armorId)) probes.push({ids:armorIds,set:(e,id)=>({...e,armorId:id})});
-        for (let i=lockedAcc.length;i<slots;i++) probes.push({ids:accessoryIds,
-          set:(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>i===j?id:x)})});
-        const sample=(values,limit)=>{
-          const count=Math.min(values.length,Math.max(0,limit));
-          return Array.from({length:count},(_,i)=>values.at(count===1?0:Math.floor(i*(values.length-1)/(count-1))));
-        };
-        const perSlot=Math.floor(options.perLoadoutBudget/2/Math.max(1,probes.length));
-        for (const probe of probes) {
-          const start=best?.equipment || base;
-          for (const id of sample(probe.ids,perSlot)) {
-            const e=probe.set(start,id);
-            if (!consider(e.weaponId,e.armorId,e.accessoryIds)) break;
-          }
+      consider(emptyGear.weaponId,emptyGear.armorId,emptyGear.accessoryIds);
+      const magnitude=id=>Object.values(equipment.get(id)?.stats || {}).reduce((sum,value)=>sum+Math.abs(Number(value)||0),0);
+      const order=(ids,preferred)=>ids.slice().sort((a,b)=>Number(b===preferred && b>0)-Number(a===preferred && a>0) ||
+        Number(b>0)-Number(a>0) || magnitude(b)-magnitude(a) || b-a);
+      // Whole-build weapon/armor probes seed the joint walk, without eliminating any stat tradeoff.
+      const probeLimit=Math.floor(options.perLoadoutBudget/4),probeEnd=Date.now()+(Math.min(sliceEnd,state.deadline)-Date.now())/4;
+      for(const weapon of order(weaponIds,base.weaponId)){
+        if(attempts>=probeLimit || Date.now()>=probeEnd)break;
+        const current=best?.equipment || base;if(!consider(weapon,current.armorId,current.accessoryIds))break;
+      }
+      for(const armor of order(armorIds,base.armorId)){
+        if(attempts>=probeLimit || Date.now()>=probeEnd)break;
+        const current=best?.equipment || base;if(!consider(current.weaponId,armor,current.accessoryIds))break;
+      }
+      const start=best?.equipment || base,preferredAccessories=new Set(start.accessoryIds);
+      const jointAccessories=accessoryCandidates.slice().sort((a,b)=>Number(preferredAccessories.has(b))-Number(preferredAccessories.has(a)) ||
+        Number((equipment.get(b)?.passiveIds || []).length>0)-Number((equipment.get(a)?.passiveIds || []).length>0) || magnitude(b)-magnitude(a) || b-a);
+      jointAccessories.push(-1);
+      let interrupted=false;
+      const stop=()=>{
+        if(attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd){interrupted=true;return true;}
+        return false;
+      };
+      traverse:for(const weapon of order(weaponIds,start.weaponId))for(const armor of order(armorIds,start.armorId)){
+        for(const set of accessorySets(jointAccessories,slots,available,lockedAcc,stop)){
+          if(!consider(weapon,armor,set)){interrupted=true;break traverse;}
         }
-        // Keep joint passive combinations in the search, spread across the catalog rather than low IDs first.
-        const start=best?.equipment || base;
-        for (const set of sample(accessories,Math.floor(options.perLoadoutBudget/4)))
-          if (!consider(start.weaponId,start.armorId,set)) break;
-      } else {
-        for (const weapon of weaponIds) if (!consider(weapon,base.armorId,base.accessoryIds)) break;
-        for (const armor of armorIds) if (!consider(base.weaponId,armor,base.accessoryIds)) break;
-        for (const set of accessories) if (!consider(base.weaponId,base.armorId,set)) break;
+        if(interrupted)break traverse;
       }
-      let enumerated=0;
-      // shortcut: the bounded sweep samples large spaces; raise budgets or use exact search for proof of optimality.
-      const gcd=(a,b)=>b?gcd(b,a%b):a;
-      let stride=Math.max(1,Math.floor(total/Math.max(1,options.perLoadoutBudget)));
-      while (gcd(stride,total)!==1)stride++;
-      for (let n=0;n<total;n++) {
-        const flat=(n*stride)%total,ai=flat%accessories.length;
-        const remainder=Math.floor(flat/accessories.length),ri=remainder%armorIds.length;
-        const wi=Math.floor(remainder/armorIds.length);
-        if (!consider(weaponIds[wi],armorIds[ri],accessories.at(ai))) break;
-        enumerated++;
-      }
-      if (enumerated<total) {state.truncated=true;state.reasons.add('loadout budget');}
+      if(interrupted){state.truncated=true;state.reasons.add('loadout budget');}
       const ranked=[...local.values()].filter(Boolean).sort((a,b)=>b.score-a.score || a.key.localeCompare(b.key));
       const keep=new Map(ranked.slice(0,options.candidatesPerVision).map(c=>[c.key,c]));
       // Keep stock alternatives: giving a scarce best item to one member can change the best team.
@@ -207,6 +217,15 @@
       for(const id of contested) {
         const alternate=ranked.find(c=>!C.equipmentIds(c.equipment).includes(id));
         if(alternate)keep.set(alternate.key,alternate);
+      }
+      // Retain disjoint concrete accessory allocations, so equivalent IDs remain usable across a party.
+      const spareAccessories=new Map(available);
+      for(let i=0;i<options.partySize;i++){
+        const alternate=ranked.find(c=>c.equipment.accessoryIds.some(positive) &&
+          [...countsOf(c.equipment.accessoryIds)].every(([id,count])=>count<=(spareAccessories.get(id)||0)));
+        if(!alternate)break;
+        keep.set(alternate.key,alternate);
+        for(const id of alternate.equipment.accessoryIds.filter(positive))spareAccessories.set(id,spareAccessories.get(id)-1);
       }
       // Retain role specialists and the original comparison even if their individual damage is low.
       for (const role of new Set(ranked.flatMap(c=>c.roles))) {
@@ -219,7 +238,7 @@
       }
       const baseline=local.get(keyOf({...base,visionId}));
       if (baseline)keep.set(baseline.key,baseline);
-      const empty=local.get(keyOf({weaponId:-1,armorId:-1,accessoryIds:Array(slots).fill(-1),visionId}));
+      const empty=local.get(keyOf({...emptyGear,visionId}));
       if (empty)keep.set(empty.key,empty);
       if (ranked.length>keep.size) {state.truncated=true;state.reasons.add('candidate pruning');}
       for(const c of keep.values())all.set(c.key,c);
