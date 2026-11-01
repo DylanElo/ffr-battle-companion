@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=40', 'search.js?v=32', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=41', 'search.js?v=33', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -23,16 +23,24 @@ self.onmessage = async event => {
     }
     options.deadline=Date.now()+(options.timeMs>0?options.timeMs:10000);
     options.evaluationTimeMs=500;
-    const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:event.data.mode!=='single'});
+    const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:true,fillAbilitySlots:event.data.mode==='single'});
     const start=performance.now();
     if(event.data.mode==='single'){
       // One character: Resonance, gear, and the best attack with its abilities/passives, for damage or stagger.
       // `available` is the item stock left after other characters' reservations; `taken` Resonances are in use elsewhere.
       const taken=new Set(event.data.taken || []);
+      const owned=new Set((snapshot.resonances || []).map(row=>row.id));
+      let checkpointScore=-Infinity;
+      const checkpoint=candidate=>{
+        if(taken.has(candidate.visionId) || candidate.visionId>0 && !owned.has(candidate.visionId) || !Number.isFinite(candidate.score) || candidate.score<=checkpointScore)return;
+        checkpointScore=candidate.score;
+        const member={...candidate,evaluation:{...candidate.evaluation,warnings:[...new Set([...(model.globalWarnings || []),...(candidate.evaluation.warnings || [])])]}};
+        self.postMessage({id,type:'checkpoint',result:{results:[member],before:null,current:null,scenario:model.scenario,modelEvidence:model.evidence}});
+      };
       self.postMessage({id,type:'progress',message:'Trying your Resonances, gear and ability combinations…'});
       const evaluate=args=>model.evaluate(args);
       const available=new Map(event.data.available);
-      const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options},
+      const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options,candidate:checkpoint},
         options,available);
       // shortcut: complete a bounded shortlist; increase candidate budgets for a wider comparison.
       const completed=candidates.filter(c=>!taken.has(c.visionId)).sort((a,b)=>b.score-a.score)

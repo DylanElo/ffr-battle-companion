@@ -71,3 +71,49 @@ test('real evaluator failures are not swallowed as deadline truncation',()=>{
     assert.throws(()=>withClock(()=>B.createModel(catalog,snapshot,enemy,{goals:['damage'],deadline:100,evaluationTimeMs:2}).evaluate(input)),caught=>caught===error);
   }finally{P.analyze=original;}
 });
+
+test('passive expansion stops inside its package and never caches the partial choice',()=>{
+  const {catalog,snapshot,enemy,input}=fixture();
+  const passive=native.passives.find(row=>row.id===1310);
+  const additions=Array.from({length:24},(_,n)=>({...passive,id:50001+n,equipCost:1}));
+  catalog.passives=[...catalog.passives,...additions];
+  catalog.statGrowth[1].rows[0].skillIds=additions.map(row=>row.id);
+  const originalNow=Date.now,originalAnalyze=P.analyze;
+  let clock=0,interrupt=true;
+  const visited=new Set();
+  try{
+    Date.now=()=>clock;
+    P.analyze=(catalog,ids,...rest)=>{
+      for(const id of ids)if(id>=50001&&id<=50024)visited.add(id);
+      if(interrupt && visited.size)clock=1000;
+      return originalAnalyze(catalog,ids,...rest);
+    };
+    const model=B.createModel(catalog,snapshot,enemy,{goals:['damage'],includeSupportOptions:false,rounds:1,deadline:500});
+    const partial=model.evaluate(input);
+    assert.equal(partial.valid,true,'first complete legal action survives interrupted package expansion');
+    assert.equal(partial.searchTruncated,true);
+    assert.equal(visited.size,1,'deadline is checked before expanding the next passive');
+    assert.ok(partial.skillCost<=partial.skillBudget);
+    assert.ok(partial.equippedSkillIds.length<=partial.maxSkillSlots);
+    interrupt=false;clock=0;visited.clear();
+    const full=model.evaluate(input);
+    assert.equal(full.valid,true);
+    assert.ok(visited.size>1,'an interrupted package must not poison the model cache');
+    assert.ok(full.score>=partial.score);
+  }finally{Date.now=originalNow;P.analyze=originalAnalyze;}
+});
+
+test('knapsack stops inside a wide DP expansion and retains an affordable completed state',()=>{
+  const entries=Array.from({length:180},(_,n)=>({id:n+1,cost:n+1,value:n+1}));
+  let checks=0;
+  const selected=B.knapsack(entries,1000,8,()=>++checks>15);
+  assert.ok(checks<=17,'the DP stops cooperatively instead of scanning the remaining entries');
+  assert.ok(selected.length<=8);
+  assert.ok(selected.reduce((sum,id)=>sum+id,0)<=1000);
+  assert.ok(selected.length>0,'a completed partial DP state is retained');
+});
+
+test('already valued legal passive choices survive a deadline before DP expansion starts',()=>{
+  assert.deepEqual(B.knapsack([{id:1,cost:3,value:5},{id:2,cost:4,value:7},{id:3,cost:9,value:100}],5,2,()=>true),[2]);
+  assert.deepEqual(B.knapsack([{id:1,cost:0,value:5}],5,0,()=>true),[]);
+});
