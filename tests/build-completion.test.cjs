@@ -1,0 +1,53 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const B = require('../docs/battle.js');
+const native = require('../docs/data/catalog.json');
+const rules = require('../docs/skill-rules.json');
+
+function fixture(budget = 80) {
+  const base = native.skills.find(s => s.id === 401010);
+  const learned = Array.from({length: 10}, (_, n) => ({...base, id: 900000 + n, name: `Alternative ${n}`, mag: 1, equipCost: 10, cost: 0}));
+  const character = {id: 1, name: 'Completion fixture', sex: 'Male', weaponType: 'Sword', armorTypes: [], levelParamId: 1,
+    stats: {HitPoint: 1000, MagicPoint: 1000, Attack: 100, Intelligence: 100, Defence: 30, Mind: 30, Agility: 50}, baseSkillEquipCost: budget, passiveIds: []};
+  const catalog = {...native, skillRules: rules, characters: [character], skills: [base, ...learned], passives: [], visions: [], masterSkills: [], artifacts: [], equipment: [],
+    statGrowth: {1: {rows: [{level: 1, requiredExperience: 0, adds: {}, skillIds: learned.map(s => s.id)}]}}};
+  const equipment = {weaponId: -1, armorId: -1, accessoryIds: [], visionId: -1};
+  const snapshot = {characters: [{id: 1, joinStatus: 'Join', usable: true, experience: 0, baseParameters: [], activeSkillIds: [base.id], equippedSkillIds: Array(8).fill(-1), equipment}],
+    inventory: [], resonances: [], party: [1], player: {difficulty: 'Normal'}};
+  const enemy = {id: 1, level: 1, stats: {MaxHitPoint: 1e9, MaxBreakPoint: 1e9, Defence: 50, Mind: 50, Agility: 0}, resistances: {}, passiveIds: []};
+  return {catalog, snapshot, enemy, input: {characterId: 1, visionId: -1, equipment}};
+}
+
+test('Build fills affordable empty slots with learned alternatives without weakening the chosen attack', () => {
+  const {catalog, snapshot, enemy, input} = fixture(), before = JSON.stringify(snapshot);
+  const options = {goals: ['damage'], rounds: 1, includeSupportOptions: true};
+  const baseline = B.createModel(catalog, snapshot, enemy, options).evaluate(input);
+  const result = B.createModel(catalog, snapshot, enemy, {...options, fillAbilitySlots: true}).evaluate(input);
+  assert.equal(result.valid, true);
+  assert.equal(result.equippedSkillIds.length, 8);
+  assert.equal(new Set(result.equippedSkillIds).size, 8);
+  assert.equal(result.skillCost, 80);
+  assert.equal(result.skillId, baseline.skillId);
+  assert.equal(result.fightDamage, baseline.fightDamage);
+  assert.equal(JSON.stringify(snapshot), before);
+});
+
+test('Build leaves slots empty only when no remaining learned action fits the AP budget', () => {
+  const {catalog, snapshot, enemy, input} = fixture(15);
+  const result = B.createModel(catalog, snapshot, enemy, {goals: ['damage'], rounds: 1, fillAbilitySlots: true}).evaluate(input);
+  assert.equal(result.valid, true);
+  assert.equal(result.equippedSkillIds.length, 1);
+  assert.equal(result.skillCost, 10);
+  assert.ok(result.skillCost <= result.skillBudget);
+});
+
+test('completion preserves pinned abilities and does not fill an explicitly fixed loadout', () => {
+  const {catalog, snapshot, enemy, input} = fixture();
+  const model = B.createModel(catalog, snapshot, enemy, {goals: ['damage'], rounds: 1, fillAbilitySlots: true});
+  const pinned = model.evaluate({...input, lockedSkillIds: [900009]});
+  assert.equal(pinned.equippedSkillIds.length, 8);
+  assert.ok(pinned.equippedSkillIds.includes(900009));
+  const fixed = model.evaluate({...input, equippedSkillIds: []});
+  assert.equal(fixed.valid, true);
+  assert.deepEqual(fixed.equippedSkillIds, []);
+});

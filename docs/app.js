@@ -1,5 +1,5 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
-import {createOptimizerController} from './optimizer-controller.js?v=56';
+import {createOptimizerController} from './optimizer-controller.js?v=57';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=13';
 import {shareCard, partyImage} from './share-image.js?v=6';
 import {renderSlot, renderPicker, renderAbilityList, renderAbilityPicker} from './slot-ui.js?v=7';
@@ -310,10 +310,10 @@ function takenVisions() {
 
 // Full search: the party engine for one character against one enemy (Resonance, gear, attack,
 // abilities and passives), scored on predicted damage or stagger. Runs in the search worker.
-let deepWorker = null, deepRun = 0;
+let deepWorker = null, deepRun = 0, deepTimer = null;
 let unlockWorker = null, unlockRun = 0;
 function cancelUnlockSearch() { unlockRun++; unlockWorker?.terminate(); unlockWorker = null; ui.unlocks = null; }
-function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; cancelUnlockSearch(); }
+function cancelDeep() { deepRun++; clearTimeout(deepTimer); deepTimer = null; deepWorker?.terminate(); deepWorker = null; cancelUnlockSearch(); }
 
 function findUnlocks() {
   if (!draft || ui.deep?.busy) return;
@@ -323,7 +323,7 @@ function findUnlocks() {
   if (refusal) { ui.unlocks = {error: refusal}; render(); return; }
   const id = unlockRun, charId = ui.charId, g = goalFor(charId);
   ui.unlocks = {busy: true, progress: 'Checking your owned Resonances…'};
-  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=53', import.meta.url));
+  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=54', import.meta.url));
   worker.onmessage = e => {
     if (id !== unlockRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.unlocks.progress = e.data.message;
@@ -350,13 +350,31 @@ function deepSearch() {
     || validateAbilities(before.equippedSkillIds || [], learnedFor(before.visionId), index);
   const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=53', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=54', import.meta.url));
+  let checkpoint = null;
+  const finish = result => {
+    ui.deep = { results: result.results, current: result.current, before, beforeReason, beforeEvaluation: result.before,
+      scenario: result.scenario, evidence: result.modelEvidence, pick: 0, enemyId, goals, pinned };
+    cancelDeep(); if (ui.deep.results.length) applyDeep(0); render();
+  };
+  // A stalled worker or data request must not leave Build running indefinitely.
+  deepTimer = setTimeout(() => {
+    if (id !== deepRun || ui.charId !== charId) return;
+    if (checkpoint) {
+      const member = checkpoint.results[0];
+      member.evaluation = {...member.evaluation, searchTruncated: true, warnings: [...(member.evaluation.warnings || []), 'Search time limit reached; using the best completed legal build.']};
+      finish(checkpoint);
+    } else {
+      ui.deep = {error: 'The search timed out before completing a legal build. Your draft is unchanged. Try again or lock a Resonance to narrow the search.'};
+      cancelDeep(); render();
+    }
+  }, 12000);
   worker.onmessage = e => {
     if (id !== deepRun || e.data.id !== id || ui.charId !== charId) return;
+    if (e.data.type === 'checkpoint') { checkpoint = e.data.result; return; }
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
     else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, before, beforeReason, beforeEvaluation: e.data.result.before,
-      scenario: e.data.result.scenario, evidence: e.data.result.modelEvidence, pick: 0, enemyId, goals, pinned }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
+    else { finish(e.data.result); return; }
     render();
   };
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };

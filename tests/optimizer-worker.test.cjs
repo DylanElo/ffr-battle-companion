@@ -5,6 +5,53 @@ const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../docs/optimizer-worker.js'),'utf8');
 
+test('single worker checkpoints only improving owned, unreserved completed candidates without extra evaluations',async()=>{
+  const messages=[];let evaluated=0,modelOptions;
+  const model={evaluate:()=>{evaluated++;return {valid:true};},explainAbilities:()=>[],
+    scenario:{rounds:5},evidence:{formula:'Native arithmetic'},globalWarnings:['Known limitation']};
+  const candidates=[
+    {visionId:100,score:10},{visionId:101,score:500},{visionId:999,score:1000},
+    {visionId:100,score:9},{visionId:100,score:10},{visionId:102,score:11},
+    {visionId:102,score:NaN},{visionId:-1,score:12},
+  ].map(row=>({...row,characterId:1,equipment:{weaponId:10,accessoryIds:[]},evaluation:{valid:true,skillId:1,equippedSkillIds:[5],warnings:['Known limitation','Local warning']}}));
+  const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
+    self:{postMessage:message=>messages.push(message)},CompanionBattle:{createModel:(c,s,e,options)=>{modelOptions=options;return model;}},
+    CompanionSearch:{buildCandidates:(c,s,id,callbacks)=>{
+      for(const candidate of candidates){callbacks.candidate(candidate);assert.equal(evaluated,0,'A checkpoint cannot trigger another model evaluation');}
+      return [];
+    },finalizeBuilds:()=>[]}};
+  vm.runInNewContext(source,context);
+  await context.self.onmessage({data:{id:77,mode:'single',catalog:{enemies:[{id:1}]},
+    snapshot:{characters:[{id:1,equipment:{visionId:100}}],resonances:[{id:100},{id:101},{id:102}]},
+    characterId:1,enemyId:1,taken:[101],available:[],options:{timeMs:1}}});
+  const checkpoints=messages.filter(message=>message.type==='checkpoint');
+  assert.deepEqual(checkpoints.map(message=>message.result.results[0].score),[10,11,12]);
+  assert.deepEqual(checkpoints.map(message=>message.result.results[0].visionId),[100,102,-1]);
+  assert.equal(checkpoints.every(message=>message.id===77),true);
+  assert.equal(checkpoints[0].result.before,null);
+  assert.equal(checkpoints[0].result.current,null);
+  assert.equal(checkpoints[0].result.scenario,model.scenario);
+  assert.equal(checkpoints[0].result.modelEvidence,model.evidence);
+  assert.equal(JSON.stringify(checkpoints[0].result.results[0].evaluation.warnings),JSON.stringify(['Known limitation','Local warning']));
+  assert.equal(evaluated,1,'Only the existing saved-setup comparison evaluates after searching');
+  assert.equal(modelOptions.includeSupportOptions,true);
+  assert.equal(modelOptions.fillAbilitySlots,true);
+});
+
+test('search publishes a candidate checkpoint only after its evaluation passed validation',()=>{
+  const Search=require('../docs/search.js'),seen=[];
+  const catalog={characters:[{id:1,sex:'Male',weaponType:'Sword',armorTypes:[]}],equipment:[],visions:[{id:100},{id:101}]};
+  const snapshot={characters:[{id:1,joinStatus:'Join',usable:true,equipment:{weaponId:-1,armorId:-1,accessoryIds:[],visionId:100}}],
+    inventory:[],resonances:[{id:100},{id:101}],party:[1]};
+  const options={timeMs:0,maxEvaluations:2,perLoadoutBudget:1,visionIds:[100,101]};
+  const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:({visionId})=>visionId===100?{valid:false,score:100}:{valid:true,score:3},
+    candidate:member=>{assert.equal(member.evaluation.valid,true);assert.ok(Number.isFinite(member.score));seen.push(member);}},options);
+  assert.equal(seen.length,1);
+  assert.equal(seen[0].visionId,101);
+  assert.equal(results.length,1);
+  assert.equal(results[0],seen[0]);
+});
+
 test('single worker completes equipment alternatives before ranking and deduplicating attacks',async()=>{
   const messages=[],finalized=[];
   const candidates=[{visionId:100,equipment:{weaponId:10},score:100,evaluation:{skillId:1}},

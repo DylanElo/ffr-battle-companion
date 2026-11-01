@@ -21,19 +21,30 @@
   const defenseSum=(stats,modifiers)=>modifiers?.dominantDefence?2*Math.max(number(stats.PhysicalDefense),number(stats.MagicalDefense)):number(stats.PhysicalDefense)+number(stats.MagicalDefense);
   const combatHits=(normal,broken,count=1)=>Array.from({length:count},(_,actionIndex)=>
     (normal.hits || [{damage:normal.damage,breakDamage:normal.breakDamage}]).map((hit,i)=>({...hit,actionIndex,brokenDamage:broken.hits?.[i]?.damage ?? broken.damage}))).flat();
-  function knapsack(entries,budget,slots){
+  function knapsack(entries,budget,slots,shouldStop=()=>false){
     const states=new Map([['0:0',{cost:0,slots:0,score:0,ids:[]}]]);
+    let interrupted=false;
+    const stop=()=>{if(shouldStop()){interrupted=true;return true;}return false;};
     for(const item of entries){
+      if(stop())break;
       if(!(item.value>0) || item.cost>budget)continue;
       const old=[...states.values()];
-      for(const state of old){
+      for(const [index,state] of old.entries()){
+        if((index&63)===0 && stop())break;
         const cost=state.cost+item.cost,count=state.slots+1;
         if(cost>budget || count>slots)continue;
         const score=state.score+item.value,key=`${cost}:${count}`,current=states.get(key);
         if(!current || score>current.score)states.set(key,{cost,slots:count,score,ids:[...state.ids,item.id]});
       }
     }
-    return [...states.values()].sort((a,b)=>b.score-a.score || a.cost-b.cost)[0]?.ids || [];
+    let best=states.get('0:0');
+    const keep=state=>{if(state.score>best.score || state.score===best.score && state.cost<best.cost)best=state;};
+    for(const state of states.values())keep(state);
+    // If candidate valuation spent the remaining time, its completed affordable
+    // single choices are still available without expanding the DP further.
+    if(interrupted && slots>0)for(const item of entries)if(item.value>0 && item.cost<=budget)
+      keep({cost:item.cost,score:item.value,ids:[item.id]});
+    return best.ids;
   }
   function createModel(catalog,snapshot,enemy,provided={}){
     if(!catalog.statGrowth || !catalog.battleRules)throw new Error('The battle catalog is missing native growth and calculation tables. Refresh game data.');
@@ -220,7 +231,7 @@
       return rollDamage({...state.stats,level:state.level},skill,stateAnalysis,{...context,level:state.level,criticalAnalysis,criticalStats});
     }
     // locked: pinned learned ids (see evaluate); always equipped. Empty means the unpinned search, unchanged.
-    function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}},locked=[]){
+    function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}},locked=[],shouldStop=()=>false){
       if(prepared.fixed){
         const masterIds=prepared.equippedIds.filter(id=>indexes.masterSkills.has(id));
         const ids=prepared.equippedIds.filter(id=>indexes.passives.has(id));
@@ -299,8 +310,10 @@
       // Pins already reserved by the turn (or the attack itself) are charged there, not twice.
       const pins=locked.filter(id=>id!==skill.id && !turn.reservedIds.includes(id));
       const pinPackage=pins.filter(id=>source(id)),pinActives=pins.filter(id=>!source(id));
-      let result=null,bestValue=-Infinity;
+      let result=null,bestValue=-Infinity,packageTruncated=false;
+      const stopPackage=()=>{if(shouldStop()){packageTruncated=true;return true;}return false;};
       for(const fixed of forced){
+        if(result && stopPackage())break;
         const fixedIds=unique([...(fixed?[fixed.id]:[]),...pinPackage]),fixedPassives=expanded(fixedIds),activeFree=freeSkills(fixedIds).has(skill.id);
         const reservedIds=turn.reservedIds.filter(id=>!freeSkills(fixedIds).has(id));
         const activeCost=activeFree?0:number(skill.equipCost),activeSlots=activeFree?0:1;
@@ -310,12 +323,13 @@
         if(budget<0 || slots<0)continue;
         const fixedValue=valueOf(fixedPassives,expandedOccurrences(fixedIds)),entries=[];
         for(const id of unique([...prepared.learned,...masters.map(m=>m.id)])){
+          if(stopPackage())break;
           if(fixedIds.includes(id) || fixedPassives.includes(id) || baseIds.includes(id) || turn.reservedIds.includes(id))continue;
           const item=source(id);if(!item)continue;
           const value=Math.max(0,valueOf(unique([...fixedPassives,...expanded([id])]),expandedOccurrences([...fixedIds,id]))-fixedValue);
           if(value>0)entries.push({id,cost:Math.max(0,number(item.equipCost)),value});
         }
-        const selected=unique([...fixedIds,...knapsack(entries,budget,slots)]);
+        const selected=unique([...fixedIds,...knapsack(entries,budget,slots,stopPackage)]);
         const masterIds=selected.filter(id=>indexes.masterSkills.has(id));
         const covered=new Set(expanded(masterIds));
         const ids=selected.filter(id=>indexes.passives.has(id) && (!covered.has(id) || pinPackage.includes(id)));
@@ -335,7 +349,8 @@
       }
       // With pins, no affordable package means this attack cannot be used (evaluate skips a null package).
       if(!result && !locked.length)result={ids:[],passiveIds:[],masterIds:[],equippedIds:[],freeActiveIds:[...prepared.free],cost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeCost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeSlots:prepared.free.has(skill.id)?0:1};
-      packageCache.set(key,result);return result;
+      if(!packageTruncated)packageCache.set(key,result);
+      return result;
     }
     const equipCostOf=ids=>ids.reduce((sum,id)=>sum+number((indexes.skills.get(id) || indexes.passives.get(id) || indexes.masterSkills.get(id))?.equipCost),0);
     // LB gauge passives: fill-rate multiplier (IncreaseParameterVariation on LimitBurstPoint; strongest one counts),
@@ -583,7 +598,7 @@
       return {factor,amount:Math.trunc(Math.max(1,Math.fround(Math.fround(amount)*factor)))};
     };
     // maxSamples lets a search rank candidates on the first few of the same reproducible paths, then score finalists in full.
-    function simulateFight(members,maxSamples=Infinity){
+    function simulateFight(members,maxSamples=Infinity,checkSearchDeadline=()=>{}){
       const rounds=scenario.rounds,allStaggered=scenario.enemyCount===1;
       const gain=number(allStaggered?catalog.battleRules.allBreakLBIncrease:catalog.battleRules.breakLBIncrease,allStaggered?50:25);
       const phaseHasGamble=turn=>turn && [...(turn.leaves || []).map(leaf=>leaf.skillId),...(turn.reactionSkills || [])].some(id=>isGambleSkill(indexes.skills.get(Number(id))));
@@ -633,12 +648,14 @@
       const fill=(s,amount)=>{const before=s.gauge;s.gauge=Math.max(0,Math.min(s.m.limit.max,s.gauge+Math.trunc(Math.fround(amount))));s.gained+=s.gauge-before;};
       const outcomes=[];
       for(let sample=0;sample<samples;sample++){
+        checkSearchDeadline();
         const state=initial.map(s=>({...s,gauge:Math.max(0,Math.min(number(s.m.limit?.max),number(s.m.limit?.initial))),gained:0,uses:[],finishUses:[],guards:[],extraActions:0,phaseEvents:[],mp:number(s.m.availableMp),mpExhaustedRounds:[],
           hp:number((s.m.actionPlan || s.m.fallbackActionPlan)?.maxHp),hpSpent:0,resourceSkips:[],stateLeafResults:[],resourceEvents:[],currentSkillIds:[],skillHistory:[],goodLuck:s.initialLuck,overclocks:[],overheatUntil:0,openingDone:false,rotationIndex:0,demonForm:false,focusLife:0,focusSpeedUntil:0,gambleDraws:0,combatDraws:0}));
         for(const s of state)s.combatRng=round=>draw(sample,round,s.m.id,0x3ac81f09^Math.imul(++s.combatDraws,0x9e3779b9));
         for(const s of state)s.gambleRng=round=>draw(sample,round,s.m.id,0x2d6a5bc1^Math.imul(++s.gambleDraws,0x9e3779b9));
         let damage=0,breakDamage=0,gauge=0,recoverAt=0,staggers=0,firstStagger=0;
         for(let round=1;round<=rounds;round++){
+          checkSearchDeadline();
           const acted=new Set(),pending=new Set(),participated=new Set();
           const grant=(source,target,reason)=>{
             if(source.phase!=='normal' || !target || (target.m.actionPlan || target.m.fallbackActionPlan) && target.hp<=0 || participated.has(target) || pending.has(target))return;
@@ -1039,7 +1056,9 @@
       let timedOut=false;
       const consider=(skill,turn)=>{
         checkDeadline();
-        const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked);
+        const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked,()=>{
+          if(Date.now()>=deadline){timedOut=true;return true;}return false;
+        });
         if(!packageInfo)return;
         const allPassives=unique([...freeIds,...packageInfo.passiveIds,...turn.reservedIds.filter(id=>indexes.passives.has(id))]);
         const passiveIdOccurrences=S.passiveIdOccurrences(catalog,prepared.borrowed,equipment,
@@ -1098,6 +1117,14 @@
           clean(callBundle?.conditionData?.Condition || 'None')==='None' && clean(callEffect?.type)==='AddExPhase' && number(callEffect?.params?.[0])===100 &&
           number(callEffect?.prob,100)===100 && number(callEffect?.activationProbability,100)===100 && clean(callEffect?.condition?.Condition || 'None')==='None';
         if(callSupported)ensureSupport([call],'bonusPhase');
+        // Extra learned actions broaden the completed loadout without changing the scored attack or its passives.
+        if(options.fillAbilitySlots && !prepared.fixed)for(const action of prepared.skills.slice().sort((a,b)=>number(a.equipCost)-number(b.equipCost) || a.id-b.id)){
+          if(slotsUsed>=calculated.maxSkillSlots)break;
+          if(!prepared.legal.has(action.id) || packageFree.has(action.id) || activeSelected.includes(action.id) || selected.includes(action.id))continue;
+          const cost=number(action.equipCost);
+          if(supportCost+cost>calculated.skillBudget)continue;
+          activeSelected.push(action.id);supportCost+=cost;slotsUsed++;
+        }
         const legalSkills=new Set([...packageFree,...activeSelected,...selected]);
         const supportActions=[...prepared.support.buffs,...prepared.support.debuffs].filter(a=>legalSkills.has(a.skillId) && number(a.mpCost)<=availableMp && number(a.probability,100)===100 && number(a.activationProbability,100)===100);
         if(callSupported && legalSkills.has(call.id) && number(call.cost)<=availableMp)supportActions.push({skillId:call.id,name:call.name,kind:'bonusPhase',mpCost:number(call.cost),rootRelation:'Friendlies',rootTarget:'Single',effectId:54105,probability:100,activationProbability:100});
@@ -1107,7 +1134,7 @@
         const fallbackActionPlan={turn,openingTurn:turn.openingTurn,rotationTurns:turn.rotationTurns,luckPolicy:turn.luckPolicy,characterId,equipment,passiveIds:allPassives,passiveIdOccurrences,maxHp:number(stats.MaxHitPoint),maxMp:number(stats.MaxMagicPoint ?? stats.MagicPoint)};
         const historyScaled=allPassives.some(id=>(indexes.passives.get(id)?.effectBundles || []).some(bundle=>clean(indexes.effects.get(Number(bundle.effectId))?.type)==='DmgMulSkillNum'));
         const actionPlan=scenario.incomingDamage>0 || historyScaled || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo' || (indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(id))) || allPassives.some(id=>[1511,1499,1404].includes(id))?fallbackActionPlan:null;
-        const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,passiveIdOccurrences,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan,fallbackActionPlan,finish:prepared.finish}]);
+        const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,passiveIdOccurrences,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan,fallbackActionPlan,finish:prepared.finish}],Infinity,()=>{if(results.length)checkDeadline();});
         const score=goalScore({damage:fight.damage,breakDamage:damage.breakVerified?fight.breakDamage:0,gauge:fight.gauge[characterId],durability:number(fight.remainingHp[characterId],stats.MaxHitPoint)>0?(survivability+.02*(number(fight.remainingHp[characterId],stats.MaxHitPoint)-number(stats.MaxHitPoint)))*.5:0});
         const warnings=[...(calculated.warnings || []),...(prepared.learn.warnings || [])];
         if(packageInfo.masterIds.length)warnings.push('Spirit bundles use native mastery grants and their descriptions; exact runtime expansion has not been traced.');

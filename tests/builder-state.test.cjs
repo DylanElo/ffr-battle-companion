@@ -7,9 +7,11 @@ const core = require('../docs/core.js');
 const source = fs.readFileSync(path.join(__dirname, '../docs/app.js'), 'utf8');
 
 function fixture() {
-  const handlers = {}, workers = [];
+  const handlers = {}, workers = [], timers = new Map();
   const context = vm.createContext({
     structuredClone, URL,
+    setTimeout: (fn, ms) => {const id = timers.size + 1; timers.set(id, {fn, ms}); return id;},
+    clearTimeout: id => timers.delete(id),
     C: {...core, checkLocks: () => '', validPlan: () => '', stock: () => new Map()},
     document: {addEventListener: (event, handler) => { handlers[event] = handler; }},
     catalog: {}, snapshot: {characters: []}, plans: {},
@@ -34,8 +36,33 @@ function fixture() {
     target.closest = selector => selector === '[data-copy-path]' ? null : target;
     handlers.click({target});
   };
-  return {context, workers, start, change, click};
+  return {context, workers, timers, start, change, click};
 }
+
+test('a stalled Build ends at its watchdog without changing the draft', () => {
+  const {context, timers, start} = fixture(), before = JSON.stringify(context.draft), worker = start();
+  const timer = [...timers.values()][0]; assert.equal(timer.ms, 12000);
+  timer.fn();
+  assert.equal(worker.terminated, true);
+  assert.equal(context.ui.deep.busy, undefined);
+  assert.match(context.ui.deep.error, /timed out/);
+  assert.equal(JSON.stringify(context.draft), before);
+  worker.onmessage({data: {id: worker.message.id, type: 'result', result: {results: []}}});
+  assert.match(context.ui.deep.error, /timed out/);
+});
+
+test('the Build watchdog applies its completed checkpoint and cancels the worker', () => {
+  const {context, timers, start} = fixture();
+  context.applyBuildResult = (before, result) => ({draft: {...structuredClone(before), ...result.equipment}, dropped: []});
+  const worker = start();
+  worker.onmessage({data: {id: worker.message.id, type: 'checkpoint', result: {results: [{equipment: {weaponId: 90}, evaluation: {warnings: []}}]}}});
+  assert.equal(context.ui.deep.busy, true); assert.equal(context.draft.weaponId, 10);
+  [...timers.values()][0].fn();
+  assert.equal(context.draft.weaponId, 90);
+  assert.equal(context.ui.deep.results[0].evaluation.searchTruncated, true);
+  assert.equal(worker.terminated, true);
+  assert.equal(timers.size, 0);
+});
 
 test('fully pinned equipment still searches unlocked abilities', () => {
   const {context, workers, start} = fixture();

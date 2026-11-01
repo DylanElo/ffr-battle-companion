@@ -60,6 +60,7 @@
     const candidate={characterId,visionId,equipment:{...equipment,accessoryIds:equipment.accessoryIds.slice()},
       score:Number(evaluation.score),evaluation,roles:rolesOf(evaluation),key};
     state.cache.set(key,candidate);
+    callbacks.candidate?.(candidate);
     return candidate;
   }
   // Count legal suffixes once; unrank only the combinations the bounded search actually visits.
