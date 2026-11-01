@@ -3,6 +3,10 @@
   const C = typeof module !== 'undefined' ? require('./core.js') : root.Companion;
   const positive = value => Number.isInteger(Number(value)) && Number(value) > 0;
   const keyOf = equipment => [equipment.weaponId, equipment.armorId, ...equipment.accessoryIds.slice().sort((a,b)=>a-b)].join(',');
+  // Completed builds use the same tie rule in search, previews and final results.
+  const compareCandidates = (a,b) => b.score-a.score ||
+    (Number(a.evaluation?.skillCost)||0)-(Number(b.evaluation?.skillCost)||0) ||
+    String(a.key || '').localeCompare(String(b.key || ''));
   const countsOf = ids => {
     const counts = new Map();
     for (const id of ids.filter(positive).map(Number)) counts.set(id,(counts.get(id)||0)+1);
@@ -69,7 +73,7 @@
     }
     const candidate={characterId,visionId,equipment:{...equipment,accessoryIds:equipment.accessoryIds.slice()},
       score:Number(evaluation.score),evaluation,roles:rolesOf(evaluation),key};
-    if(cached && cached.score>candidate.score)return cached;
+    if(cached && compareCandidates(cached,candidate)<0)return cached;
     state.cache.set(key,candidate);
     callbacks.candidate?.(candidate);
     return candidate;
@@ -110,6 +114,31 @@
       }
     }
     yield* visit(0);
+  }
+  function equipmentOrdering(catalog,native,visionId,options){
+    const action=(catalog.skills || []).find(skill=>skill.id===Number(options.actionId));
+    const keys=new Set(),addAttack=type=>{
+      if(C.clean(type)==='Magic'){keys.add('Intelligence');keys.add('MagicalAttack');}
+      else if(C.clean(type)==='Physic'){keys.add('Attack');keys.add('PhysicalAttack');}
+      else if(C.clean(type)==='Divine')keys.add('Divine');
+    };
+    if(action)addAttack(action.calcType);
+    if(!keys.size){
+      addAttack((catalog.visions || []).find(vision=>vision.id===visionId)?.attackType);
+      for(const key of C.kitProfile([],native).keys)if(['PhysicalAttack','MagicalAttack'].includes(key)){
+        keys.add(key);keys.add(key==='MagicalAttack'?'Intelligence':'Attack');
+      }
+    }
+    const requirements=options.requirements || {},survival=requirements.survive || (options.goals || []).includes('durability');
+    if(survival)for(const key of ['HitPoint','MaxHitPoint','PhysicalDefense','MagicalDefense','Defence','Mind'])keys.add(key);
+    if(Number(requirements.minHp)>0){keys.add('HitPoint');keys.add('MaxHitPoint');}
+    // Ordering is a search hint only: inverse scales, conditions and all distinct passive sources remain searchable.
+    const goal=C.priorityGoal(catalog,[...keys]);
+    if(action && Number(action.cost)>0){
+      const mp=C.priorityGoal(catalog,['MagicPoint','MaxMagicPoint']);
+      for(const [key,weight] of Object.entries(mp.weights))goal.weights[key]=weight*.1;
+    }
+    return item=>C.score(item,goal);
   }
   function buildCandidates(catalog,snapshot,characterId,callbacks,options={},availableArg,stateArg) {
     options=defaults(options);
@@ -175,15 +204,15 @@
         attempts++;
         const candidate=evaluateOne(state,callbacks,saved.id,visionId,equip);
         local.set(key,candidate);
-        if (candidate && (!best || candidate.score>best.score)) best=candidate;
+        if (candidate && (!best || compareCandidates(candidate,best)<0)) best=candidate;
         return true;
       };
       // Seed the saved loadout before pruning so a search budget never hides its comparison.
       consider(base.weaponId,base.armorId,base.accessoryIds);
       consider(emptyGear.weaponId,emptyGear.armorId,emptyGear.accessoryIds);
-      const magnitude=id=>Object.values(equipment.get(id)?.stats || {}).reduce((sum,value)=>sum+Math.abs(Number(value)||0),0);
+      const priority=equipmentOrdering(catalog,native,visionId,options),priorityOf=id=>priority(equipment.get(id));
       const order=(ids,preferred)=>ids.slice().sort((a,b)=>Number(b===preferred && b>0)-Number(a===preferred && a>0) ||
-        Number(b>0)-Number(a>0) || magnitude(b)-magnitude(a) || b-a);
+        Number(b>0)-Number(a>0) || priorityOf(b)-priorityOf(a) || b-a);
       // Whole-build weapon/armor probes seed the joint walk, without eliminating any stat tradeoff.
       const probeLimit=Math.floor(options.perLoadoutBudget/4),probeEnd=Date.now()+(Math.min(sliceEnd,state.deadline)-Date.now())/4;
       for(const weapon of order(weaponIds,base.weaponId)){
@@ -196,7 +225,7 @@
       }
       const start=best?.equipment || base,preferredAccessories=new Set(start.accessoryIds);
       const jointAccessories=accessoryCandidates.slice().sort((a,b)=>Number(preferredAccessories.has(b))-Number(preferredAccessories.has(a)) ||
-        Number((equipment.get(b)?.passiveIds || []).length>0)-Number((equipment.get(a)?.passiveIds || []).length>0) || magnitude(b)-magnitude(a) || b-a);
+        Number((equipment.get(b)?.passiveIds || []).length>0)-Number((equipment.get(a)?.passiveIds || []).length>0) || priorityOf(b)-priorityOf(a) || b-a);
       jointAccessories.push(-1);
       let interrupted=false;
       const stop=()=>{
@@ -210,7 +239,7 @@
         if(interrupted)break traverse;
       }
       if(interrupted){state.truncated=true;state.reasons.add('loadout budget');}
-      const ranked=[...local.values()].filter(Boolean).sort((a,b)=>b.score-a.score || a.key.localeCompare(b.key));
+      const ranked=[...local.values()].filter(Boolean).sort(compareCandidates);
       const keep=new Map(ranked.slice(0,options.candidatesPerVision).map(c=>[c.key,c]));
       // Keep stock alternatives: giving a scarce best item to one member can change the best team.
       const contested=new Set(ranked.slice(0,options.candidatesPerVision).flatMap(c=>C.equipmentIds(c.equipment)));
@@ -293,6 +322,7 @@
     const gear=new Map(catalog.equipment.map(e=>[e.id,e]));
     const used=countsOf(members.flatMap(m=>C.equipmentIds(m.equipment)));
     const owned=inventory(snapshot);
+    const abilityCost=member=>Number(member.evaluation?.skillCost)||0;
     const worth=id=>Object.values(gear.get(id)?.stats || {}).reduce((a,b)=>a+Number(b||0),0);
     const unmodeled=(evaluation,item)=>[...(evaluation.passiveAnalysis?.unsupported || []),...(evaluation.passiveAnalysis?.deferred || [])]
       .filter(effect=>(item?.passiveIds || []).includes(effect.passiveId));
@@ -322,6 +352,7 @@
         const next=out.slice();next[memberIndex]=without;
         const before=partyScore(out),after=partyScore(next);
         if(!Number.isFinite(before) || !Number.isFinite(after) || after<before)continue;
+        if(after===before && without.score===best.score && abilityCost(without)>abilityCost(best))continue;
         used.set(id,(used.get(id)||0)-1);best=without;out[memberIndex]=best;
       }
       for (const [slot,index,get,set] of slotsOf(best.equipment)) {
@@ -338,8 +369,10 @@
           const next=out.slice();next[memberIndex]=c;
           const nextPartyScore=partyScore(next);
           if (!Number.isFinite(nextPartyScore) || nextPartyScore<previousPartyScore) continue;
+          if(nextPartyScore===previousPartyScore && c.score===best.score && abilityCost(c)>abilityCost(best))continue;
           if (damageOnly && slot==='accessory' && nextPartyScore<=previousPartyScore) continue;
-          if (!pick || nextPartyScore>pick.partyScore || (nextPartyScore===pick.partyScore && (c.score>pick.c.score || c.score===pick.c.score && worth(item.id)>worth(pick.id))))pick={c,id:item.id,partyScore:nextPartyScore};
+          if (!pick || nextPartyScore>pick.partyScore || (nextPartyScore===pick.partyScore && (c.score>pick.c.score || c.score===pick.c.score &&
+            (abilityCost(c)<abilityCost(pick.c) || abilityCost(c)===abilityCost(pick.c) && worth(item.id)>worth(pick.id)))))pick={c,id:item.id,partyScore:nextPartyScore};
         }
         // The cache keys accessories unordered, so keep this slot order rather than the cached one.
         if (pick) {best={...pick.c,equipment:set(best.equipment,pick.id)};used.set(pick.id,(used.get(pick.id)||0)+1);out[memberIndex]=best;}
@@ -506,6 +539,6 @@
       reasons:[...state.reasons],teamsConsidered:teamCount,totalTeams:teams.length,
       results:results.map(({members,score,evaluation})=>({members,score,evaluation})),baseline,elapsedMs:Date.now()-state.started};
   }
-  const api={rankParties,buildCandidates,finalizeBuilds,validateParty,inventory};
+  const api={rankParties,buildCandidates,finalizeBuilds,validateParty,inventory,compareCandidates};
   if(typeof module!=='undefined')module.exports=api;else root.CompanionSearch=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

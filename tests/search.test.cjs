@@ -2,6 +2,31 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const S=require('../docs/search.js');
 
+test('finalization preserves cheaper equal-score abilities while retaining neutral gear fill and upgrades',()=>{
+  for(const [cost,score,expectedWeapon] of [[40,10,-1],[0,10,10],[40,11,10]]){
+    const {catalog,snapshot}=fixture(1);
+    catalog.equipment=catalog.equipment.filter(item=>item.id===10);
+    const equipment={weaponId:-1,armorId:-1,accessoryIds:[],visionId:100};
+    const member={characterId:1,visionId:100,equipment,score:10,roles:[],evaluation:{skillCost:0,equippedSkillIds:[]}};
+    const [result]=S.finalizeBuilds(catalog,snapshot,[member],new Map([[10,1]]),{
+      options:{goals:['damage']},evaluate:({equipment})=>({valid:true,score:equipment.weaponId>0?score:10,
+        skillCost:equipment.weaponId>0?cost:0,equippedSkillIds:[]})});
+    assert.equal(result.equipment.weaponId,expectedWeapon,`cost ${cost}, score ${score}`);
+  }
+});
+
+test('neutral accessory removal cannot replace a cheaper ability loadout with a costlier one',()=>{
+  const {catalog,snapshot}=fixture(1);
+  catalog.equipment=catalog.equipment.filter(item=>item.id===30);
+  const equipment={weaponId:-1,armorId:-1,accessoryIds:[30],visionId:100};
+  const member={characterId:1,visionId:100,equipment,score:10,roles:[],evaluation:{skillCost:0,equippedSkillIds:[]}};
+  const [result]=S.finalizeBuilds(catalog,snapshot,[member],new Map([[30,1]]),{
+    options:{goals:['damage']},evaluate:({equipment})=>({valid:true,score:10,
+      skillCost:equipment.accessoryIds.includes(30)?0:40,equippedSkillIds:[]})});
+  assert.deepEqual(result.equipment.accessoryIds,[30]);
+  assert.equal(result.evaluation.skillCost,0);
+});
+
 function fixture(n=4) {
   return {
     catalog:{characters:Array.from({length:n},(_,i)=>({id:i+1,name:`C${i+1}`,sex:'Male',weaponType:'Sword',armorTypes:['Light']})),

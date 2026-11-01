@@ -64,6 +64,47 @@ test('the Build watchdog applies its completed checkpoint and cancels the worker
   assert.equal(timers.size, 0);
 });
 
+test('Stop keeps the completed preview, original restore draft, and ignores a late worker result', () => {
+  const {context,timers,start,click}=fixture();
+  context.applyBuildResult=(before,result)=>({draft:{...structuredClone(before),...result.equipment},dropped:[]});
+  const before=JSON.stringify(context.draft),worker=start();
+  worker.onmessage({data:{id:worker.message.id,type:'checkpoint',result:{results:[{equipment:{weaponId:90},evaluation:{score:12,warnings:[]}}]}}});
+  assert.equal(context.ui.deep.results[0].evaluation.score,12,'The completed build is available for preview');
+  assert.equal(JSON.stringify(context.draft),before,'Preview does not overwrite the draft');
+  click({id:'deep-cancel'});
+  assert.equal(context.draft.weaponId,90);
+  assert.equal(context.ui.deep.status,'stopped');
+  assert.equal(context.ui.deep.results[0].evaluation.searchTruncated,true);
+  assert.equal(JSON.stringify(context.ui.deep.before),before);
+  assert.equal(worker.terminated,true);assert.equal(timers.size,0);
+  worker.onmessage({data:{id:worker.message.id,type:'result',result:{results:[]}}});
+  assert.equal(context.ui.deep.status,'stopped');assert.equal(context.draft.weaponId,90);
+});
+
+test('Stop without a checkpoint preserves the draft and reports a normal stop', () => {
+  const {context,start,click}=fixture(),before=JSON.stringify(context.draft),worker=start();
+  click({id:'deep-cancel'});
+  assert.equal(JSON.stringify(context.draft),before);
+  assert.equal(context.ui.deep.error,undefined);
+  assert.match(context.ui.deep.note,/draft is unchanged/);
+  assert.equal(worker.terminated,true);
+});
+
+test('selected action and requirements are passed to Build and editing them cancels old work', () => {
+  const {context,start,change}=fixture();
+  const request={goals:['limit'],enemyId:'general',actionId:42,requirements:{minHp:6000,survive:true,element:'Water'}};
+  context.goalFor=()=>request;
+  const worker=start();
+  assert.equal(worker.message.options.actionId,42);
+  assert.deepEqual(worker.message.options.requirements,request.requirements);
+  let patch;
+  context.setGoal=(id,value)=>{patch=value;};
+  change({id:'deep-min-hp',value:'7000'});
+  assert.equal(worker.terminated,true);
+  assert.equal(context.ui.deep,null);
+  assert.deepEqual({...patch.requirements},{minHp:'7000',survive:true,element:'Water'});
+});
+
 test('fully pinned equipment still searches unlocked abilities', () => {
   const {context, workers, start} = fixture();
   const worker = start();
@@ -282,4 +323,17 @@ test('staging a party cancels unlock work before replacing the draft', () => {
   assert.equal(context.ui.charId, 2);
   worker.onmessage({data: {id: worker.message.id, type: 'result', result: {results: [{required: 95}]}}});
   assert.equal(context.ui.unlocks, null);
+});
+
+for(const kind of ['message','runtime'])test(`a ${kind} error retains the last completed build and restore draft`,()=>{
+  const {context,start}=fixture();
+  context.applyBuildResult=(before,result)=>({draft:{...structuredClone(before),...result.equipment},dropped:[]});
+  const before=JSON.stringify(context.draft),worker=start();
+  worker.onmessage({data:{id:worker.message.id,type:'checkpoint',result:{results:[{equipment:{weaponId:90},evaluation:{score:12,warnings:[]}}]}}});
+  if(kind==='message')worker.onmessage({data:{id:worker.message.id,type:'error',message:'Finalization failed.'}});
+  else worker.onerror({message:'Finalization failed.'});
+  assert.equal(context.ui.deep.error,'Finalization failed.');
+  assert.equal(context.ui.deep.status,'limited');assert.equal(context.draft.weaponId,90);
+  assert.equal(JSON.stringify(context.ui.deep.before),before);assert.equal(worker.terminated,true);
+  assert.match(context.ui.deep.results[0].evaluation.warnings.at(-1),/best completed legal build/);
 });
