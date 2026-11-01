@@ -12,9 +12,9 @@
   const catalogCache=new WeakMap(),effectCache=new WeakMap();
   const evidence={
     parameters:'Native eUnitParameterType / eUnitParameterVariationType; current DT_SkillEffectData ParamList.',
-    additiveDamage:'Installed executable common multiplier helper 0x14523e3e0 sums DamageCalculation and target-break effect factors into one bucket, clamped >= 0.',
+    additiveDamage:'Installed executable common multiplier helper 0x14523e3e0 sums DamageCalculation and target-break effect factors into one bucket, clamped >= 0; eligible DamageMultiplier instances are summed even when their effect IDs match.',
     critical:'Installed executable helper 0x145238c00 adds critical effect factors to the native critical base.',
-    limits:'Unsupported timing, conditions, effect types, random activation and parameter layouts are excluded explicitly. Multi-copy identical-effect stacking is not verified.'
+    limits:'Unsupported timing, conditions, effect types, random activation and parameter layouts are excluded explicitly. Identical-effect stacking beyond DamageMultiplier instances from explicitly counted sources is not verified.'
   };
   const add=(object,key,value)=>{object[key]=(object[key]||0)+value;};
   const known=value=>value!==undefined && value!==null;
@@ -31,7 +31,8 @@
       const {key,value,comparison}=test;
       const actual=key.startsWith('skill.')?context.skill?.[key.slice(6)]:context[key];
       if(!known(actual))return {state:'unknown',reason:`Requires ${key}.`};
-      const passed=comparison==='min'?Number(actual)>=value:comparison==='nonempty'?actual.length>0:comparison==='exact'?actual===value:clean(actual)===clean(value);
+      if(key==='targetCount' && (!Number.isInteger(actual) || actual<0))return {state:'unknown',reason:'Requires an actual integer target count.'};
+      const passed=comparison==='min'?Number(actual)>=value:comparison==='nonempty'?actual.length>0:comparison==='exact'?actual===value:comparison==='oneOf'?value.includes(clean(actual)):clean(actual)===clean(value);
       if(!passed)return {state:'no'};
     }
     return {state:'yes'};
@@ -174,6 +175,17 @@
       if(!(Number(p[0])>0) || !allDefault(1))return reject('Unrecognized level-scaled power layout.');
       term.kind='coefficientPerLevel';term.value=100/Number(p[0]);return term;
     }
+    if(type==='DmgMulAllToSingle'){
+      if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || !allDefault(1))return reject('Unrecognized all-to-single damage layout.');
+      requireValue('skill.target',['Group','All'],'oneOf');requireValue('targetCount',1,'exact');
+      return {...term,kind:'damagePercent',value:Number(p[0])};
+    }
+    if(type==='DmgMulSkillNum'){
+      const timing=clean(effect.applyTiming);
+      if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || !Number.isFinite(Number(p[1])) || Number(p[1])<0 || !Number.isInteger(Number(p[2])) || Number(p[2])<0 || Number(p[2])>128 || !allDefault(3) || !['DamageCalculation','DamageCalculationOnBreak','BreakDmgCalculation'].includes(timing))return reject('Unrecognized skill-history multiplier layout.');
+      if(timing==='DamageCalculationOnBreak')requireValue('broken',true);
+      return {...term,kind:timing==='BreakDmgCalculation'?'breakPerSkill':'damagePerSkill',value:Number(p[0]),cap:Number(p[1]),historyTurns:Number(p[2])};
+    }
     // Decimating Attacks: +p0% per target, when attacking all enemies. Tip-Top Shape: +p0% per buff on the user.
     if(type==='DmgMulTargetlNum' || type==='DmgMulBuffNum'){
       if(!allDefault(1))return reject('Unrecognized count-scaled damage layout.');
@@ -191,7 +203,9 @@
     modifiers.bonusPhaseChancePercent=0;
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
-    for(const id of passiveIds || []){
+    // An occurrence list replaces semantic references; it never adds a second copy of the reference list.
+    const occurrences=Array.isArray(providedContext.passiveIdOccurrences)?providedContext.passiveIdOccurrences:null;
+    for(const id of occurrences || passiveIds || []){
       const passive=byPassive.get(Number(id));result.coverage.passives++;
       if(!passive){result.unsupported.push({passiveId:id,reason:'Unknown passive ID.'});continue;}
       if(!Array.isArray(passive.effectBundles)){result.unsupported.push({passiveId:id,name:passive.name,reason:'Native passive bundle timing is missing.'});continue;}
@@ -212,7 +226,7 @@
         }
         if(blocked)continue;
         if(Number(effect.prob??100)!==100 || Number(effect.activationProbability??100)!==100){result.deferred.push({...record,reason:'Random activation requires a stochastic/event model.',probability:effect.prob,activationProbability:effect.activationProbability});continue;}
-        if(seenEffects.has(effect.id)){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
+        if(seenEffects.has(effect.id) && !(occurrences && record.type==='DamageMultiplier')){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
         seenEffects.add(effect.id);
         let term=effectCache.get(effect);
         if(!term){term=decode(effect);effectCache.set(effect,term);}
@@ -221,11 +235,12 @@
       }
     }
     // The caller supplies only already-applied effects on this subject; action/recipient legality stays in the battle planner.
+    // Repeated DamageMultiplier IDs here represent distinct applied instances, not repeated semantic passive references.
     for(const id of providedContext.activeEffectIds || []){
       const effect=byEffect.get(Number(id)),record={effectId:Number(id),source:'activeEffect'};
       result.coverage.effects++;
       if(!effect){result.unsupported.push({...record,reason:'Unknown active effect ID.'});continue;}
-      if(seenEffects.has(effect.id)){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
+      if(seenEffects.has(effect.id) && clean(effect.type)!=='DamageMultiplier'){result.deferred.push({...record,reason:'Duplicate native effect: identical-effect stacking has not been verified.'});continue;}
       seenEffects.add(effect.id);
       const gate=condition(effect.condition,context);
       if(gate.state==='unknown'){result.deferred.push({...record,reason:gate.reason});continue;}
@@ -292,6 +307,19 @@
         }
         result.applied.push(term);
         continue;
+      }
+      if(term.kind==='damagePerSkill' || term.kind==='breakPerSkill'){
+        if(term.historyTurns===0){result.applied.push({...term,value:0,skillCount:0});result.terms.push({...term,value:0,skillCount:0});continue;}
+        const validIds=ids=>Array.isArray(ids) && ids.length<=256 && ids.every(id=>Number.isInteger(id) && id>0);
+        const history=context.skillHistory,current=context.currentSkillIds;
+        if(!validIds(current) || !Array.isArray(history) || history.length>128 || !history.every(validIds)){
+          result.deferred.push({...term,reason:'Requires complete current skill IDs and completed global-turn history.'});continue;
+        }
+        const previous=term.historyTurns?history.slice(-term.historyTurns):[];
+        const skillCount=new Set([...current,...previous.flat()]).size;
+        const value=Math.min(term.cap,skillCount*term.value);
+        modifiers[term.kind==='damagePerSkill'?'damagePercent':'breakPercent']+=value;
+        result.applied.push({...term,value,skillCount});result.terms.push({...term,value,skillCount});continue;
       }
       if(term.kind==='damagePerTarget' || term.kind==='damagePerBuff'){
         if(term.kind==='damagePerTarget' && !['Group','All'].includes(clean(context.skill?.target))){result.inactive.push({...term,reason:'Only when attacking all enemies.'});continue;}

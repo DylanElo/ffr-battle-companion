@@ -46,7 +46,8 @@ test('buildStats includes innate, Resonance, gear and equipped master passives w
   const result=Stats.buildStats(catalog,snapshot,1);
   assert.equal(result.stats.Defence,40,'base 20 receives each 10/20/30/40 percent effect once');
   assert.equal(result.stats.PhysicalDefense,45,'gear defense remains additive to passive-scaled base defense');
-  assert.equal(result.deferredStatEffects.length,0);
+  assert.equal(result.deferredStatEffects.length,1,'The repeated stat effect remains excluded, now with its second source visible');
+  assert.match(result.deferredStatEffects[0].reason,/identical-effect stacking has not been verified/);
   const empty=Stats.buildStats(catalog,snapshot,1,{...snapshot.characters[0].equipment,equippedSkillIds:[]});
   assert.equal(empty.stats.Defence,32,'explicit empty abilities removes the master grant but retains always-on effects');
   assert.equal(Stats.buildStats(catalog,snapshot,1).stats.Defence,40,'cache separates equipped ability loadouts');
@@ -58,8 +59,8 @@ test('buildStats defers combat-conditional stat effects instead of inventing a c
   catalog.effects=[{id:400,type:'ParameterContinuousVariation',params:[50,6,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1],condition:{Condition:'None'},activationProbability:100}];
   const result=Stats.buildStats(catalog,snapshot,1);
   assert.equal(result.stats.Defence,20);
-  assert.equal(result.deferredStatEffects.length,1);
-  assert.match(result.deferredStatEffects[0].reason,/status condition/);
+  assert.equal(result.deferredStatEffects.length,2,'Both the automatic Sync and equipped references require the missing condition');
+  assert.ok(result.deferredStatEffects.every(effect=>/status condition/.test(effect.reason)));
 });
 test('each effect delta truncates independently and attribute modifiers propagate into derived attack',()=>{
   const {catalog,snapshot}=fixture();
@@ -91,17 +92,73 @@ test('native caps and invalid experience are handled without mutating source',()
   const broken=structuredClone(snapshot);broken.characters[0].experience=-1;
   assert.throws(()=>Stats.characterStats(catalog,broken,1),/experience/);
 });
-test('learned skills use level and permanent sync while free awakening grants require ownership',()=>{
+test('learned skills use permanent sync and equipped Resonance grants require ownership',()=>{
   const {catalog,snapshot}=fixture();
   const pool=Stats.learned(catalog,snapshot,1,20);
-  assert.deepEqual(pool.freeActiveIds,[101,103]);
+  assert.deepEqual(pool.freeActiveIds,[101,103,100]);
   assert.deepEqual(pool.learnedActiveIds.sort(),[100,101,102]);
-  assert.deepEqual(pool.alwaysPassiveIds,[201]);
+  assert.deepEqual(pool.alwaysPassiveIds,[201,200]);
   assert.deepEqual(pool.learnedPassiveIds,[200]);
   assert.equal(pool.skillBudget,112);
   const absent=Stats.learned(catalog,snapshot,1,999);
   assert.deepEqual(absent.freeActiveIds,[101]);
   assert.ok(absent.warnings.some(w=>/not owned/.test(w)));
+});
+
+test('equipped Terra automatically grants reached Sync active and passive milestones',()=>{
+  // Native1452510D0/14524FDE0 gather equipped Vision Sync types2/1 through145021000.
+  // Reflected eVisionMasteryParameterType: ActiveSkill1,PassiveSkill2,MasterSkill4.
+  const source=JSON.parse(fs.readFileSync(path.join(__dirname,'../docs/data/catalog.json'),'utf8'));
+  const terra=source.visions.find(v=>v.id===13108);
+  assert.ok(terra);
+  for(const [points,expectedPassives,expectedActive] of [
+    [0,[],[]],[9,[],[]],[10,[1430],[]],[94,[1430],[]],
+    [95,[1430],[400660]],[434,[1430],[400660]],
+    [435,[1430,1000],[400660]],[1545,[1430,1000,1332],[400660]],
+    [5095,[1430,1000,1332,1047],[400660]],
+  ]){
+    const {catalog,snapshot}=fixture();
+    catalog.visions=[{...terra,awakening:[]}];
+    catalog.masterSkills=[{id:1310800,grants:{passiveIds:[2999]}}];
+    snapshot.resonances=[{id:13108,sync:[{characterId:1,points}]}];
+    snapshot.characters[0].equipment.visionId=13108;
+    snapshot.characters[0].equippedSkillIds=[];
+    const before=JSON.stringify({catalog,snapshot});
+    const pool=Stats.learned(catalog,snapshot,1,13108);
+    assert.deepEqual(pool.alwaysPassiveIds,expectedPassives,`Sync points ${points}`);
+    assert.deepEqual(pool.freeActiveIds,[101,...expectedActive],`Sync points ${points}`);
+    assert.ok(!pool.alwaysPassiveIds.includes(1310800),'MasterSkill milestone does not expand its bundle automatically');
+    assert.ok(!pool.alwaysPassiveIds.includes(2999),'a MasterSkill bundle does not contribute extra automatic passives');
+    assert.equal(JSON.stringify({catalog,snapshot}),before);
+  }
+});
+
+test('automatic Sync grants require current ownership and this character milestone record',()=>{
+  for(const mode of ['otherVision','unowned','unknown','otherCharacter','missingRecord','belowThreshold']){
+    const {catalog,snapshot}=fixture();
+    catalog.visions[0].awakening=[];
+    let visionId=20;
+    if(mode==='otherVision')visionId=21;
+    if(mode==='unowned')snapshot.resonances=snapshot.resonances.filter(v=>v.id!==20);
+    if(mode==='unknown')visionId=999;
+    if(mode==='otherCharacter')snapshot.resonances[0].sync=[{characterId:2,points:100}];
+    if(mode==='missingRecord')snapshot.resonances[0].sync=[];
+    if(mode==='belowThreshold')snapshot.resonances[0].sync[0].points=9;
+    const pool=Stats.learned(catalog,snapshot,1,visionId);
+    assert.deepEqual(pool.freeActiveIds,[101],mode);
+    assert.deepEqual(pool.alwaysPassiveIds,[],mode);
+    if(mode==='otherVision'){
+      assert.ok(pool.learnedActiveIds.includes(100),'all-owned learned abilities remain equipable');
+      assert.ok(pool.learnedPassiveIds.includes(200));
+    }
+  }
+  const {catalog,snapshot}=fixture();
+  catalog.visions[0].awakening=[];
+  catalog.visions[0].synchro=[{requiredPoints:0,grants:[{type:'PassiveSkill',id:200}]}];
+  snapshot.resonances[0].sync=[];
+  assert.deepEqual(Stats.learned(catalog,snapshot,1,20).alwaysPassiveIds,[],'missing Sync record is native−1, not an explicit zero-point record');
+  snapshot.resonances[0].sync=[{characterId:1,points:0}];
+  assert.deepEqual(Stats.learned(catalog,snapshot,1,20).alwaysPassiveIds,[200],'explicit zero-point record reaches an actual zero-point grant');
 });
 test('native latest full-health snapshot validates all eight HP values and learned-cost budgets',t=>{
   const root=path.resolve(__dirname,'..'),dll=path.join(root,'importer/bin/Release/net10.0/BattleCompanionImporter.dll');
