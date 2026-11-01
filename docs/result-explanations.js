@@ -1,4 +1,4 @@
-import {h} from './build-details.js?v=12';
+import {h} from './build-details.js?v=13';
 
 const list = value => Array.isArray(value) ? value : [];
 const numeric = value => typeof value === 'number' && Number.isFinite(value);

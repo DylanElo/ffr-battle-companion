@@ -57,6 +57,7 @@ export function moveDetails(ev, indexes) {
 // A removal check: the same build without one piece. Positive deltas are what the piece adds.
 function gainText(reason) {
   if (!reason) return '';
+  if (reason.reason==='budget-exhausted') return 'Comparison not run within the search time.';
   if (reason.without?.valid === false || ['required-for-action', 'required-for-evaluation'].includes(reason.reason)) return 'Needed for the attack.';
   const parts = [['damageDelta', 'damage'], ['staggerDelta', 'stagger']].filter(([key]) => Number.isFinite(reason[key]) && Math.abs(reason[key]) >= .5)
     .map(([key, label]) => `${reason[key] > 0 ? '+' : '−'}${whole(Math.abs(reason[key]))} ${label} per round`);
@@ -72,6 +73,7 @@ function roleOf(id, ev) {
 }
 
 const emptyReasons = {
+  'budget-exhausted': 'Comparison not run within the search time.',
   'no-owned-compatible': 'You own nothing for this slot.',
   'reserved-or-used': 'Your copies are used by other characters.',
   'lowers-model': 'Nothing you own improves this build here.',

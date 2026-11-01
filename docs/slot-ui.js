@@ -1,5 +1,5 @@
 // One equipment or Resonance slot: the current piece with what it does, and (when open) every choice with its change.
-import { h } from './build-details.js?v=12';
+import { h } from './build-details.js?v=13';
 
 const para = (cls, text) => text ? `<p class="${cls}">${h(text)}</p>` : '';
 const effects = list => (list || []).map(e => `<p class="dim small"><b>${h(e.name)}</b>${e.text ? ` — ${h(e.text)}` : ''}</p>`).join('');

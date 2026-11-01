@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=39', 'search.js?v=31', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=40', 'search.js?v=32', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -9,7 +9,7 @@ function currentOf(model,snapshot,id){
 }
 let rulesPromise;
 self.onmessage = async event => {
-  const {id,catalog,snapshot,enemyId,options} = event.data;
+  const {id,catalog,snapshot,enemyId,options={}} = event.data;
   try {
     rulesPromise ||= fetch('skill-rules.json?v=1').then(response=>{if(!response.ok)throw new Error('Native skill eligibility rules are unavailable.');return response.json();});
     catalog.skillRules=await rulesPromise;
@@ -21,6 +21,8 @@ self.onmessage = async event => {
       self.postMessage({id,type:'result',result});
       return;
     }
+    options.deadline=Date.now()+(options.timeMs>0?options.timeMs:10000);
+    options.evaluationTimeMs=500;
     const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:event.data.mode!=='single'});
     const start=performance.now();
     if(event.data.mode==='single'){
@@ -47,7 +49,7 @@ self.onmessage = async event => {
       results.sort((a,b)=>b.score-a.score);
       for(const member of results){
         member.evaluation={...member.evaluation,warnings:[...new Set([...(model.globalWarnings || []),...(member.evaluation.warnings || [])])]};
-        member.abilityReasons=model.explainAbilities(member);
+        member.abilityReasons=Date.now()<options.deadline?model.explainAbilities(member):[];
       }
       const baseline=event.data.baseline;
       const before=baseline?model.evaluate({characterId:event.data.characterId,visionId:baseline.visionId,equipment:baseline,

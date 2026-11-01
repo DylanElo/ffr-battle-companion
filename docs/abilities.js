@@ -1,5 +1,5 @@
 // Manually equipped abilities: what a character can equip, what it costs, and what no longer fits.
-import { describeAbility } from './piece-details.js?v=1';
+import { describeAbility } from './piece-details.js?v=2';
 
 const costOf = (id, indexes) => describeAbility(id, indexes)?.cost || 0;
 const learnedIds = l => [...(l.learnedActiveIds || []), ...(l.learnedPassiveIds || []), ...(l.masterSkillIds || [])];
