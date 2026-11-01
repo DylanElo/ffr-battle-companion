@@ -16,6 +16,11 @@
     if(!Number.isFinite(value) || value<min || value>max)throw new RangeError(`${name} must be finite in [${min}, ${max}].`);
     return value;
   }
+  // ParameterVariation RatioIncrease at 145139750-145139776; MP uses its actual maximum.
+  function mpRecoveryAmount(maxMp,value,ratio=false) {
+    finite('maximum MP',maxMp,0);finite('MP recovery value',value,0);
+    return ratio?Math.trunc(f(f(maxMp)*nativePercent(value))):Math.trunc(value);
+  }
   function ratioFactor(attack,defense) {
     finite('attack',attack,0);finite('defense',defense,0);
     const ratio=f(f(f(attack)/f(Math.max(defense,1)))+EPS);
@@ -190,6 +195,6 @@
       multipliers:{critical,allDamage,element:input.elementFactor??1,percent:input.percentFactor??1,outgoing:input.outgoingFactor??1,target:input.targetFactor??1,hitRatio:input.hitRatio??1},
       warnings:['Native break formula verified statically, not calibrated against an observed battle trace.','Caller supplies break-specific element factors and effect buckets; HP-damage multipliers must not be substituted.']};
   }
-  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,gambleSuccess,gambleHitProbability,skillHitSuccess,skillHitProbability,skillMpCost,skillHpCost,canPayHpCost,damageTakenLb,initiativeJitter,initiativePriority,damage,recovery,breakDamage};
+  const api={DEFAULT_RULES,ratioFactor,baseDamage,criticalProbability,gambleSuccess,gambleHitProbability,skillHitSuccess,skillHitProbability,skillMpCost,skillHpCost,canPayHpCost,mpRecoveryAmount,damageTakenLb,initiativeJitter,initiativePriority,damage,recovery,breakDamage};
   if(typeof module!=='undefined')module.exports=api;else root.NativeDamage=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

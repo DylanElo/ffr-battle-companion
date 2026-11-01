@@ -1,0 +1,187 @@
+{
+  "executableSha256": "B8C588E46EBADBE37FECA7BDF2DA0AE63A8538099D14A53EC0C2241B086E5FFA",
+  "source": "145139750-145139776, generic ParameterVariation RatioIncrease; MP max dispatch14523C320, MP delta145230953->14524AED0",
+  "method": "Copied native code/constants in isolated Unicorn memory; no game process or save writes.",
+  "cases": [
+    {
+      "maxMp": 0,
+      "value": 2,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 0,
+      "value": 3,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 0,
+      "value": 5,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 1,
+      "value": 2,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 1,
+      "value": 3,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 1,
+      "value": 5,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 19,
+      "value": 2,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 19,
+      "value": 3,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 19,
+      "value": 5,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 20,
+      "value": 2,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 20,
+      "value": 3,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 20,
+      "value": 5,
+      "ratio": true,
+      "expected": 1
+    },
+    {
+      "maxMp": 33,
+      "value": 2,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 33,
+      "value": 3,
+      "ratio": true,
+      "expected": 0
+    },
+    {
+      "maxMp": 33,
+      "value": 5,
+      "ratio": true,
+      "expected": 1
+    },
+    {
+      "maxMp": 99,
+      "value": 2,
+      "ratio": true,
+      "expected": 1
+    },
+    {
+      "maxMp": 99,
+      "value": 3,
+      "ratio": true,
+      "expected": 2
+    },
+    {
+      "maxMp": 99,
+      "value": 5,
+      "ratio": true,
+      "expected": 4
+    },
+    {
+      "maxMp": 100,
+      "value": 2,
+      "ratio": true,
+      "expected": 2
+    },
+    {
+      "maxMp": 100,
+      "value": 3,
+      "ratio": true,
+      "expected": 3
+    },
+    {
+      "maxMp": 100,
+      "value": 5,
+      "ratio": true,
+      "expected": 5
+    },
+    {
+      "maxMp": 617,
+      "value": 2,
+      "ratio": true,
+      "expected": 12
+    },
+    {
+      "maxMp": 617,
+      "value": 3,
+      "ratio": true,
+      "expected": 18
+    },
+    {
+      "maxMp": 617,
+      "value": 5,
+      "ratio": true,
+      "expected": 30
+    },
+    {
+      "maxMp": 1000,
+      "value": 2,
+      "ratio": true,
+      "expected": 20
+    },
+    {
+      "maxMp": 1000,
+      "value": 3,
+      "ratio": true,
+      "expected": 30
+    },
+    {
+      "maxMp": 1000,
+      "value": 5,
+      "ratio": true,
+      "expected": 50
+    },
+    {
+      "maxMp": 999999,
+      "value": 2,
+      "ratio": true,
+      "expected": 20000
+    },
+    {
+      "maxMp": 999999,
+      "value": 3,
+      "ratio": true,
+      "expected": 30000
+    },
+    {
+      "maxMp": 999999,
+      "value": 5,
+      "ratio": true,
+      "expected": 50000
+    }
+  ]
+}

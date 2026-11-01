@@ -1,0 +1,26 @@
+{
+  "evidence": "Installed native getter and aggregate bytes executed in isolated Unicorn memory; no game process access",
+  "exeSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "scionGetter": "0x144DC3120",
+  "scionProduct": "0x145239560",
+  "areaFactor": "0x145237420",
+  "scion": [
+    {"instances": 0, "multiplier": 1},
+    {"instances": 1, "multiplier": 1.5000001192092896},
+    {"instances": 2, "multiplier": 2.250000476837158}
+  ],
+  "area": [
+    {"isApplyAllMag": false, "instances": 0, "factor": 1},
+    {"isApplyAllMag": false, "instances": 1, "factor": 1},
+    {"isApplyAllMag": false, "instances": 2, "factor": 1},
+    {"isApplyAllMag": true, "instances": 0, "factor": 0.40000009536743164},
+    {"isApplyAllMag": true, "instances": 1, "factor": 1},
+    {"isApplyAllMag": true, "instances": 2, "factor": 1}
+  ],
+  "limits": [
+    "Synthetic allDamageMagnification 40; native effect-list aggregation and getter bytes executed unchanged",
+    "Skill Flow history collection and the two scale applications were independently disassembled; not executed by this small oracle",
+    "Repeated physical effect instances do not establish that duplicate equipped abilities are legal",
+    "MP effect 61001 requires separate native cost/context verification"
+  ]
+}

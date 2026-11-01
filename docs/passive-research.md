@@ -44,7 +44,7 @@ Context can include `skill: {id,dmgType,attr,element}`, HP/MP/LB percentages, co
 
 The module does not model a complete battle event queue. Reaction chains, random repeats/counters, status infliction chances, temporary state accumulation, extra actions, skill-specific coefficient changes, race damage, and most bespoke unique passives stay explicit exclusions. It does not infer parameters from English prose or treat ownership as proof a passive is equipped. The caller must supply passives that are validly learned/equipped/free from the current loadout and enforce their equip-cost capacity.
 
-The native common additive damage bucket and eligible repeated DamageMultiplier instances are verified. Other identical-effect duplicate stacking, cross-family defensive stacking and some skill/condition parameter interpretations still need further native/runtime evidence; they must remain visible in recommendation confidence.
+The native common additive damage bucket and eligible repeated DamageMultiplier instances are verified. [Scion Sorceress and Area Effect Adept](scion-area-verification.md) additionally verify a product across physical history-scaling instances and an idempotent area-reduction bypass. Other identical-effect duplicate stacking, cross-family defensive stacking and some skill/condition parameter interpretations still need further native/runtime evidence; they must remain visible in recommendation confidence.
 
 ## Current native skill-state and wrapper rules
 

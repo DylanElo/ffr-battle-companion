@@ -18,7 +18,7 @@ export function renderResultExplanations({evaluation = {}, scenario = {}, enemyN
   if (pinned) assumptions.push('Your pinned pieces restrict the search.');
   if (numeric(scenario.rounds)) assumptions.push(`${scenario.rounds} rounds, starting at full HP. Enemy HP depletion and early kills are not simulated.`);
   if (scenario.difficulty) assumptions.push(`Difficulty: ${scenario.difficulty}.`);
-  if (numeric(scenario.mpPercent)) assumptions.push(`Starting MP: ${scenario.mpPercent}%. Actions spend MP; no MP recovery or replacement action is assumed after MP runs out.`);
+  if (numeric(scenario.mpPercent)) assumptions.push(`Starting MP: ${scenario.mpPercent}%. Actions use verified MP cost modifiers and normal ActionBegin Auto MP Restore. Other MP recovery and replacement actions after exhaustion are not modeled.`);
   if (typeof scenario.critical === 'boolean') assumptions.push(scenario.critical ? 'Guaranteed critical hits are enabled.' : 'Critical hits use modeled chances; guaranteed critical hits are off.');
   if (typeof scenario.broken === 'boolean') assumptions.push(scenario.broken ? 'The enemy is assumed already staggered.' : 'The enemy starts unstaggered; modeled stagger can occur during the sequence.');
   if (numeric(scenario.enemyCount)) assumptions.push(`Enemy count: ${scenario.enemyCount}.`);
