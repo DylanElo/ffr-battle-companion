@@ -3,13 +3,14 @@
   // Hot in the optimizer: native enum strings repeat, so memoize.
   const cleaned=new Map(),clean=x=>{const s=String(x??'');let v=cleaned.get(s);if(v===undefined){v=s.split('::').pop();if(cleaned.size<50000)cleaned.set(s,v);}return v;};
   const f=Math.fround,EPS=f(2**-23);
+  const passiveModel=typeof module!=='undefined'?require('./passives.js'):root.CompanionPassives;
   const parameterNames={1:'HitPoint',2:'MagicPoint',3:'BreakPoint',4:'LimitBurstPoint',5:'Attack',6:'Defence',7:'Intelligence',8:'Mind',9:'Agility',10:'Level',11:'EquipCost',12:'PhysicalAttack',13:'PhysicalDefense',14:'MagicalAttack',15:'MagicalDefense',16:'Divine'};
   const aliases={MaxHitPoint:'HitPoint',MaxMagicPoint:'MagicPoint',MaxBreakPoint:'BreakPoint',SkillEquipCost:'EquipCost'};
   const normalize=key=>aliases[key]||key;
   const positiveIds=values=>[...new Set((values||[]).map(Number).filter(id=>Number.isInteger(id)&&id>0))];
   const catalogCache=new WeakMap(),snapshotCache=new WeakMap();
   function catalogIndex(catalog){
-    if(!catalogCache.has(catalog))catalogCache.set(catalog,Object.fromEntries(['characters','visions','equipment','skills','passives','masterSkills'].map(key=>[key,new Map((catalog[key]||[]).map(row=>[Number(row.id),row]))])));
+    if(!catalogCache.has(catalog))catalogCache.set(catalog,Object.fromEntries(['characters','visions','equipment','skills','passives','masterSkills','effects'].map(key=>[key,new Map((catalog[key]||[]).map(row=>[Number(row.id),row]))])));
     return catalogCache.get(catalog);
   }
   function add(target,key,value){key=normalize(clean(key));target[key]=(target[key]||0)+(Number(value)||0);}
@@ -163,7 +164,28 @@
     const base=characterStats(catalog,snapshot,charId,saved.equipment);
     return {freeActiveIds:positiveIds(freeActiveIds),learnedActiveIds:positiveIds(learnedActiveIds),alwaysPassiveIds:positiveIds(alwaysPassiveIds),learnedPassiveIds:positiveIds(learnedPassiveIds),masterSkillIds:positiveIds(masterSkillIds),skillBudget:base.skillBudget,maxSkillSlots:base.maxSkillSlots,warnings:[...new Set([...warnings,...base.warnings])]};
   }
-  const api={parameterNames,normalize,effectDelta,growth,permanentSync,characterStats,learned};
+  const buildStatsCache=new WeakMap();
+  function buildStats(catalog,snapshot,charId,build){
+    const context=characterContext(catalog,snapshot,charId),gear=build || context.saved.equipment;
+    const equipped=positiveIds(gear.equippedSkillIds ?? context.saved.equippedSkillIds);
+    const key=[gear.weaponId,gear.armorId,...(gear.accessoryIds || []),gear.visionId,'skills',...equipped.slice().sort((a,b)=>a-b)].join(',');
+    let cache=buildStatsCache.get(context);
+    if(!cache)buildStatsCache.set(context,cache=new Map());
+    if(cache.has(key))return cache.get(key);
+    const index=catalogIndex(catalog),pool=learned(catalog,snapshot,charId,gear.visionId);
+    const gearIds=[gear.weaponId,gear.armorId,...(gear.accessoryIds || [])];
+    const passiveIds=positiveIds([...pool.alwaysPassiveIds,...gearIds.flatMap(id=>index.equipment.get(Number(id))?.passiveIds || []),
+      ...equipped.flatMap(id=>index.masterSkills.get(id)?.grants?.passiveIds || (index.passives.has(id)?[id]:[]))]);
+    // No action or combat state is assumed in the editor; conditional stat changes remain deferred.
+    const passiveAnalysis=passiveModel.analyze(catalog,passiveIds);
+    const deferredStatEffects=passiveAnalysis.deferred.filter(record=>{
+      const kind=record.kind || (index.effects.has(record.effectId)?passiveModel.decode(index.effects.get(record.effectId)).kind:'');
+      return ['statFlat','statPercent','statScale','primaryStatScale'].includes(kind);
+    });
+    const result={...characterStats(catalog,snapshot,charId,gear,passiveAnalysis.terms),passiveAnalysis,deferredStatEffects};
+    cache.set(key,result);return result;
+  }
+  const api={parameterNames,normalize,effectDelta,growth,permanentSync,characterStats,buildStats,learned};
   if(typeof module!=='undefined')module.exports=api;
   else root.CompanionStats=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

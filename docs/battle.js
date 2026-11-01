@@ -219,7 +219,8 @@
       const criticalStats=S.characterStats(catalog,snapshot,characterId,equipment,criticalAnalysis.terms).stats;
       return rollDamage({...state.stats,level:state.level},skill,stateAnalysis,{...context,level:state.level,criticalAnalysis,criticalStats});
     }
-    function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}}){
+    // locked: pinned learned ids (see evaluate); always equipped. Empty means the unpinned search, unchanged.
+    function passivePackage(prepared,visionId,skill,equipment,freeIds,turn={reservedIds:[],context:{}},locked=[]){
       if(prepared.fixed){
         const masterIds=prepared.equippedIds.filter(id=>indexes.masterSkills.has(id));
         const ids=prepared.equippedIds.filter(id=>indexes.passives.has(id));
@@ -240,10 +241,11 @@
       const divisor=[...contextCounts.values()].reduce((factor,entry)=>gcd(factor,entry.count),0);
       // Surrogate values average the leaves: repetition count and sibling order do not change that average.
       const contextKey=JSON.stringify([...contextCounts].sort(([a],[b])=>a.localeCompare(b)).map(([key,entry])=>[key,entry.count/divisor]));
-      const key=`${prepared.saved.id}:${visionId}:${prepared.current}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}:${contextKey}`;
+      const baselineKey=freeIds.slice().sort((a,b)=>a-b).join(',');
+      const key=`${prepared.saved.id}:${visionId}:${prepared.current}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}:${contextKey}:free=${baselineKey}${locked.length?`:pins=${locked.join(',')}`:''}`;
       if(packageCache.has(key))return packageCache.get(key);
       const reference=prepared.saved.equipment;
-      const baseIds=unique(prepared.borrowed),baseAnalysis=analysis(baseIds,skill,turn.context);
+      const baseIds=unique(freeIds),baseAnalysis=analysis(baseIds,skill,turn.context);
       const baseFinal=S.characterStats(catalog,snapshot,prepared.saved.id,reference,baseAnalysis.terms);
       // One roll per (leaf skill, context, passive set) on the saved gear; recipes and Resonances reuse it.
       function referenceRoll(ids,leafSkill,context){
@@ -267,7 +269,7 @@
       }
       const baseline=referenceDamage(baseIds);
       // A passive set's value uses the saved reference gear, so it is shared across loadouts, budgets and reserved abilities.
-      const valuePrefix=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${contextKey}:`;
+      const valuePrefix=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${contextKey}:free=${baselineKey}:`;
       function valueOf(ids){
         const valueKey=valuePrefix+ids.slice().sort((a,b)=>a-b).join(',');
         if(!valueCache.has(valueKey) && valueCache.size<200000)valueCache.set(valueKey,computeValue(ids));
@@ -290,13 +292,17 @@
       const freeSkills=ids=>new Set([...prepared.free,...ids.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || [])]);
       const requiredIds=unique([skill.id,...turn.reservedIds]);
       const forced=[null,...masters.filter(m=>(m.grants.activeIds || []).some(id=>requiredIds.includes(id)))];
+      // Pins already reserved by the turn (or the attack itself) are charged there, not twice.
+      const pins=locked.filter(id=>id!==skill.id && !turn.reservedIds.includes(id));
+      const pinPackage=pins.filter(id=>source(id)),pinActives=pins.filter(id=>!source(id));
       let result=null,bestValue=-Infinity;
       for(const fixed of forced){
-        const fixedIds=fixed?[fixed.id]:[],fixedPassives=expanded(fixedIds),activeFree=freeSkills(fixedIds).has(skill.id);
+        const fixedIds=unique([...(fixed?[fixed.id]:[]),...pinPackage]),fixedPassives=expanded(fixedIds),activeFree=freeSkills(fixedIds).has(skill.id);
         const reservedIds=turn.reservedIds.filter(id=>!freeSkills(fixedIds).has(id));
         const activeCost=activeFree?0:number(skill.equipCost),activeSlots=activeFree?0:1;
-        const fixedCost=fixed?number(fixed.equipCost):0;
-        const budget=number(stats0.skillBudget)-equipCostOf(reservedIds)-activeCost-fixedCost,slots=number(stats0.maxSkillSlots,8)-reservedIds.length-activeSlots-fixedIds.length;
+        const pinnedActives=pinActives.filter(id=>!freeSkills(fixedIds).has(id));
+        const fixedCost=(fixed?number(fixed.equipCost):0)+pinPackage.filter(id=>id!==fixed?.id).reduce((sum,id)=>sum+number(source(id)?.equipCost),0)+equipCostOf(pinnedActives);
+        const budget=number(stats0.skillBudget)-equipCostOf(reservedIds)-activeCost-fixedCost,slots=number(stats0.maxSkillSlots,8)-reservedIds.length-activeSlots-fixedIds.length-pinnedActives.length;
         if(budget<0 || slots<0)continue;
         const fixedValue=valueOf(fixedPassives),entries=[];
         for(const id of unique([...prepared.learned,...masters.map(m=>m.id)])){
@@ -308,13 +314,14 @@
         const selected=unique([...fixedIds,...knapsack(entries,budget,slots)]);
         const masterIds=selected.filter(id=>indexes.masterSkills.has(id));
         const covered=new Set(expanded(masterIds));
-        const ids=selected.filter(id=>indexes.passives.has(id) && !covered.has(id));
+        const ids=selected.filter(id=>indexes.passives.has(id) && (!covered.has(id) || pinPackage.includes(id)));
         const equippedIds=unique([...masterIds,...ids]);
         const allPassiveIds=expanded(equippedIds);
         const finalFree=freeSkills(masterIds),finalActiveFree=finalFree.has(skill.id);
         const cost=equippedIds.reduce((sum,id)=>sum+number(source(id)?.equipCost),0)+(finalActiveFree?0:number(skill.equipCost));
         const count=equippedIds.length+(finalActiveFree?0:1);
-        const finalReservedIds=turn.reservedIds.filter(id=>!finalFree.has(id));
+        // Pinned actives ride with the reserved ids so evaluate charges and reports them.
+        const finalReservedIds=[...turn.reservedIds.filter(id=>!finalFree.has(id)),...pinActives.filter(id=>!finalFree.has(id))];
         if(cost+equipCostOf(finalReservedIds)>number(stats0.skillBudget) || count+finalReservedIds.length>number(stats0.maxSkillSlots,8))continue;
         const value=valueOf(allPassiveIds);
         if(value>bestValue || value===bestValue && (!result || cost<result.cost)){
@@ -322,7 +329,8 @@
             activeCost:finalActiveFree?0:number(skill.equipCost),activeSlots:finalActiveFree?0:1,reservedIds:finalReservedIds};
         }
       }
-      if(!result)result={ids:[],passiveIds:[],masterIds:[],equippedIds:[],freeActiveIds:[...prepared.free],cost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeCost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeSlots:prepared.free.has(skill.id)?0:1};
+      // With pins, no affordable package means this attack cannot be used (evaluate skips a null package).
+      if(!result && !locked.length)result={ids:[],passiveIds:[],masterIds:[],equippedIds:[],freeActiveIds:[...prepared.free],cost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeCost:prepared.free.has(skill.id)?0:number(skill.equipCost),activeSlots:prepared.free.has(skill.id)?0:1};
       packageCache.set(key,result);return result;
     }
     const equipCostOf=ids=>ids.reduce((sum,id)=>sum+number((indexes.skills.get(id) || indexes.passives.get(id) || indexes.masterSkills.get(id))?.equipCost),0);
@@ -1000,16 +1008,28 @@
           mp:recipe.mp,context:leaves[0]?.context || {},mixed:!!otherSkill,reckless:leaves.some(action=>action.reckless)};
       });
     }
-    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds}){
+    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds,lockedSkillIds}){
       const prepared=prep(characterId,visionId,current,equippedSkillIds);
       if(!prepared.saved || !C.joined(prepared.saved))return {valid:false,score:-Infinity};
+      const allowed=new Set([...prepared.learn.learnedActiveIds,...prepared.learn.learnedPassiveIds,...prepared.learn.masterSkillIds,...prepared.free]);
       if(prepared.fixed){
-        const allowed=new Set([...prepared.learn.learnedActiveIds,...prepared.learn.learnedPassiveIds,...prepared.learn.masterSkillIds,...prepared.free]);
         if(prepared.equippedIds.some(id=>!allowed.has(id)))return {valid:false,score:-Infinity,reason:'The fixed ability loadout contains an unknown or unlearned ability.'};
+      }
+      // A fixed loadout already supplies its abilities. A search must satisfy every requested pin.
+      const requested=prepared.fixed?[]:unique(lockedSkillIds || []);
+      if(requested.some(id=>!allowed.has(id)))return {valid:false,score:-Infinity,reason:'A pinned ability is an unknown or unlearned ability with this Resonance.'};
+      const locked=requested.filter(id=>!prepared.free.has(id));
+      if(locked.length){
+        const stats0=S.characterStats(catalog,snapshot,characterId,equipment,[]);
+        const granted=new Set(locked.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || []));
+        const charged=locked.filter(id=>!granted.has(id));
+        if(charged.reduce((sum,id)=>sum+number((indexes.passives.get(id) || indexes.masterSkills.get(id) || indexes.skills.get(id))?.equipCost),0)>number(stats0.skillBudget) ||
+          charged.length>number(stats0.maxSkillSlots,8))return {valid:false,score:-Infinity,reason:'The pinned abilities alone exceed the ability budget or slots.'};
       }
       const freeIds=unique([...prepared.borrowed,...gearPassives(equipment)]),results=[],rollByContext=new Map();
       const consider=(skill,turn)=>{
-        const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn);
+        const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked);
+        if(!packageInfo)return;
         const allPassives=unique([...freeIds,...packageInfo.passiveIds,...turn.reservedIds.filter(id=>indexes.passives.has(id))]);
         const passiveAnalysis=analysis(allPassives,skill,{...turn.context,lbCapacity:prepared.limitMax});
         const calculated=S.characterStats(catalog,snapshot,characterId,equipment,passiveAnalysis.terms);
@@ -1198,8 +1218,8 @@
       }
 
       // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
-      // Only the strongest learned fill-rate passive is tried (Triple over Double), on the best turn.
-      const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)).slice(-1),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
+      // Each learned tier competes on its actual AP/slot cost; the strongest tier may not fit.
+      const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
       if(!prepared.fixed && (prepared.limits.length || (goals.has('limit') && prepared.limitMax>0)) && charges.length+extras.length){
         const sets=[];
         for(const charge of [null,...charges])for(let mask=0;mask<(1<<extras.length);mask++){
@@ -1207,7 +1227,7 @@
           if(ids.length)sets.push(ids);
         }
         for(const base of results.slice().sort((a,b)=>b.score-a.score).slice(0,1))for(const ids of sets){
-          const reservedIds=[...base.turn.reservedIds,...ids];
+          const reservedIds=unique([...base.turn.reservedIds,...ids]);
           consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
         }
       }

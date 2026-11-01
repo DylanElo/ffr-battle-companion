@@ -1,21 +1,36 @@
-import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=2';
-import {createOptimizerController} from './optimizer-controller.js?v=43';
-import {comparison} from './optimizer-ui.js?v=42';
-import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=11';
-import {shareCard, partyImage} from './share-image.js?v=4';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
+import {createOptimizerController} from './optimizer-controller.js?v=54';
+import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
+import {shareCard, partyImage} from './share-image.js?v=5';
+import {renderSlot, renderPicker, renderAbilityList} from './slot-ui.js?v=5';
+import {equippableAbilities, abilityLoad, canEquip, validateAbilities, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=5';
+import {describeItem, describeAbility} from './piece-details.js?v=1';
+import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=1';
+import {renderResultExplanations} from './result-explanations.js?v=1';
+import {renderUnlockRecommendations} from './unlock-ui.js?v=1';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
 const h = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const ELEMENTS = ['Fire', 'Ice', 'Wind', 'Earth', 'Thunder', 'Water', 'Light', 'Dark'];
 const EMPTY = { inventory: [], characters: [], resonances: [], party: [] };
-const VIEWS = [['party', 'Party'], ['bosses', 'Bosses'], ['characters', 'Characters'], ['resonances', 'Resonances']];
+const VIEWS = [['characters', 'Characters'], ['bosses', 'Bosses'], ['resonances', 'Resonances'], ['party', 'Team ideas']];
 const REPORT_URL = 'https://github.com/DylanElo/ffr-battle-companion/issues/new';
 
-let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'party', pending = null;
-// enemyId is the Party page's boss, bossId the one browsed on Bosses, deepEnemyId the Characters build target.
-const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, deepEnemyId: 0, perspective: 0, charId: 0, pickVision: true,
-  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'effects', deepGoals: ['damage'], deepGeneral: true, deep: null, deepIncomingDamage: 0, deepIncomingType: 'Physic',
+let goals = {};
+const bossIds = () => catalog.enemies.filter(e => e.isBoss).map(e => e.id);
+const goalsKey = () => 'ffr-companion-goals:' + snapshot.source.sha256;
+// Goals stay in this browser only; they are never written to the save.
+const goalFor = charId => C.normalizeGoal(goals[charId], bossIds());
+function setGoal(charId, patch) {
+  goals[charId] = { ...goalFor(charId), ...patch };
+  try { localStorage.setItem(goalsKey(), JSON.stringify(goals)); } catch {}
+}
+let saveFile = null, catalog, index = {}, snapshot = EMPTY, plans = {}, draft = null, view = 'characters', pending = null;
+// enemyId is the Party page's boss, bossId the one browsed on Bosses; the Characters build target lives in goalFor(charId).
+const ui = { kitId: 0, enemyQ: '', bossOnly: true, enemyId: 0, bossId: 0, perspective: 0, charId: 0,
+  reserve: true, kitQ: '', ownedOnly: true, gearQ: '', fightTab: 'resonances', charTab: 'abilities', deep: null, openSlot: null, slotQ: '',
+  abilityFilters: {q: '', kind: 'all', affordable: false}, transferOpen: false, transferHash: '', transferIssues: [], unlocks: null,
   rf: { tags: [], targets: [], calcs: [], elements: [] }, rfUnlocked: false };
 
 const NOUNS = { characters: 'character', visions: 'Resonance', equipment: 'item', skills: 'ability', passives: 'ability', masterSkills: 'ability', enemies: 'enemy' };
@@ -74,22 +89,75 @@ async function loadSave(file) {
 export function loadSnapshot(parsed) {
   if(parsed.schemaVersion!==1 || !parsed.source?.sha256 || !Array.isArray(parsed.characters) || !Array.isArray(parsed.inventory) || !Array.isArray(parsed.resonances))throw new Error('Unsupported inventory snapshot.');
   optimizerController.cancel();cancelDeep();ui.deep=null;snapshot=parsed;
-  try { plans = JSON.parse(localStorage.getItem('ffr-companion-plans:' + snapshot.source.sha256)) || {}; } catch { plans = {}; }
+  const stored = readWorkspace(browserStorage(), snapshot.source.sha256);
+  // Restoring a plan must not discard gear sharing chosen before reload; the editor shows reservation conflicts.
+  const restored = revalidateWorkspace(stored,
+    {catalog, snapshot, indexes: index, stats: globalThis.CompanionStats, core: C, reserve: false});
+  plans = restored.plans; goals = restored.goals;
+  const choices = workspaceChoices(browserStorage(), snapshot.source.sha256);
+  ui.transferOpen = !Object.keys(plans).length && !Object.keys(goals).length && choices.length > 0;
+  ui.transferHash = choices[0]?.hash || ''; ui.transferIssues = restored.issues;
+  rememberWorkspace(browserStorage(), snapshot.source);
   const people = recruited(), first = snapshot.party.find(id => people.some(c => c.id === id)) ?? people[0]?.id ?? 0;
   ui.charId = ui.perspective = first; ui.ownedOnly = true;
-  ui.enemyId = ui.bossId = ui.deepEnemyId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'party';
+  ui.enemyId = ui.bossId = suggestedBoss()?.id ?? ui.enemyId; ui.bossOnly = true; view = 'characters';
   setDraft();
   render();
   toast(`Loaded ${snapshot.source.fileName}`);
 }
 
 function storePlans() {
-  try { localStorage.setItem('ffr-companion-plans:' + snapshot.source.sha256, JSON.stringify(plans)); }
-  catch { toast('This browser won’t store plans. Export them to keep them.'); }
+  try { localStorage.setItem('ffr-companion-plans:' + snapshot.source.sha256, JSON.stringify(plans)); return true; }
+  catch { toast('This browser won’t store plans. Export them to keep them.'); return false; }
+}
+function browserStorage() { try { return localStorage; } catch { return null; } }
+
+function transferWorkspace() {
+  const source = workspaceChoices(browserStorage(), snapshot.source.sha256).find(w => w.hash === ui.transferHash);
+  if (!source) { toast('Choose an earlier save workspace.'); return; }
+  const incoming = readWorkspace(browserStorage(), source.hash);
+  const saved = snapshot.characters.find(c => c.id === ui.charId);
+  const kept = plans[ui.charId] || saved?.equipment;
+  const dirtyDraft = draft && kept && JSON.stringify(draft) !== JSON.stringify(C.withLocks(withAbilities(kept, saved), kept.accessoryIds.length));
+  const edited = dirtyDraft ? structuredClone(draft) : null;
+  // Existing character plans win; copying never discards work already kept in this workspace.
+  const merged = revalidateWorkspace({plans: {...incoming.plans, ...plans}, goals: {...incoming.goals, ...goals}},
+    {catalog, snapshot, indexes: index, stats: globalThis.CompanionStats, core: C, reserve: ui.reserve});
+  ui.transferIssues = merged.issues;
+  if (merged.issues.some(issue => Object.hasOwn(plans, issue.characterId))) {
+    render(); toast('Copy would conflict with a current plan. Your workspace is unchanged.'); return;
+  }
+  cancelDeep(); ui.deep = null;
+  plans = merged.plans; goals = merged.goals;
+  ui.transferOpen = false;
+  const storedPlans = storePlans(); let storedGoals = true;
+  try { localStorage.setItem(goalsKey(), JSON.stringify(goals)); } catch { storedGoals = false; }
+  setDraft(); if (edited) draft = edited; render();
+  toast(storedPlans && storedGoals ? `Carried plans from ${source.fileName}. ${ui.transferIssues.length ? 'Review the conflicts below.' : 'All plans fit this save.'}`
+    : 'Plans copied for this session. Browser storage failed; export plans to keep them.');
+}
+
+function workspacePanel() {
+  const choices = workspaceChoices(browserStorage(), snapshot.source.sha256);
+  return `${choices.length ? `<details class="workspace-transfer" id="workspace-transfer-panel" ${ui.transferOpen ? 'open' : ''}>
+    <summary>Continue plans from another save</summary>
+    <p class="dim small">Choose a workspace from the same playthrough. Valid plans and goals are copied into this save’s workspace; the original stays available.</p>
+    <label>Earlier workspace<select id="workspace-source">${choices.map(w => opt(w.hash, `${w.fileName}${w.updatedAt ? ' · ' + new Date(w.updatedAt).toLocaleString() : ''}`, w.hash === ui.transferHash)).join('')}</select></label>
+    <p class="dim small">Current character plans and goals are kept. Gear, Resonances and abilities are checked against this save before use.</p>
+    <button type="button" id="workspace-transfer">Copy valid plans and goals</button>
+  </details>` : ''}${ui.transferIssues.length ? `<section class="transfer-issues" role="status"><h3>Plans needing review</h3><ul>${ui.transferIssues.map(issue => `<li>${h(name('characters', issue.characterId))}: ${h(issue.reason)}</li>`).join('')}</ul><p class="dim small">Rejected plans remain in their original workspace.</p></section>` : ''}`;
 }
 function setDraft() {
   const saved = snapshot.characters.find(c => c.id === ui.charId);
-  draft = structuredClone(plans[ui.charId] || saved?.equipment || null);
+  const build = plans[ui.charId] || saved?.equipment;
+  draft = build ? C.withLocks(withAbilities(build, saved), build.accessoryIds.length) : null;
+  if (draft) {
+    for (const slot of ['vision', 'weapon', 'armor']) if (!(Number(draft[slot + 'Id']) > 0)) draft.locks[slot] = false;
+    draft.locks.accessories = draft.accessoryIds.map((id, i) => Number(id) > 0 && !!draft.locks.accessories[i]);
+  }
+  ui.openSlot = null;
+  ui.slotQ = '';
+  ui.abilityFilters = {q: '', kind: 'all', affordable: false};
 }
 
 // ---------- shared bits ----------
@@ -129,8 +197,8 @@ function suggestedBoss() {
 
 function welcome() {
   return `<section class="window welcome">
-    <h2>The best party for your next boss</h2>
-    <p class="sub">Load your save, pick a boss, then equip the party in one click.</p>
+    <h2>Build your characters, one at a time</h2>
+    <p class="sub">Load your save, pick a character and a goal, place the gear and Resonance you want, then keep it as a plan.</p>
     <div class="toolbar"><label class="load"><input type="file" accept=".sav" data-pick><span>Load your save</span></label>${whereHelp}</div>
     <p class="dim small">Your save stays on your computer. Nothing is uploaded.</p>
     <p class="dim small">No save handy? Look up <button type="button" class="ghost" data-view="bosses">bosses</button> or <button type="button" class="ghost" data-view="resonances">Resonances</button>.</p>
@@ -148,7 +216,7 @@ function party() {
         <select id="next-enemy">${opt('general', 'Any fight (a typical boss at your level)', general)}${bosses.map(e => opt(e.id, `${e.name} (Lv ${e.level})${e.id === suggested?.id ? ', next' : ''}`, !general && e.id === ui.enemyId)).join('')}</select></label>
       ${!general && enemy ? `<div class="boss-summary">${bossCard(enemy)}</div>` : ''}
     </section>
-    <section class="window"><h3>Best party</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
+    <section class="window"><h3>Parties worth trying, not a proven best</h3>${optimizerController.render({ fixedAgainst: true, picture })}</section>
   </div>`;
 }
 
@@ -222,6 +290,10 @@ function fightDetails(enemy) {
 
 // Everything the character can use with the planned Resonance: their own abilities, level and sync
 // unlocks, and the Resonance's grants (same source the party optimizer uses).
+// The ability pool and AP budget for the draft's gear with the given Resonance.
+function learnedFor(visionId) {
+  try { return learnedForBuild(globalThis.CompanionStats, catalog, snapshot, ui.charId, { ...draft, visionId }); } catch { return null; }
+}
 function usableSkills(visionId) {
   try {
     const l = globalThis.CompanionStats.learned(catalog, snapshot, ui.charId, visionId);
@@ -238,31 +310,71 @@ function takenVisions() {
 // Full search: the party engine for one character against one enemy (Resonance, gear, attack,
 // abilities and passives), scored on predicted damage or stagger. Runs in the search worker.
 let deepWorker = null, deepRun = 0;
-function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; }
+let unlockWorker = null, unlockRun = 0;
+function cancelUnlockSearch() { unlockRun++; unlockWorker?.terminate(); unlockWorker = null; ui.unlocks = null; }
+function cancelDeep() { deepRun++; deepWorker?.terminate(); deepWorker = null; cancelUnlockSearch(); }
+
+function findUnlocks() {
+  if (!draft || ui.deep?.busy) return;
+  cancelUnlockSearch();
+  const refusal = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve)
+    || validateAbilities(draft.equippedSkillIds || [], learnedFor(draft.visionId), index);
+  if (refusal) { ui.unlocks = {error: refusal}; render(); return; }
+  const id = unlockRun, charId = ui.charId, g = goalFor(charId);
+  ui.unlocks = {busy: true, progress: 'Checking your owned Resonances…'};
+  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=51', import.meta.url));
+  worker.onmessage = e => {
+    if (id !== unlockRun || e.data.id !== id || ui.charId !== charId) return;
+    if (e.data.type === 'progress') ui.unlocks.progress = e.data.message;
+    else {
+      cancelUnlockSearch();
+      ui.unlocks = e.data.type === 'error' ? {error: e.data.message} : {...e.data.result, goals: [...g.goals]};
+    }
+    render();
+  };
+  worker.onerror = e => { if (id === unlockRun) { cancelUnlockSearch(); ui.unlocks = {error: e.message || 'The unlock search couldn’t start.'}; render(); } };
+  worker.postMessage({id, mode: 'unlocks', catalog, snapshot, characterId: charId, build: structuredClone(draft), enemyId: g.enemyId,
+    options: {goals: [...g.goals], difficulty: 'save', mpPercent: 100, incomingDamage: g.incomingDamage, incomingType: g.incomingType,
+      critical: false, broken: false, minHealers: 0, minProtectors: 0, timeMs: 8000, maxEvaluations: 53}});
+  render();
+}
 function deepSearch() {
   cancelDeep();
-  const id = deepRun, charId = ui.charId, enemyId = ui.deepGeneral ? 'general' : ui.deepEnemyId, goals = [...ui.deepGoals];
+  const id = deepRun, charId = ui.charId, g = goalFor(charId), enemyId = g.enemyId, goals = [...g.goals];
+  const pins = C.searchOptionsFor(draft);
+  const refusal = C.checkLocks(catalog, snapshot, charId, draft, plans, ui.reserve);
+  if (refusal) { ui.deep = { error: refusal }; render(); return; }
+  const before = structuredClone(draft);
+  const beforeReason = C.validPlan(catalog, snapshot, charId, before, plans, ui.reserve)
+    || validateAbilities(before.equippedSkillIds || [], learnedFor(before.visionId), index);
+  const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=41', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=51', import.meta.url));
   worker.onmessage = e => {
-    if (e.data.id !== id || ui.charId !== charId) return;
+    if (id !== deepRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
     else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, pick: 0, enemyId, goals }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
+    else { ui.deep = { results: e.data.result.results, current: e.data.result.current, before, beforeReason, beforeEvaluation: e.data.result.before,
+      scenario: e.data.result.scenario, evidence: e.data.result.modelEvidence, pick: 0, enemyId, goals, pinned }; cancelDeep(); if (ui.deep.results.length) applyDeep(0); }
     render();
   };
   worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
-  worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, taken: [...takenVisions()],
+  worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, baseline: beforeReason ? null : before, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
-    options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: ui.deepIncomingDamage, incomingType: ui.deepIncomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
+    options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: g.incomingDamage, incomingType: g.incomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
       perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 8000, visionSlices: true,
-      visionIds: ui.pickVision || !(Number(draft.visionId) > 0) ? null : [Number(draft.visionId)] } });
+      visionIds: pins.visionIds, locks: pins.locks } });
   render();
 }
 function applyDeep(i) {
+  cancelUnlockSearch();
   const r = ui.deep.results[i]; ui.deep.pick = i;
-  draft = { ...r.equipment, accessoryIds: [...r.equipment.accessoryIds], visionId: r.visionId,
-    equippedSkillIds: r.evaluation.equippedSkillIds || [], recommendedActionId: r.evaluation.skillId };
+  const learnedFor = d => { try { return learnedForBuild(globalThis.CompanionStats, catalog, snapshot, ui.charId, d); } catch { return null; } };
+  const { draft: next, dropped } = applyBuildResult(ui.deep.before || draft, r, learnedFor, index);
+  draft = next;
+  ui.deep.applied = structuredClone(next);
+  ui.deep.restored = false;
+  if (dropped.length) toast(`No room for pinned ${dropped.map(id => name('skills', id)).join(', ')}, so ${dropped.length > 1 ? 'they are' : 'it is'} no longer pinned.`);
 }
 
 function gearPriorities() {
@@ -275,7 +387,7 @@ function gearPriorities() {
 const CARD_STATS = [['PhysicalAttack', 'ATK'], ['MagicalAttack', 'MAG'], ['PhysicalDefense', 'DEF'], ['MagicalDefense', 'MDEF'], ['HitPoint', 'HP'], ['MagicPoint', 'MP'], ['Agility', 'SPD'], ['Divine', 'Divine']];
 // Real totals (base, level, sync and gear) when the stat model can run; equipment bonuses otherwise.
 function totals(equipment) {
-  try { const r = globalThis.CompanionStats.characterStats(catalog, snapshot, ui.charId, equipment); return { stats: r.stats, level: r.level }; }
+  try { return globalThis.CompanionStats.buildStats(catalog, snapshot, ui.charId, equipment); }
   catch { return { stats: C.stats(C.equipmentIds(equipment).map(id => index.equipment.get(id))), level: null }; }
 }
 
@@ -285,10 +397,12 @@ function characters() {
   const roster = `<section class="window roster" aria-label="Characters">
     <ul class="pick" role="listbox" aria-label="Characters">${people.map(c => `<li role="option" tabindex="0" data-char="${c.id}" data-key="c${c.id}" aria-selected="${c.id === ui.charId}">${charFace(c.id, 'sm')}<span>${h(name('characters', c.id))}${snapshot.party.includes(c.id) ? '<small>Party</small>' : ''}</span>
       ${plans[c.id] ? '<i class="plan-dot" title="Has a gear plan"></i>' : ''}</li>`).join('')}</ul>
+    ${Object.keys(plans).length && saveFile ? '<button type="button" class="primary" id="apply-plans">Equip plans in my save</button>' : ''}
+    ${workspacePanel()}
+    <details class="roster-options" data-keep="roster-options"><summary>Gear sharing & export</summary>
     ${Object.keys(plans).length ? '<p class="dim small"><i class="plan-dot"></i> has a gear plan</p>' : ''}
     <label class="check"><input type="checkbox" id="reserve" ${ui.reserve ? 'checked' : ''}> Don’t take others’ gear</label>
-    ${Object.keys(plans).length ? `${saveFile ? '<button type="button" class="primary" id="apply-plans">Equip plans in my save</button>' : ''}
-      <button type="button" class="ghost" id="export">Export plans</button>` : ''}
+    ${Object.keys(plans).length ? '<button type="button" class="ghost" id="export">Export plans</button>' : ''}</details>
   </section>`;
   if (!saved || !native || !draft) return `<div class="chars">${roster}<section class="window"><p class="dim">Nobody in this save can equip gear yet.</p></section></div>`;
 
@@ -306,60 +420,78 @@ function characters() {
       <h2>${h(native.name)}</h2>
       <p class="sub">${after.level ? `Level ${after.level} · ` : ''}${h(pretty(native.weaponType))}</p>
     </div></div>
-    <dl class="card-stats">${statRows}</dl>
-    ${deepPanel(native)}
+    <div><dl class="card-stats">${statRows}</dl>${after.deferredStatEffects?.length ? '<p class="dim small">Conditional combat effects aren’t included in these totals.</p>' : ''}</div>
   </section>`;
 
   const available = C.stock(snapshot, ui.charId, plans, ui.reserve);
   const savedIds = [saved.equipment.weaponId, saved.equipment.armorId, ...saved.equipment.accessoryIds];
+  const gearKey = (slot, i) => slot === 'accessory' ? `accessory:${i}` : slot;
+  const draftWith = (slot, i, id) => { const d = structuredClone(draft); if (slot === 'accessory') d.accessoryIds[i] = id; else if (slot === 'vision') d.visionId = id; else d[slot + 'Id'] = id; return d; };
+  const deltaText = d => { const base = totals(draft).stats, next = totals(d).stats;
+    return CARD_STATS.map(([k, label]) => { const c = (Number(next[k]) || 0) - (Number(base[k]) || 0); return c ? `${c > 0 ? '+' : ''}${c} ${label}` : ''; }).filter(Boolean).join(', '); };
+  const itemView = (id, delta = '') => { const item = index.equipment.get(Number(id)); return item ? { ...describeItem(item, index), statsText: statsText(item), delta }
+    : { id: -1, name: 'Empty', statsText: '', delta, text: '', effects: [] }; };
+  const lk = draft.locks, slotLocked = key => key === 'vision' ? lk.vision : key === 'weapon' || key === 'armor' ? lk[key] : !!lk.accessories[+key.slice(10)];
+  let picker = '';
+  const slotView = options => { if (options.open) picker = renderPicker(options); return renderSlot(options); };
   const slotRows = [['weapon', 'Weapon', draft.weaponId], ['armor', 'Armor', draft.armorId], ...draft.accessoryIds.map((id, i) => ['accessory', `Accessory ${i + 1}`, id, i])]
     .map(([slot, label, id, i = 0], n) => {
-      const list = C.candidates(catalog, native, available, slot, goal), cur = Number(id);
-      return `<label for="slot${n}">${label}</label><select id="slot${n}" data-slot="${slot}" data-index="${i}" data-key="slot${n}" class="${cur !== Number(savedIds[n]) ? 'changed' : ''}">
-        ${opt(-1, 'Empty', cur <= 0)}${cur > 0 && !list.some(x => x.id === cur) ? opt(cur, `${name('equipment', cur)} (equipped)`, true) : ''}
-        ${list.map(x => opt(x.id, `${x.name}: ${statsText(x)}${available.get(x.id) > 1 ? ` (${available.get(x.id)} free)` : ''}`, x.id === cur)).join('')}</select>`;
+      const key = gearKey(slot, i), cur = Number(id), open = ui.openSlot === key;
+      let choices = [];
+      if (open) {
+        const list = C.candidates(catalog, native, C.stockForSlot(available, draft, slot, i), slot, goal);
+        const ids = [-1, ...(cur > 0 && !list.some(x => x.id === cur) ? [cur] : []), ...list.map(x => x.id)];
+        choices = ids.map(x => itemView(x, x === cur ? '' : deltaText(draftWith(slot, i, x))));
+      }
+      return slotView({ key, label, current: itemView(cur), locked: slotLocked(key), open, choices, changed: cur !== Number(savedIds[n]) });
     }).join('');
   const v = index.visions.get(Number(draft.visionId));
-  const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve);
-  const isPlan = plans[ui.charId] && JSON.stringify(draft) === JSON.stringify(plans[ui.charId]);
-  const changed = JSON.stringify(draft) !== JSON.stringify(plans[ui.charId] || saved.equipment);
+  const visionView = (r, delta = '') => r ? { id: r.id, name: r.name, statsText: '', delta, text: r.description || '', effects: [] } : { id: -1, name: 'None', statsText: '', delta, text: '', effects: [] };
+  const visionSlot = slotView({ key: 'vision', label: 'Resonance', current: visionView(v), locked: lk.vision, open: ui.openSlot === 'vision',
+    choices: ui.openSlot === 'vision' ? [visionView(null), ...snapshot.resonances.map(r => visionView(index.visions.get(r.id)))] : [],
+    changed: Number(draft.visionId) !== Number(saved.equipment.visionId) });
+  const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve)
+    || validateAbilities(draft.equippedSkillIds || [], learnedFor(draft.visionId), index);
+  const basis = b => JSON.stringify(C.withLocks(withAbilities(b, saved), draft.accessoryIds.length));
+  const isPlan = plans[ui.charId] && JSON.stringify(draft) === basis(plans[ui.charId]);
+  const changed = JSON.stringify(draft) !== basis(plans[ui.charId] || saved.equipment);
 
   const equip = `<section class="window equip">
-    ${deepResult()}
-    <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}
-      <div><label for="vision" class="dim small">Resonance</label>
-        <select id="vision" data-key="vision" class="${Number(draft.visionId) !== Number(saved.equipment.visionId) ? 'changed' : ''}">${opt(-1, 'None', Number(draft.visionId) <= 0)}${snapshot.resonances.map(r => opt(r.id, name('visions', r.id), r.id === Number(draft.visionId))).join('')}</select></div></div>
+    <div class="loadout-head"><div><h3>Loadout</h3><p class="dim small">Edit a piece, or lock it to keep it when building.</p></div>
+    <div class="toolbar">
+      ${isPlan ? `<span class="planned">Plan saved</span><button type="button" class="ghost" data-release="${ui.charId}">Remove plan</button>`
+        : `<button type="button" class="primary" id="keep" ${warning || !changed ? 'disabled' : ''}>Keep as plan</button>`}
+    </div></div>
+    <div class="vision-slot">${v ? visionFace(v.id, 'md') : '<span class="face md empty"></span>'}${visionSlot}</div>
     <div class="slots">${slotRows}</div>
     ${warning ? `<p class="note">${h(warning)}</p>` : ''}
-    <div class="toolbar">
-      ${isPlan ? `<span class="planned">Planned</span><button type="button" class="ghost" data-release="${ui.charId}">Remove plan</button>`
-        : `<button type="button" id="keep" ${warning || !changed ? 'disabled' : ''}>Keep as plan</button>`}
-    </div>
-    ${equipTabs(native, v, available)}
   </section>`;
-  return `<div class="chars">${roster}${card}${equip}</div>`;
+  const result = deepResult(), evaluation = ui.deep?.results?.[ui.deep.pick]?.evaluation;
+  const resultSummary = evaluation ? `Build ready · ${Math.round(evaluation.fightDamage ?? evaluation.damage ?? 0).toLocaleString()} estimated damage per round` : 'Build results';
+  return `<div class="chars">${roster}<div class="character-workspace">${card}<section class="window build-controls">${deepPanel(native)}</section>
+    ${result ? `<details class="window build-analysis" data-keep="build-analysis"><summary>${h(resultSummary)} <span class="dim small">— View details</span></summary>${result}</details>` : ''}
+    <div class="loadout-grid">${equip}<section class="window ability-panel" aria-label="Abilities and effects">${equipTabs(native, v, available)}</section></div>
+    ${renderUnlockRecommendations({state: ui.unlocks, indexes: index, parameterNames: globalThis.CompanionStats.parameterNames, buildBusy: !!ui.deep?.busy})}</div></div>${picker}`;
 }
 
 // The one build tool: Resonance (or the one you locked), gear, attack, abilities and passives, searched together.
 function deepPanel(native) {
-  const d = ui.deep || {}, busy = !!d.busy, locked = !ui.pickVision && Number(draft.visionId) > 0;
-  const enemies = catalog.enemies.filter(e => e.isBoss || e.id === ui.deepEnemyId).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  const g = goalFor(ui.charId), d = ui.deep || {}, busy = !!d.busy, locked = draft.locks.vision && Number(draft.visionId) > 0;
+  const enemies = catalog.enemies.filter(e => e.isBoss).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
   return `<div class="deep">
-    <h4>Build ${h(native.name)}</h4>
-    <p class="dim small">Finds the best Resonance, gear and abilities you own for this character.</p>
+    <div class="build-intro"><h3>Build ${h(native.name)}</h3><p class="dim small">Fill unlocked slots with your owned gear and abilities.</p></div>
     <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
-      `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${ui.deepGoals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
+      `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${g.goals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
     <label class="against"><span class="dim small">Against</span>
-      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', ui.deepGeneral)}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, !ui.deepGeneral && e.id === ui.deepEnemyId)).join('')}</select></label>
+      <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', g.enemyId === 'general')}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, e.id === g.enemyId)).join('')}</select></label>
     <details data-keep="deep-advanced"><summary>Expert scenario</summary>
       <p class="dim small">One fixed hit per character after acting, each round. Damage is after defense, before Mirror reduction. Set 0 for no incoming hits.</p>
-      <label class="small">Hit damage <input type="number" id="deep-incoming-damage" min="0" max="99999999" step="1" value="${h(ui.deepIncomingDamage)}" ${busy ? 'disabled' : ''}></label>
-      <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,ui.deepIncomingType===value)).join('')}</select></label>
+      <label class="small">Hit damage <input type="number" id="deep-incoming-damage" min="0" max="99999999" step="1" value="${h(g.incomingDamage)}" ${busy ? 'disabled' : ''}></label>
+      <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,g.incomingType===value)).join('')}</select></label>
     </details>
-    <label class="check small"><input type="checkbox" id="pick-vision" ${ui.pickVision ? 'checked' : ''} ${busy ? 'disabled' : ''}> Let it pick the Resonance</label>
     ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}.</p>` : ''}
     <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
-      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button>`}</div>
+      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button>${d.before && d.results?.length ? `<button type="button" id="restore-build" ${d.restored ? 'disabled' : ''}>Restore pre-Build draft</button>${d.restored ? '<button type="button" id="retry-build">Try selected result</button>' : ''}` : ''}`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
   </div>`;
 }
@@ -369,7 +501,7 @@ function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
-  if (!d.results.length) return `<div class="deep-result"><p>No usable attack was found against ${h(against)}.</p></div>`;
+  if (!d.results.length) return `<div class="deep-result"><p>${d.pinned ? 'Nothing fits with your pinned pieces.' : `No usable attack was found against ${h(against)}.`}</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, limits = ev.limitUses || [], outOfMp = ev.mpExhaustedRounds || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : '',
@@ -379,14 +511,35 @@ function deepResult() {
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
       <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span></div>
-    ${d.current ? comparison({ damage: d.current.fightDamage ?? d.current.damage, firstStagger: d.current.firstStagger }, { damage: ev.fightDamage ?? ev.damage, firstStagger: ev.firstStagger }) : ''}
+    ${renderResultExplanations({evaluation: ev, scenario: d.scenario, enemyName: against, goals: d.goals, pinned: d.pinned, evidence: d.evidence})}
+    ${buildComparison(d, r)}
     <div class="member-hit">${moveDetails(ev, index)}</div>
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
     <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
     ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
-    <p class="dim small">The Resonance and gear below are filled in. Keep them as a plan to equip them.</p>
+    <p class="dim small">${d.restored ? 'Your pre-Build draft is restored. The comparison still shows the selected result.' : 'The Resonance and gear below are filled in. Keep them as a plan to equip them.'}</p>
     <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button></div>
   </div>`;
+}
+
+function buildComparison(d, result) {
+  if (!d.before) return '';
+  const before = d.before, after = d.applied || {...result.equipment, visionId: result.visionId, equippedSkillIds: result.evaluation.equippedSkillIds || []};
+  const ev = result.evaluation, base = d.beforeEvaluation;
+  const n = v => Number.isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString() : '—';
+  const score = v => Number.isFinite(Number(v)) ? Number(v).toLocaleString(undefined, {maximumSignificantDigits: 4}) : '—';
+  const row = (label, a, b) => `<tr${String(a) !== String(b) ? ' class="changed"' : ''}><th scope="row">${h(label)}</th><td>${h(a)}</td><td>${h(b)}</td></tr>`;
+  const slots = [['Resonance', 'visions', before.visionId, after.visionId], ['Weapon', 'equipment', before.weaponId, after.weaponId], ['Armor', 'equipment', before.armorId, after.armorId],
+    ...before.accessoryIds.map((id, i) => [`Accessory ${i + 1}`, 'equipment', id, after.accessoryIds?.[i]])];
+  const abilityNames = ids => (ids || []).map(id => describeAbility(id, index)?.name || `#${id}`).join(', ') || 'None';
+  return `<section class="build-comparison" aria-label="Compare with pre-Build draft">
+    <h4>Before Build / selected result</h4><p class="dim small">Same goals and fight conditions. Your original abilities are kept fixed in the before estimate.</p>
+    <div class="comparison-scroll"><table><thead><tr><th scope="col">Choice</th><th scope="col">Before Build</th><th scope="col">Selected result</th></tr></thead><tbody>
+    ${base?.valid ? row('Damage per round', n(base.fightDamage ?? base.damage), n(ev.fightDamage ?? ev.damage)) + row('Stagger per round', n(base.fightBreakDamage ?? base.breakDamage), n(ev.fightBreakDamage ?? ev.breakDamage)) + row('Goal score', score(base.score), score(ev.score)) : ''}
+    ${slots.map(([label, kind, a, b]) => row(label, name(kind, a), name(kind, b))).join('')}
+    ${row('Abilities', abilityNames(before.equippedSkillIds), abilityNames(after.equippedSkillIds))}</tbody></table></div>
+    ${base?.valid ? '' : `<p class="dim small">The pre-Build draft could not be scored.${d.beforeReason ? ' ' + h(d.beforeReason) : ''} Gear and abilities can still be compared.</p>`}
+  </section>`;
 }
 
 // One character's Build result in the shape the party picture takes: one member, its fight damage as the total.
@@ -405,15 +558,19 @@ function equipTabs(native, v, available) {
   const term = ui.gearQ.trim().toLowerCase();
   const inv = snapshot.inventory.map(o => [o, index.equipment.get(o.id)]).filter(([o, e]) => e && o.quantity > 0
     && (!term || `${e.name} ${e.detailType} ${(e.passiveIds || []).map(id => name('passives', id)).join(' ')}`.toLowerCase().includes(term)));
+  const learned = learnedFor(draft.visionId), ids = draft.equippedSkillIds || [];
+  const abilities = learned ? equippableAbilities(learned, index) : [];
   let body;
-  if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
+  if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: draft.locks.skillIds,
+    filters: ui.abilityFilters, reasons: Object.fromEntries(abilities.filter(a => !ids.includes(a.id)).map(a => [a.id, canEquip(a.id, ids, learned, index)]).filter(([, why]) => why)) }) : '<p class="dim">Abilities unavailable.</p>';
+  else if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
   else if (ui.charTab === 'items') body = `<input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
     <table><thead><tr><th>Item</th><th>Free</th><th>Stats</th></tr></thead><tbody>
     ${inv.map(([o, e]) => `<tr class="${['weapon', 'armor', 'accessory'].some(s => C.eligible(e, native, s)) ? '' : 'dim'}"><td>${h(e.name)}</td><td>${available.get(e.id) || 0}/${o.quantity}</td><td>${h(statsText(e))}</td></tr>`).join('')}
     </tbody></table>`;
   else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
 `;
-  return `${tabs('charTab', [['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${v.name} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
+  return `${tabs('charTab', [['abilities', `Abilities (${ids.length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${h(v.name)} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
 // ---------- resonances ----------
@@ -556,6 +713,7 @@ function partyPlans(members) {
 const optimizerController = createOptimizerController({ getCatalog: () => catalog, getSnapshot: () => snapshot, getFaces: () => faces, rerender: () => render(),
   stageParty: members => {
     const next = partyPlans(members);
+    cancelDeep(); ui.deep = null;
     // Other characters keep their plans while those still fit next to this party.
     for (const [id, plan] of Object.entries(plans)) if (!next[id] && !C.validPlan(catalog, snapshot, id, plan, next, false)) next[id] = plan;
     plans = next; ui.reserve = false; ui.charId = members[0].characterId; storePlans(); setDraft(); view = 'characters'; scrollTo({ top: 0 });
@@ -583,6 +741,7 @@ const RENDER = { party, bosses, characters, resonances };
 
 function render() {
   const key = document.activeElement?.dataset?.key, sel = document.activeElement?.selectionStart;
+  const pickerScroll = $('#slot-picker')?.scrollTop || 0;
   // Panels marked data-keep stay open across re-renders (e.g. the party search's "More" settings).
   const keepOpen = new Set([...document.querySelectorAll('details[data-keep][open]')].map(d => d.dataset.keep));
   $('#save').innerHTML = hasSave()
@@ -593,10 +752,26 @@ function render() {
   $('#app').innerHTML = `<nav class="window commands" aria-label="Sections"><ul>${VIEWS.map(([id, label]) =>
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
   for (const d of document.querySelectorAll('details[data-keep]')) if (keepOpen.has(d.dataset.keep)) d.open = true;
+  const picker = $('#slot-picker');
+  if (picker) { picker.showModal(); $('#slot-q').value = ui.slotQ; filterPicker(); picker.scrollTop = pickerScroll; }
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
   if (target) { target.focus({ preventScroll: true }); if (sel != null && target.type === 'search') target.setSelectionRange(sel, sel); }
-  $('.pick [aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
+  if (!picker) $('.pick [aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
 }
+
+function filterPicker() {
+  const choices = [...document.querySelectorAll('#slot-picker .choice')], term = ui.slotQ.trim().toLowerCase();
+  for (const choice of choices) choice.hidden = !choice.textContent.toLowerCase().includes(term);
+  const count = choices.filter(c => !c.hidden).length;
+  $('#picker-count').textContent = `${count} ${count === 1 ? 'choice' : 'choices'}`;
+  $('#picker-empty').hidden = count > 0;
+}
+function closePicker() {
+  const key = ui.openSlot; ui.openSlot = null; ui.slotQ = ''; render();
+  [...document.querySelectorAll('[data-open-slot]')].find(b => b.dataset.openSlot === key)?.focus({ preventScroll: true });
+}
+document.addEventListener('cancel', e => { if (e.target.id === 'slot-picker') { e.preventDefault(); closePicker(); } }, true);
+document.addEventListener('toggle', e => { if (e.target.isConnected && e.target.id === 'workspace-transfer-panel') ui.transferOpen = e.target.open; }, true);
 
 // Page-level changes animate with View Transitions (where supported). When a list item was
 // clicked, its portrait is the one that flies into the hero slot; otherwise pages just crossfade.
@@ -673,8 +848,56 @@ document.addEventListener('click', e => {
       if (view !== 'resonances') { view = 'resonances'; ui.kitQ = ''; ui.ownedOnly = false; scrollTo({ top: 0 }); }
     }, t); return;
   }
-  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; ui.pickVision = true; setDraft(); }, t); return; }
+  if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; setDraft(); }, t); return; }
+  if (t.hasAttribute('data-close-picker')) { closePicker(); return; }
+  if (t.dataset.openSlot) { ui.openSlot = t.dataset.openSlot; ui.slotQ = ''; render(); return; }
+  if (t.dataset.pickSlot) {
+    const key = t.dataset.pickSlot, id = +t.dataset.id; cancelDeep(); ui.deep = null; ui.openSlot = null;
+    if (key === 'vision') {
+      draft.visionId = id;
+      const learned = learnedFor(id);
+      if (learned) {
+        const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
+        draft.equippedSkillIds = kept; draft.locks.skillIds = draft.locks.skillIds.filter(x => kept.includes(x));
+        if (dropped.length) toast(`Removed ${dropped.map(d => describeAbility(d, index)?.name ?? d).join(', ')}: not available with this Resonance.`);
+      }
+    }
+    else if (key.startsWith('accessory:')) draft.accessoryIds[+key.slice(10)] = id;
+    else draft[key + 'Id'] = id;
+    if (!(id > 0)) {
+      if (key.startsWith('accessory:')) draft.locks.accessories[+key.slice(10)] = false;
+      else draft.locks[key] = false;
+    }
+    render(); [...document.querySelectorAll('[data-open-slot]')].find(b => b.dataset.openSlot === key)?.focus({ preventScroll: true }); return;
+  }
+  if (t.dataset.lock) {
+    const key = t.dataset.lock;
+    if (!key.startsWith('skill:') && !(Number(key.startsWith('accessory:') ? draft.accessoryIds[+key.slice(10)] : draft[key + 'Id']) > 0)) return;
+    cancelDeep(); ui.deep = null;
+    const lk = draft.locks;
+    if (key.startsWith('skill:')) { const id = +key.slice(6); lk.skillIds = lk.skillIds.includes(id) ? lk.skillIds.filter(x => x !== id) : [...lk.skillIds, id]; }
+    else if (key.startsWith('accessory:')) lk.accessories[+key.slice(10)] = !lk.accessories[+key.slice(10)];
+    else lk[key] = !lk[key];
+    render(); return;
+  }
+  if (t.dataset.abilityToggle) {
+    cancelDeep(); ui.deep = null;
+    const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId);
+    if (ids.includes(id)) { draft.equippedSkillIds = ids.filter(x => x !== id); draft.locks.skillIds = draft.locks.skillIds.filter(x => x !== id); }
+    else if (learned && !canEquip(id, ids, learned, index)) draft.equippedSkillIds = [...ids, id];
+    render(); return;
+  }
   if (t.id === 'deep') { deepSearch(); return; }
+  if (t.id === 'find-unlocks') { findUnlocks(); return; }
+  if (t.id === 'unlock-cancel') { cancelUnlockSearch(); render(); return; }
+  if (t.dataset.unlockVision) {
+    go(() => { ui.kitId = +t.dataset.unlockVision; ui.perspective = ui.charId; ui.kitQ = ''; ui.ownedOnly = true; view = 'resonances'; scrollTo({top: 0}); }); return;
+  }
+  if (t.id === 'workspace-transfer') { transferWorkspace(); return; }
+  if (t.id === 'restore-build' && ui.deep?.before) {
+    cancelDeep(); draft = structuredClone(ui.deep.before); ui.deep.restored = true; ui.openSlot = null; render(); return;
+  }
+  if (t.id === 'retry-build' && ui.deep?.results?.length) { applyDeep(ui.deep.pick); render(); return; }
   if (t.id === 'share-build') { shareBuild(); return; }
   if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
   if (t.dataset.deepPick) { applyDeep(+t.dataset.deepPick); render(); return; }
@@ -682,18 +905,22 @@ document.addEventListener('click', e => {
     const v = index.visions.get(+t.dataset.plan);
     go(() => {
       ui.charId = ui.perspective;
-      setDraft(); draft.visionId = v.id; ui.pickVision = false; ui.deepGeneral = false; ui.deepEnemyId = ui.bossId; view = 'characters'; scrollTo({ top: 0 }); deepSearch();
+      setDraft(); draft.visionId = v.id; draft.locks.vision = true; setGoal(ui.charId, { enemyId: ui.bossId }); view = 'characters'; scrollTo({ top: 0 }); deepSearch();
     }); return;
   }
-  if (t.dataset.release) { delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
+  if (t.dataset.release) { cancelDeep(); ui.deep = null; delete plans[t.dataset.release]; storePlans(); setDraft(); render(); return; }
   if (t.dataset.rf) {
     const cut = t.dataset.rf.indexOf(':'), key = t.dataset.rf.slice(0, cut), value = t.dataset.rf.slice(cut + 1); // values like "down:ATK" contain ':'
     ui.rf[key] = ui.rf[key].includes(value) ? ui.rf[key].filter(x => x !== value) : [...ui.rf[key], value];
     render(); return;
   }
   if ('rfClear' in t.dataset) { ui.rf = { tags: [], targets: [], calcs: [], elements: [] }; ui.rfUnlocked = false; render(); return; }
-  if (t.id === 'saved-gear') { draft = structuredClone(snapshot.characters.find(c => c.id === ui.charId).equipment); ui.deep = null; render(); return; }
-  if (t.id === 'keep') { plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return; }
+  if (t.id === 'saved-gear') { const saved = snapshot.characters.find(c => c.id === ui.charId); const locks = draft.locks; draft = withAbilities(saved.equipment, saved); draft.locks = locks; cancelDeep(); ui.deep = null; render(); return; }
+  if (t.id === 'keep') {
+    const why = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve) || validateAbilities(draft.equippedSkillIds || [], learnedFor(draft.visionId), index);
+    if (why) { toast(why); return; }
+    plans[ui.charId] = structuredClone(draft); storePlans(); render(); toast(`Kept plan for ${name('characters', ui.charId)}`); return;
+  }
   if (t.id === 'export') exportPlans();
   if (t.id === 'apply-plans') applyPlans();
 });
@@ -705,25 +932,29 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('input', e => {
   const t = e.target, map = { 'enemy-q': 'enemyQ', 'kit-q': 'kitQ', 'gear-q': 'gearQ' };
+  if (t.id === 'slot-q') { ui.slotQ = t.value; filterPicker(); return; }
+  if (t.id === 'ability-q') { ui.abilityFilters.q = t.value; render(); return; }
   if (map[t.id]) { ui[map[t.id]] = t.value; render(); }
 });
 
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('[data-pick], #pick')) { if (t.files[0]) loadSave(t.files[0]); return; }
+  if (t.id === 'workspace-source') { ui.transferHash = t.value; return; }
+  if (t.id === 'ability-kind' || t.id === 'ability-affordable') {
+    ui.abilityFilters[t.id === 'ability-kind' ? 'kind' : 'affordable'] = t.id === 'ability-kind' ? t.value : t.checked;
+    render(); return;
+  }
   if (t.id === 'boss-only') ui.bossOnly = t.checked;
   else if (t.id === 'owned-only') ui.ownedOnly = t.checked;
   else if (t.id === 'rf-unlocked') ui.rfUnlocked = t.checked;
   else if (t.id === 'perspective' || t.id === 'kit-perspective' || t.id === 'rf-perspective') ui.perspective = +t.value;
-  else if (t.id === 'reserve') ui.reserve = t.checked;
-  else if (t.name === 'deep-goal') { ui.deepGoals = t.checked ? [...new Set([...ui.deepGoals, t.value])] : ui.deepGoals.filter(g => g !== t.value); if (!ui.deepGoals.length) { ui.deepGoals = [t.value]; t.checked = true; } }
+  else if (t.id === 'reserve') { cancelDeep(); ui.deep = null; ui.reserve = t.checked; }
+  else if (t.name === 'deep-goal') { cancelDeep(); ui.deep = null; const cur = goalFor(ui.charId).goals; setGoal(ui.charId, { goals: t.checked ? [...cur, t.value] : cur.filter(x => x !== t.value) }); }
   else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
-  else if (t.id === 'deep-incoming-damage') { ui.deepIncomingDamage = Math.max(0, Math.min(99999999, Math.trunc(Number(t.value) || 0))); cancelDeep(); ui.deep = null; }
-  else if (t.id === 'deep-incoming-type') { ui.deepIncomingType = t.value === 'Magic' ? 'Magic' : 'Physic'; cancelDeep(); ui.deep = null; }
-  else if (t.id === 'deep-enemy') { ui.deepGeneral = t.value === 'general'; if (!ui.deepGeneral) ui.deepEnemyId = +t.value; }
-  else if (t.id === 'vision') { draft.visionId = +t.value; ui.pickVision = false; ui.deep = null; }
-  else if (t.id === 'pick-vision') ui.pickVision = t.checked;
-  else if (t.dataset.slot) { ui.deep = null; const id = +t.value; if (t.dataset.slot === 'accessory') draft.accessoryIds[+t.dataset.index] = id; else draft[t.dataset.slot + 'Id'] = id; }
+  else if (t.id === 'deep-incoming-damage') { setGoal(ui.charId, { incomingDamage: t.value }); cancelDeep(); ui.deep = null; }
+  else if (t.id === 'deep-incoming-type') { setGoal(ui.charId, { incomingType: t.value }); cancelDeep(); ui.deep = null; }
+  else if (t.id === 'deep-enemy') { cancelDeep(); ui.deep = null; setGoal(ui.charId, { enemyId: t.value === 'general' ? 'general' : +t.value }); }
   else return;
   render();
 });

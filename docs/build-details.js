@@ -1,6 +1,6 @@
 // What a build is made of, in player terms: the move, the gear, the abilities and what is always on.
 // Each line opens to what it does (the game's own description) and what it adds in this build.
-const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+export const h = value => String(value ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const list = value => Array.isArray(value) ? value : [];
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 const n = value => number(value).toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -10,11 +10,16 @@ const labels = { PhysicalAttack: 'ATK', MagicalAttack: 'MAG', PhysicalDefense: '
   Intelligence: 'INT', Mind: 'SPR', Agility: 'SPD', Divine: 'Divine' };
 const lookup = (indexes, kind, id) => indexes[kind]?.get(Number(id));
 const ability = (indexes, id) => lookup(indexes, 'skills', id) || lookup(indexes, 'passives', id) || lookup(indexes, 'masterSkills', id);
-function description(item, indexes) {
-  return String(item?.desc || '').replace(/\{Effect(\d+)Param(\d+)\}/g, (_, effect, param) => {
-    const bundle = item.effectBundles?.[Number(effect) - 1];
-    const value = lookup(indexes, 'effects', bundle?.effectId)?.params?.[Number(param) - 1];
-    return Number.isFinite(value) ? n(value) : 'unknown';
+export function description(item, indexes) {
+  const effectOf = effect => lookup(indexes, 'effects', item.effectBundles?.[Number(effect) - 1]?.effectId);
+  // "{Effect1Turn} {Effect1Turn}|plural(one=turn, other=turns)" is the effect's duration with its unit.
+  return String(item?.desc || '').replace(/\{Effect(\d+)Turn\} \{Effect\d+Turn\}\|plural\(one=([^,]+), other=([^)]+)\)/g, (_, effect, one, other) => {
+    const turns = effectOf(effect)?.duration;
+    return Number.isFinite(turns) ? `${n(turns)} ${turns === 1 ? one : other}` : 'unknown';
+  }).replace(/\{Effect(\d+)Param(\d+)(Rate)?\}/g, (_, effect, param, rate) => {
+    const value = effectOf(effect)?.params?.[Number(param) - 1];
+    // "Rate" params are multipliers (120 = +20%).
+    return Number.isFinite(value) ? n(rate ? value - 100 : value) : 'unknown';
   });
 }
 

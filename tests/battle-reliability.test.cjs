@@ -46,6 +46,44 @@ test('removing the last equipped ability does not reuse the unrestricted optimiz
   assert.ok(fixed.damage<optimized.damage);
 });
 
+test('gear-supplied passives are not equipped again, and changing gear does not reuse that package', () => {
+  const {catalog,snapshot,enemy,input} = fixture([900002]);
+  catalog.effects = catalog.effects.map(e=>({...e,params:e.params.map((value,i)=>i===1?5:value)}));
+  catalog.equipment = [{id:900010,name:'Attack ring',type:'Accessory',stats:{},passiveIds:[900002]}];
+  input.equipment.accessoryIds = [900010,-1];
+  snapshot.inventory = [{id:900010,quantity:1}];
+  const model = B.createModel(catalog,snapshot,enemy,{goals:['damage'],rounds:1,includeSupportOptions:false});
+  const optimized = model.evaluate(input), fixed = model.evaluate({...input,equippedSkillIds:[]});
+  assert.equal(optimized.valid,true);
+  assert.equal(optimized.fightDamage,fixed.fightDamage);
+  assert.equal(optimized.skillCost,0);
+  assert.deepEqual(optimized.equippedSkillIds,[]);
+  const withoutRing = model.evaluate({...input,equipment:{...input.equipment,accessoryIds:[-1,-1]}});
+  assert.ok(withoutRing.equippedSkillIds.includes(900002));
+  assert.equal(withoutRing.skillCost,25);
+  const pinned = model.evaluate({...input,lockedSkillIds:[900002]});
+  assert.ok(pinned.equippedSkillIds.includes(900002),'an explicit redundant pin remains an intentional choice');
+  assert.equal(pinned.skillCost,25);
+});
+
+test('an affordable Double LB Charge is tried when learned Triple Charge exceeds AP', () => {
+  const attack = {...native.skills.find(s=>s.id===401010),cost:0,mag:30,breakDmg:100,criticalHitRate:0,equipCost:10};
+  const equipment = {weaponId:-1,armorId:-1,accessoryIds:[],visionId:-1};
+  const person = {id:1001,joinStatus:'Join',usable:true,experience:0,baseParameters:[],activeSkillIds:[attack.id],equippedSkillIds:Array(8).fill(-1),equipment};
+  const character = {id:1001,name:'Rain',levelParamId:1,stats:{HitPoint:1000,MagicPoint:1000,Attack:100,Intelligence:100,Mind:20,Defence:20,Agility:50},baseSkillEquipCost:40,passiveIds:[]};
+  const catalog = {...native,characters:[character],statGrowth:{1:{rows:[{level:1,requiredExperience:0,adds:{},skillIds:[1000,1031]}]}},visions:[],equipment:[],artifacts:[],masterSkills:[],skills:[attack,...native.skills.filter(s=>s.attr.endsWith('LimitBurst')&&s.hasUnit==='Rain')],passives:native.passives.filter(p=>[1000,1031].includes(p.id))};
+  const snapshot = {characters:[person],resonances:[],inventory:[],party:[1001],player:{difficulty:'Normal'}};
+  const enemy = {id:3,name:'Target',level:1,stats:{MaxHitPoint:1e12,MaxBreakPoint:100,Agility:0,Defence:1,Mind:1},resistances:{},passiveIds:[]};
+  const model = B.createModel(catalog,snapshot,enemy,{goals:['limit'],rounds:5,includeSupportOptions:false});
+  const input = {characterId:1001,visionId:-1,equipment};
+  const optimized = model.evaluate(input), pinned = model.evaluate({...input,lockedSkillIds:[1000]});
+  assert.equal(optimized.valid,true);
+  assert.ok(optimized.equippedSkillIds.includes(1000));
+  assert.equal(optimized.score,pinned.score);
+  assert.equal(optimized.gaugePerRound,100);
+  assert.ok(optimized.skillCost<=40);
+});
+
 test('an over-budget current setup is rejected instead of silently dropping equipped abilities', () => {
   const {catalog,snapshot,enemy,input} = fixture();
   catalog.skills = catalog.skills.map(s => s.id===900003?{...s,equipCost:101}:s);

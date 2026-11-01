@@ -1,5 +1,5 @@
 // A party result as a picture to paste into Discord, drawn on a canvas from the site's own font and portraits.
-import { commandPlan } from './build-details.js?v=11';
+import { commandPlan } from './build-details.js?v=12';
 
 const list = value => Array.isArray(value) ? value : [];
 const whole = value => Math.round(Number(value) || 0).toLocaleString('en-US');

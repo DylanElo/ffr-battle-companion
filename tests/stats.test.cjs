@@ -33,6 +33,34 @@ test('character stats include growth, seed, all owned permanent sync and gear ex
   assert.equal(Stats.characterStats(catalog,snapshot,1,{weaponId:-1,armorId:-1,accessoryIds:[]}).stats.PhysicalAttack,17,'cache must not retain prior loadout gear');
   assert.equal(Stats.characterStats(catalog,snapshot,1).stats.PhysicalAttack,20);
 });
+
+test('buildStats includes innate, Resonance, gear and equipped master passives without double counting',()=>{
+  const {catalog,snapshot}=fixture();
+  const passive=(id,value)=>({id,name:`Defense ${id}`,effectBundles:[{effectId:id,TargetType:'Self',targetRelation:'Friendlies',passiveSkillAddTiming:'SpawnUnit',conditionData:{Condition:'None'}}]});
+  catalog.passives=[passive(200,10),passive(201,20),passive(202,30),passive(203,40)];
+  catalog.effects=catalog.passives.map((p,i)=>({id:p.id,type:'ParameterContinuousVariation',params:[(i+1)*10,6,2,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1],condition:{Condition:'None'},activationProbability:100}));
+  catalog.characters[0].passiveIds=[200];
+  catalog.equipment[1].passiveIds=[202];
+  catalog.masterSkills=[{id:300,grants:{passiveIds:[203]}}];
+  snapshot.characters[0].equippedSkillIds=[200,300,-1,-1,-1,-1,-1,-1];
+  const result=Stats.buildStats(catalog,snapshot,1);
+  assert.equal(result.stats.Defence,40,'base 20 receives each 10/20/30/40 percent effect once');
+  assert.equal(result.stats.PhysicalDefense,45,'gear defense remains additive to passive-scaled base defense');
+  assert.equal(result.deferredStatEffects.length,0);
+  const empty=Stats.buildStats(catalog,snapshot,1,{...snapshot.characters[0].equipment,equippedSkillIds:[]});
+  assert.equal(empty.stats.Defence,32,'explicit empty abilities removes the master grant but retains always-on effects');
+  assert.equal(Stats.buildStats(catalog,snapshot,1).stats.Defence,40,'cache separates equipped ability loadouts');
+});
+
+test('buildStats defers combat-conditional stat effects instead of inventing a combat state',()=>{
+  const {catalog,snapshot}=fixture();
+  catalog.passives=[{id:200,effectBundles:[{effectId:400,TargetType:'Self',targetRelation:'Friendlies',passiveSkillAddTiming:'SpawnUnit',conditionData:{Condition:'HasStatusCondition',param1:123}}]}];
+  catalog.effects=[{id:400,type:'ParameterContinuousVariation',params:[50,6,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1],condition:{Condition:'None'},activationProbability:100}];
+  const result=Stats.buildStats(catalog,snapshot,1);
+  assert.equal(result.stats.Defence,20);
+  assert.equal(result.deferredStatEffects.length,1);
+  assert.match(result.deferredStatEffects[0].reason,/status condition/);
+});
 test('each effect delta truncates independently and attribute modifiers propagate into derived attack',()=>{
   const {catalog,snapshot}=fixture();
   const percent=Stats.characterStats(catalog,snapshot,1,null,[{kind:'statPercent',parameter:'Attack',value:5},{kind:'statPercent',parameter:'Attack',value:5}]);

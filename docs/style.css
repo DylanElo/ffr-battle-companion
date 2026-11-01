@@ -162,9 +162,16 @@ summary:hover, details[open] > summary { color: var(--ink); }
 .skills li.got { border-left-color: var(--good); }
 
 /* gear */
-.slots { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 16px; align-items: center; }
-.slots label { color: var(--dim); }
-.slots select.changed { border-color: var(--gold); color: var(--gold); }
+.slots { display: grid; gap: 10px; }
+.slot { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.slot.changed { border-color: var(--gold); }
+.slot p { margin: 0; }
+.slot-head { display: flex; gap: 8px; align-items: center; }
+.slot-head > span { flex: 1; }
+.slot-head button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.slot .choices { display: grid; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.slot .choice { display: grid; gap: 2px; text-align: left; width: 100%; }
+.slot .delta { color: var(--gold); font-style: normal; }
 .statline { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0; }
 .statline span { color: var(--dim); }
 .statline b { color: var(--ink); font-weight: 700; margin-left: 4px; }
@@ -265,7 +272,7 @@ dialog form { text-align: right; margin-top: 12px; }
 .move small { color: var(--dim); }
 
 /* ---------- characters: roster · card · equipment, like the in-game equip screen ---------- */
-.chars { display: grid; grid-template-columns: 230px 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.chars { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; align-items: start; }
 .chars > .roster, .chars > .card { position: sticky; top: 12px; }
 .roster { display: flex; flex-direction: column; gap: 10px; }
 .roster .ghost { align-self: flex-start; }
@@ -316,11 +323,9 @@ dialog form { text-align: right; margin-top: 12px; }
 .deep-num { margin-left: auto; }
 .deep-num b { font-size: 24px; font-weight: 900; color: var(--gold); }
 .vision-slot { display: flex; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.vision-slot > div { flex: 1; display: grid; gap: 4px; min-width: 0; }
-.vision-slot select { width: 100%; }
+.vision-slot > .slot { flex: 1; }
 .face.empty { display: inline-block; border: 2px dashed var(--edge); transform: rotate(45deg) scale(.7); }
 .equip .slots { margin-top: 12px; }
-.equip .slots select { width: 100%; }
 
 @media (max-width: 880px) {
   .top, main { padding-left: 16px; padding-right: 16px; }
@@ -334,8 +339,6 @@ dialog form { text-align: right; margin-top: 12px; }
   .hero { gap: 14px; }
   h2 { font-size: 24px; }
   .weak-line { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .slots { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .slots label { margin-top: 8px; }
   .top .where > div { position: fixed; left: 16px; right: 16px; top: 64px; width: auto; }
   .chars { grid-template-columns: minmax(0, 1fr); }
   .chars > .roster, .chars > .card { position: static; }
@@ -346,9 +349,7 @@ dialog form { text-align: right; margin-top: 12px; }
   .party-total { text-align: left; }
 }
 @media (min-width: 881px) and (max-width: 1180px) {
-  .chars { grid-template-columns: 200px minmax(0, 1fr); }
-  .chars > .equip { grid-column: 2; }
-  .chars > .card { position: static; }
+  .chars { grid-template-columns: 180px minmax(0, 1fr); }
 }
 
 /* ================= motion =================
@@ -442,4 +443,123 @@ ul.plain { display: grid; gap: 8px; padding-left: 18px; }
   .commands button[aria-current=page] { color: var(--gold); }
   .save .dim { display: none; }
   .welcome { margin: 8px 0; padding: 24px 16px; }
+}
+.ability-load { margin: 8px 0; font-weight: 600; }
+.abilities { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ability { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.ability p { margin: 2px 0 0; }
+.ability-head { display: flex; gap: 8px; align-items: center; }
+.ability-head > strong { flex: 1; }
+
+/* Character workspace: settings, loadout and abilities share one reading order. */
+.character-workspace { display: grid; gap: 16px; min-width: 0; }
+.character-workspace .window { background: var(--panel); border: 1px solid var(--edge); box-shadow: none; }
+.character-workspace .card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: center; }
+.character-workspace .card-head { flex-direction: row; text-align: left; gap: 12px; }
+.character-workspace .card-head .face { width: 64px; height: 64px; }
+.character-workspace .card-head h2 { font-size: 24px; }
+.character-workspace .card-head p { margin: 4px 0 0; font-size: 14px; }
+.character-workspace .card-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; gap: 4px 16px; }
+.character-workspace .card-stats div { flex-wrap: wrap; gap: 2px 8px; }
+.character-workspace .deep { margin: 0; padding: 0; border: 0; grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr) auto; align-items: end; gap: 12px; }
+.deep .build-intro { grid-column: 1 / -1; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; }
+.deep .against { grid-column: 2; }
+.deep > .toolbar { grid-column: 3; grid-row: 2; align-self: end; margin: 0; }
+.deep > details, .deep > .small { grid-column: 1 / -1; }
+.deep .chips { flex-wrap: wrap; }
+.deep h3, .loadout-head h3, .build-analysis > h3 { font-size: 18px; }
+.loadout-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.loadout-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.loadout-head p { margin: 4px 0 0; }
+.loadout-head .toolbar { margin: 0; }
+.character-workspace .vision-slot { gap: 8px; align-items: start; padding-bottom: 10px; }
+.character-workspace .vision-slot > .face { width: 48px; height: 48px; margin-top: 8px; }
+.character-workspace .slot { background: var(--panel); padding: 10px 12px; }
+.slot-head button { font-size: 13px; padding: 4px 6px; min-height: 32px; }
+.slot-head button[aria-pressed=true] { background: var(--gold-soft); }
+.slot-current > p { margin-top: 2px; }
+.slot-current details { margin-top: 4px; }
+.slot-current summary { font-size: 13px; }
+.ability-panel .tabs { flex-wrap: wrap; overflow: visible; }
+.ability-panel .tabs button { padding: 6px 8px; font-size: 13px; }
+.ability-section { font-size: 14px; color: var(--dim); margin: 16px 0 8px; }
+.ability-head { flex-wrap: wrap; }
+.ability-head strong { min-width: 100px; }
+.ability-head button { font-size: 13px; min-height: 32px; }
+.ability { padding: 10px; background: var(--panel); }
+.ability.is-equipped { border-left: 3px solid var(--gold); }
+.build-analysis > summary { color: var(--gold); font-weight: 600; }
+.build-analysis .deep-result { margin: 12px 0 0; }
+.ability-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+.ability-filters label { display: grid; gap: 6px; font-size: 14px; }
+.ability-filters label:first-child { flex: 1 1 180px; }
+.ability-filters .check { display: flex; align-items: center; }
+.workspace-transfer { margin: 12px 0; }
+.workspace-transfer label { display: grid; gap: 6px; font-size: 13px; }
+.workspace-transfer select { min-width: 0; width: 100%; }
+.workspace-transfer button { margin-top: 10px; }
+.transfer-issues { margin: 12px 0; font-size: 13px; overflow-wrap: anywhere; }
+.transfer-issues h3 { font-size: 14px; }
+.build-comparison { margin: 16px 0; }
+.comparison-scroll { overflow-x: auto; }
+.build-comparison table { width: 100%; font-size: 13px; }
+.build-comparison th, .build-comparison td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+.build-comparison .changed { background: var(--gold-soft); }
+.result-explanations { margin: 12px 0; }
+.result-explanations .note { font-size: 14px; }
+.result-explanations li { margin-bottom: 6px; overflow-wrap: anywhere; }
+.unlock-panel h3 { font-size: 18px; }
+.unlock-card { margin-top: 12px; padding: 12px; border: 1px solid var(--edge); }
+.unlock-card summary { color: var(--gold); overflow-wrap: anywhere; }
+.unlock-card li { margin: 6px 0; }
+.unlock-card table { width: 100%; font-size: 14px; }
+dialog.slot-picker { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(520px, 100%); max-width: 100%; height: 100dvh; max-height: 100dvh; padding: 24px; border-radius: 0; border-width: 0 0 0 1px; overscroll-behavior: contain; }
+body:has(.slot-picker[open]) { overflow: hidden; }
+.picker-head, .choice-name { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.picker-head { margin-bottom: 12px; }
+.picker-head p { margin: 0 0 4px; }
+.picker-head h2 { font-size: 24px; }
+.picker-search { display: grid; gap: 6px; font-size: 14px; margin: 20px 0 8px; }
+.slot-picker .choices { display: grid; gap: 8px; }
+.slot-picker .choice { display: block; text-align: left; width: 100%; padding: 14px; border-color: var(--edge); }
+.slot-picker .choice[aria-pressed=true] { border-color: var(--gold); background: var(--gold-soft); }
+.slot-picker .choice p { margin: 6px 0 0; }
+.slot-picker .delta { color: var(--gold); font-style: normal; }
+.slot-picker [hidden] { display: none; }
+.chars .roster { padding: 12px; }
+.chars .roster .pick li { padding: 6px 4px 6px 24px; gap: 6px; font-size: 14px; }
+.chars .roster .pick .face { width: 28px; height: 28px; }
+.chars .roster .pick li[aria-selected=true]::before { left: 0; width: 20px; background-size: contain; background-repeat: no-repeat; }
+.chars .roster .pick li > span { overflow-wrap: break-word; }
+.chars .roster .pick { overflow-x: hidden; }
+.roster-options summary { font-size: 13px; }
+.roster-options[open] { display: grid; gap: 10px; }
+@media (max-width: 1100px) {
+  .character-workspace .card { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .loadout-grid { grid-template-columns: minmax(0, 1fr); }
+  .character-workspace .deep { grid-template-columns: minmax(0, 1fr) auto; }
+  .deep .chips { grid-column: 1 / -1; }
+  .deep .against { grid-column: 1; }
+  .deep > .toolbar { grid-column: 2; grid-row: 3; }
+}
+@media (max-width: 880px) {
+  .chars > .roster { padding: 8px; gap: 8px; }
+  .chars .roster .pick li { flex: 0 0 90px; font-size: 13px; padding: 6px; }
+  .chars .roster .pick { overflow-x: auto; }
+  .roster .check { font-size: 13px; }
+}
+@media (max-width: 560px) {
+  .top .party { display: none; }
+  .top .save { width: 100%; justify-content: space-between; gap: 8px; }
+  .top .save b { max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .commands { padding: 8px 4px; }
+  .commands button { font-size: 13px; padding: 6px 4px; }
+  .character-workspace .card-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .character-workspace .deep { grid-template-columns: minmax(0, 1fr); }
+  .deep .build-intro p { display: none; }
+  .deep .chips { gap: 4px; }
+  .deep .chip-check span { font-size: 13px; padding: 4px 8px; }
+  .deep > .toolbar { grid-column: 1; grid-row: auto; }
+  .deep .toolbar .primary { flex: 1; }
+  dialog.slot-picker { padding: 16px; }
 }
