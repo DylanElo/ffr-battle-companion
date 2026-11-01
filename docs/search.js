@@ -38,7 +38,7 @@
   const QUICK_SAMPLES = 4;
   function stateFor(options) {
     return {evaluations:0,cache:new Map(),truncated:false,reasons:new Set(),
-      started:Date.now(),deadline:deadlineAfter(options.timeMs),options};
+      started:Date.now(),deadline:Number.isFinite(options.deadline)?options.deadline:deadlineAfter(options.timeMs),options};
   }
   function stopped(state) {
     const {options} = state;
@@ -276,22 +276,24 @@
     const worth=id=>Object.values(gear.get(id)?.stats || {}).reduce((a,b)=>a+Number(b||0),0);
     const unmodeled=(evaluation,item)=>[...(evaluation.passiveAnalysis?.unsupported || []),...(evaluation.passiveAnalysis?.deferred || [])]
       .filter(effect=>(item?.passiveIds || []).includes(effect.passiveId));
-    const fillState=state?{...state,options:{...state.options,maxEvaluations:Infinity,timeMs:0}}:
-      stateFor({...defaults(callbacks.options || {}),maxEvaluations:Infinity,timeMs:0});
+    const fillState=state || stateFor(defaults(callbacks.options || {}));
     const damageOnly=fillState.options.goals?.length===1 && fillState.options.goals[0]==='damage';
     const pinnedAccessories=countsOf(fillState.options.locks?.accessoryIds || []);
     const slotsOf=equipment=>[['weapon',0,e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',0,e=>e.armorId,(e,id)=>({...e,armorId:id})],
       ...equipment.accessoryIds.map((_,i)=>['accessory',i,e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
     const out=members.slice();
     const partyScore=rows=>{
+      if(stopped(fillState))return NaN;
       const result=callbacks.evaluateParty?.(rows,{enemy:callbacks.enemy,options:fillState.options,samples:QUICK_SAMPLES});
       return callbacks.evaluateParty?Number(result?.score):rows.reduce((sum,m)=>sum+m.score,0);
     };
     for(let memberIndex=0;memberIndex<out.length;memberIndex++){
+      if(stopped(fillState))break;
       const member=out[memberIndex];
       const native=catalog.characters.find(c=>c.id===member.characterId);
       let best=member;
       if(damageOnly)for(let i=0;i<best.equipment.accessoryIds.length;i++){
+        if(stopped(fillState))break;
         const id=best.equipment.accessoryIds[i],counts=countsOf(best.equipment.accessoryIds);
         if(!(id>0) || (counts.get(id)||0)<=(pinnedAccessories.get(id)||0))continue;
         const equipment={...best.equipment,accessoryIds:best.equipment.accessoryIds.map((value,n)=>n===i?-1:value)};
@@ -303,11 +305,13 @@
         used.set(id,(used.get(id)||0)-1);best=without;out[memberIndex]=best;
       }
       for (const [slot,index,get,set] of slotsOf(best.equipment)) {
+        if(stopped(fillState))break;
         if (Number(get(best.equipment))>0) continue;
         let pick=null;
         const previousPartyScore=partyScore(out);
         if(!Number.isFinite(previousPartyScore))continue;
         for (const item of catalog.equipment) {
+          if(stopped(fillState))break;
           if ((stock.get(item.id)||0)-(used.get(item.id)||0)<1 || !C.eligible(item,native,slot)) continue;
           const c=evaluateOne(fillState,callbacks,member.characterId,member.visionId,set(best.equipment,item.id));
           if (!c || unmodeled(c.evaluation,item).length || c.score<best.score || !best.roles.every(role=>c.roles.includes(role))) continue;
@@ -327,6 +331,7 @@
       const gearReasons=slotsOf(member.equipment).map(([slot,index,get,set])=>{
         const itemId=Number(get(member.equipment));
         const base={slot,index,itemId,status:itemId>0?'selected':'empty',unmodeledEffects:unmodeled(member.evaluation,gear.get(itemId))};
+        if(stopped(fillState))return {...base,reason:'budget-exhausted'};
         if(itemId>0){
           fillState.evaluations++;
           const without=callbacks.evaluate({characterId:member.characterId,visionId:member.visionId,equipment:set(member.equipment,-1),
@@ -345,6 +350,7 @@
         if(!remaining.length)return {...base,reason:'reserved-or-used'};
         let supported=false,roleLoss=false;
         for(const item of remaining){
+          if(stopped(fillState))return {...base,reason:'budget-exhausted'};
           const candidate=evaluateOne(fillState,callbacks,member.characterId,member.visionId,set(member.equipment,item.id));
           if(!candidate || unmodeled(candidate.evaluation,item).length)continue;
           supported=true;

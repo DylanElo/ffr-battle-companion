@@ -1,13 +1,13 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
-import {createOptimizerController} from './optimizer-controller.js?v=55';
-import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
-import {shareCard, partyImage} from './share-image.js?v=5';
-import {renderSlot, renderPicker, renderAbilityList} from './slot-ui.js?v=5';
+import {createOptimizerController} from './optimizer-controller.js?v=56';
+import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=13';
+import {shareCard, partyImage} from './share-image.js?v=6';
+import {renderSlot, renderPicker, renderAbilityList} from './slot-ui.js?v=6';
 import {equippableAbilities, abilityLoad, canEquip, validateAbilities, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=5';
-import {describeItem, describeAbility} from './piece-details.js?v=1';
+import {describeItem, describeAbility} from './piece-details.js?v=2';
 import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=1';
-import {renderResultExplanations} from './result-explanations.js?v=1';
-import {renderUnlockRecommendations} from './unlock-ui.js?v=1';
+import {renderResultExplanations} from './result-explanations.js?v=2';
+import {renderUnlockRecommendations} from './unlock-ui.js?v=2';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -322,7 +322,7 @@ function findUnlocks() {
   if (refusal) { ui.unlocks = {error: refusal}; render(); return; }
   const id = unlockRun, charId = ui.charId, g = goalFor(charId);
   ui.unlocks = {busy: true, progress: 'Checking your owned Resonances…'};
-  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=52', import.meta.url));
+  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=53', import.meta.url));
   worker.onmessage = e => {
     if (id !== unlockRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.unlocks.progress = e.data.message;
@@ -349,7 +349,7 @@ function deepSearch() {
     || validateAbilities(before.equippedSkillIds || [], learnedFor(before.visionId), index);
   const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=52', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=53', import.meta.url));
   worker.onmessage = e => {
     if (id !== deepRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;

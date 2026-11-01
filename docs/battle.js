@@ -1034,7 +1034,11 @@
           charged.length>number(stats0.maxSkillSlots,8))return {valid:false,score:-Infinity,reason:'The pinned abilities alone exceed the ability budget or slots.'};
       }
       const freeIds=unique([...prepared.borrowed,...gearPassives(equipment)]),results=[],rollByContext=new Map();
+      const deadline=Math.min(Number.isFinite(options.deadline)?options.deadline:Infinity,options.evaluationTimeMs>0?Date.now()+options.evaluationTimeMs:Infinity),expired=Symbol('search deadline');
+      const checkDeadline=()=>{if(Date.now()>=deadline)throw expired;};
+      let timedOut=false;
       const consider=(skill,turn)=>{
+        checkDeadline();
         const packageInfo=passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked);
         if(!packageInfo)return;
         const allPassives=unique([...freeIds,...packageInfo.passiveIds,...turn.reservedIds.filter(id=>indexes.passives.has(id))]);
@@ -1122,7 +1126,10 @@
           appliedSynergies:passiveAnalysis.applied.map(t=>({name:t.passiveName || t.type,reason:`${t.passiveName || t.type}: ${t.kind} ${t.value ?? t.element} ${t.parameter || ''}`})),
           passiveAnalysis,criticalAnalysis,criticalStats,coverage:passiveAnalysis.coverage,warnings,availableMp});
       };
-      for(const skill of prepared.active)for(const turn of turnsFor(prepared,skill))consider(skill,turn);
+      try {
+      // A bounded comparison must try strong legal actions before catalog order spends its time.
+      const active=Number.isFinite(deadline)?prepared.active.slice().sort((a,b)=>number(b.mag)-number(a.mag) || number(a.cost)-number(b.cost)):prepared.active;
+      for(const skill of active)for(const turn of turnsFor(prepared,skill))consider(skill,turn);
       // Preserve repeated baselines, then test at most four mixed recipes from damage/stagger/MP leaders.
       const bestBySkill=new Map();
       for(const result of results){const current=bestBySkill.get(result.skillId);if(!current || result.score>current.score)bestBySkill.set(result.skillId,result);}
@@ -1146,6 +1153,7 @@
         if(first===second)continue;
         const skill=indexes.skills.get(first),base=bestBySkill.get(first);
         for(const turn of turnsFor(prepared,skill,indexes.skills.get(second))){
+          checkDeadline();
           if(turn.mp>base.availableMp)continue;
           const hits=turn.leaves.flatMap((leaf,index)=>{
             const sample=leafProxy.get(`${leaf.skillId}:${JSON.stringify(leaf.context)}`);
@@ -1241,9 +1249,12 @@
           consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
         }
       }
-      if(!results.length)return {valid:false,score:-Infinity,reason:'No supported, affordable, legally learned ordinary attack.'};
+      } catch(error){if(error!==expired)throw error;timedOut=true;}
+      if(!results.length)return {valid:false,score:-Infinity,reason:timedOut?'The search time ended before a legal build was evaluated.':'No supported, affordable, legally learned ordinary attack.'};
       // Ties go to the cheaper loadout, so abilities that change nothing for these goals aren't equipped.
-      return results.sort((a,b)=>b.score-a.score || b.damage-a.damage || a.turn.reservedIds.length-b.turn.reservedIds.length)[0];
+      const best=results.sort((a,b)=>b.score-a.score || b.damage-a.damage || a.turn.reservedIds.length-b.turn.reservedIds.length)[0];
+      if(timedOut){best.searchTruncated=true;best.warnings=[...best.warnings,'Search time reached; this is the best completed legal build.'];}
+      return best;
     }
     function evaluateParty(members,{samples=Infinity}={}){
       const baseline=members.reduce((sum,m)=>sum+m.evaluation.damage,0);
@@ -1356,7 +1367,9 @@
       const ids=evaluation.equippedSkillIds || [];
       const fixed=evaluate({characterId,visionId,equipment,equippedSkillIds:ids});
       return ids.map(id=>{
+        if(Date.now()>=(options.deadline ?? Infinity) || fixed.searchTruncated)return {id,reason:'budget-exhausted'};
         const without=evaluate({characterId,visionId,equipment,equippedSkillIds:ids.filter(other=>other!==id)});
+        if(without.searchTruncated)return {id,reason:'budget-exhausted'};
         const metrics=without.valid?{valid:true,damage:without.fightDamage,stagger:without.fightBreakDamage,score:without.score}: {valid:false,reason:without.reason};
         return {id,cost:equipCostOf([id]),without:metrics,
           damageDelta:fixed.valid && without.valid?fixed.fightDamage-without.fightDamage:null,

@@ -276,6 +276,46 @@ function withClock(fn){
   const originalNow=Date.now;let clock=0;
   try{Date.now=()=>clock;return fn(ms=>{clock+=ms;});}finally{Date.now=originalNow;}
 }
+
+test('a shared absolute deadline prevents candidate search from restarting its time budget',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(2);let calls=0;
+  S.buildCandidates(catalog,snapshot,1,{evaluate:()=>{calls++;tick(10);return {score:1};}},
+    {...options,deadline:5,timeMs:1000,visionIds:[100,101]});
+  assert.equal(calls,1,'Keep the first legal incumbent, then respect the worker deadline');
+}));
+
+test('finalization keeps completed gear and skips all comparisons after the shared deadline',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(1),equipment={weaponId:10,armorId:20,accessoryIds:[30,-1]};
+  const member={characterId:1,visionId:100,equipment,score:100,roles:[],evaluation:{equippedSkillIds:[99]}};
+  tick(10);let calls=0;
+  const [result]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),{
+    options:{...options,deadline:5},evaluate:()=>{calls++;return {score:0};}});
+  assert.equal(calls,0);
+  assert.deepEqual(result.equipment,equipment);
+  assert.ok(result.gearReasons.every(reason=>reason.reason==='budget-exhausted'));
+}));
+
+test('finalization stops after one slow callback spends the remaining time',()=>withClock(tick=>{
+  const {catalog,snapshot}=fixture(1),equipment={weaponId:-1,armorId:-1,accessoryIds:[-1,-1]};
+  const member={characterId:1,visionId:100,equipment,score:100,roles:[],evaluation:{equippedSkillIds:[]}};
+  let calls=0;
+  const [result]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),{
+    options:{...options,deadline:5},evaluate:()=>{calls++;tick(10);return {score:0};}});
+  assert.equal(calls,1);
+  assert.deepEqual(result.equipment,equipment);
+  assert.ok(result.gearReasons.every(reason=>reason.reason==='budget-exhausted'));
+}));
+
+test('finalization preserves a supplied evaluation budget instead of granting unlimited probes',()=>{
+  const {catalog,snapshot}=fixture(1),equipment={weaponId:10,armorId:20,accessoryIds:[30,-1]};
+  const member={characterId:1,visionId:100,equipment,score:100,roles:[],evaluation:{equippedSkillIds:[]}};
+  const state={evaluations:1,cache:new Map(),deadline:Infinity,options:{...options,maxEvaluations:1},reasons:new Set()};
+  let calls=0;
+  const [result]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),{evaluate:()=>{calls++;return {score:0};}},state);
+  assert.equal(calls,0);
+  assert.deepEqual(result.equipment,equipment);
+  assert.ok(state.reasons.has('evaluation budget'));
+});
 test('a slow party simulation cannot run the search past its party time budget',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(6);
   let simulations=0;
