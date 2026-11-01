@@ -2,7 +2,7 @@ import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
 import {createOptimizerController} from './optimizer-controller.js?v=56';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=13';
 import {shareCard, partyImage} from './share-image.js?v=6';
-import {renderSlot, renderPicker, renderAbilityList} from './slot-ui.js?v=6';
+import {renderSlot, renderPicker, renderAbilityList, renderAbilityPicker} from './slot-ui.js?v=7';
 import {equippableAbilities, abilityLoad, canEquip, validateAbilities, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=5';
 import {describeItem, describeAbility} from './piece-details.js?v=2';
 import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=1';
@@ -152,6 +152,7 @@ function setDraft() {
   const build = plans[ui.charId] || saved?.equipment;
   draft = build ? C.withLocks(withAbilities(build, saved), build.accessoryIds.length) : null;
   if (draft) {
+    draft.equippedSkillIds = [...(build.equippedSkillIds ?? saved?.equippedSkillIds ?? [])];
     for (const slot of ['vision', 'weapon', 'armor']) if (!(Number(draft[slot + 'Id']) > 0)) draft.locks[slot] = false;
     draft.locks.accessories = draft.accessoryIds.map((id, i) => Number(id) > 0 && !!draft.locks.accessories[i]);
   }
@@ -453,8 +454,8 @@ function characters() {
   const warning = C.validPlan(catalog, snapshot, ui.charId, draft, plans, ui.reserve)
     || validateAbilities(draft.equippedSkillIds || [], learnedFor(draft.visionId), index);
   const basis = b => JSON.stringify(C.withLocks(withAbilities(b, saved), draft.accessoryIds.length));
-  const isPlan = plans[ui.charId] && JSON.stringify(draft) === basis(plans[ui.charId]);
-  const changed = JSON.stringify(draft) !== basis(plans[ui.charId] || saved.equipment);
+  const isPlan = plans[ui.charId] && basis(draft) === basis(plans[ui.charId]);
+  const changed = basis(draft) !== basis(plans[ui.charId] || saved.equipment);
 
   const equip = `<section class="window equip">
     <div class="loadout-head"><div><h3>Loadout</h3><p class="dim small">Edit a piece, or lock it to keep it when building.</p></div>
@@ -561,8 +562,15 @@ function equipTabs(native, v, available) {
   const learned = learnedFor(draft.visionId), ids = draft.equippedSkillIds || [];
   const abilities = learned ? equippableAbilities(learned, index) : [];
   let body;
-  if (ui.charTab === 'abilities') body = learned ? renderAbilityList({ abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: draft.locks.skillIds,
-    filters: ui.abilityFilters, reasons: Object.fromEntries(abilities.filter(a => !ids.includes(a.id)).map(a => [a.id, canEquip(a.id, ids, learned, index)]).filter(([, why]) => why)) }) : '<p class="dim">Abilities unavailable.</p>';
+  if (ui.charTab === 'abilities') {
+    const options = learned && { abilities, equippedIds: ids, load: abilityLoad(ids, learned, index), lockedIds: draft.locks.skillIds };
+    body = options ? renderAbilityList({...options, openSlot: ui.openSlot}) : '<p class="dim">Abilities unavailable.</p>';
+    if (options && ui.openSlot?.startsWith('skill:')) {
+      const slotIndex = +ui.openSlot.slice(6), remaining = ids.filter((_, n) => n !== slotIndex);
+      body += renderAbilityPicker({...options, slotIndex, filters: ui.abilityFilters,
+        reasons: Object.fromEntries(abilities.map(a => [a.id, canEquip(a.id, remaining, learned, index)]).filter(([, why]) => why))});
+    }
+  }
   else if (ui.charTab === 'skills') body = v ? `<ul class="skills">${unlocked.map(s => skillItem(s, true)).join('') || '<li class="dim">Nothing unlocked yet.</li>'}</ul>` : '<p class="dim">No Resonance equipped.</p>';
   else if (ui.charTab === 'items') body = `<input type="search" id="gear-q" data-key="gear-q" placeholder="Search equipment or effects" value="${h(ui.gearQ)}" aria-label="Search equipment">
     <table><thead><tr><th>Item</th><th>Free</th><th>Stats</th></tr></thead><tbody>
@@ -570,7 +578,7 @@ function equipTabs(native, v, available) {
     </tbody></table>`;
   else body = `<ul class="skills">${passiveIds.map(id => `<li><b>${h(name('passives', id))}</b><p>${h(index.passives.get(id)?.desc ?? '')}</p></li>`).join('') || '<li class="dim">This gear has no special effects.</li>'}</ul>
 `;
-  return `${tabs('charTab', [['abilities', `Abilities (${ids.length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${h(v.name)} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
+  return `${tabs('charTab', [['abilities', `Abilities (${ids.filter(id => id > 0).length})`], ['effects', `Gear effects (${passiveIds.length})`], ['skills', v ? `${h(v.name)} skills (${unlocked.length})` : 'Resonance skills'], ['items', `All equipment (${inv.length})`]])}${body}`;
 }
 
 // ---------- resonances ----------
@@ -753,7 +761,7 @@ function render() {
     `<li><button type="button" data-view="${id}" ${id === view ? 'aria-current="page"' : ''}>${label}</button></li>`).join('')}</ul></nav>${RENDER[view]()}`;
   for (const d of document.querySelectorAll('details[data-keep]')) if (keepOpen.has(d.dataset.keep)) d.open = true;
   const picker = $('#slot-picker');
-  if (picker) { picker.showModal(); $('#slot-q').value = ui.slotQ; filterPicker(); picker.scrollTop = pickerScroll; }
+  if (picker) { picker.showModal(); if ($('#slot-q')) { $('#slot-q').value = ui.slotQ; filterPicker(); } picker.scrollTop = pickerScroll; }
   const target = key && [...document.querySelectorAll('[data-key]')].find(e => e.dataset.key === key);
   if (target) { target.focus({ preventScroll: true }); if (sel != null && target.type === 'search') target.setSelectionRange(sel, sel); }
   if (!picker) $('.pick [aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
@@ -851,14 +859,26 @@ document.addEventListener('click', e => {
   if (t.dataset.char) { if (+t.dataset.char !== ui.charId) go(() => { cancelDeep(); ui.deep = null; ui.charId = +t.dataset.char; setDraft(); }, t); return; }
   if (t.hasAttribute('data-close-picker')) { closePicker(); return; }
   if (t.dataset.openSlot) { ui.openSlot = t.dataset.openSlot; ui.slotQ = ''; render(); return; }
+  if (t.dataset.pickAbility) {
+    const slotIndex = +ui.openSlot?.slice(6), ids = [...(draft.equippedSkillIds || [])], id = +t.dataset.pickAbility;
+    const learned = learnedFor(draft.visionId);
+    if (!ui.openSlot?.startsWith('skill:') || !learned || !Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= learned.maxSkillSlots) return;
+    const previous = ids[slotIndex], remaining = ids.filter((_, n) => n !== slotIndex);
+    if (id > 0 && (remaining.includes(id) || canEquip(id, remaining, learned, index))) return;
+    cancelDeep(); ui.deep = null;
+    while (ids.length <= slotIndex) ids.push(-1);
+    ids[slotIndex] = id; draft.equippedSkillIds = ids;
+    draft.locks.skillIds = draft.locks.skillIds.map(x => x === previous ? id : x).filter(x => x > 0);
+    closePicker(); return;
+  }
   if (t.dataset.pickSlot) {
     const key = t.dataset.pickSlot, id = +t.dataset.id; cancelDeep(); ui.deep = null; ui.openSlot = null;
     if (key === 'vision') {
       draft.visionId = id;
       const learned = learnedFor(id);
       if (learned) {
-        const { kept, dropped } = dropUnavailable(draft.equippedSkillIds || [], learned);
-        draft.equippedSkillIds = kept; draft.locks.skillIds = draft.locks.skillIds.filter(x => kept.includes(x));
+        const ids = draft.equippedSkillIds || [], { kept, dropped } = dropUnavailable(ids.filter(x => x > 0), learned);
+        draft.equippedSkillIds = ids.map(x => kept.includes(x) ? x : -1); draft.locks.skillIds = draft.locks.skillIds.filter(x => kept.includes(x));
         if (dropped.length) toast(`Removed ${dropped.map(d => describeAbility(d, index)?.name ?? d).join(', ')}: not available with this Resonance.`);
       }
     }
@@ -878,13 +898,6 @@ document.addEventListener('click', e => {
     if (key.startsWith('skill:')) { const id = +key.slice(6); lk.skillIds = lk.skillIds.includes(id) ? lk.skillIds.filter(x => x !== id) : [...lk.skillIds, id]; }
     else if (key.startsWith('accessory:')) lk.accessories[+key.slice(10)] = !lk.accessories[+key.slice(10)];
     else lk[key] = !lk[key];
-    render(); return;
-  }
-  if (t.dataset.abilityToggle) {
-    cancelDeep(); ui.deep = null;
-    const id = +t.dataset.abilityToggle, ids = draft.equippedSkillIds || [], learned = learnedFor(draft.visionId);
-    if (ids.includes(id)) { draft.equippedSkillIds = ids.filter(x => x !== id); draft.locks.skillIds = draft.locks.skillIds.filter(x => x !== id); }
-    else if (learned && !canEquip(id, ids, learned, index)) draft.equippedSkillIds = [...ids, id];
     render(); return;
   }
   if (t.id === 'deep') { deepSearch(); return; }
