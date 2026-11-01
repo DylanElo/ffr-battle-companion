@@ -2,6 +2,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const core = require('../docs/core.js');
 
+test('ordinary action eligibility accepts native high-accuracy Ultima and excludes attacks below 100',()=>{
+  const ultima=require('../docs/data/catalog.json').skills.find(skill=>skill.id===220340);
+  assert.equal(ultima.name,'Ultima');
+  assert.equal(ultima.accuracy,500);
+  assert.equal(core.isOrdinaryAttack(ultima),true);
+  assert.equal(core.isOrdinaryAttack({...ultima,accuracy:100}),true);
+  assert.equal(core.isOrdinaryAttack({...ultima,accuracy:99}),false);
+});
+
 test('equipped-only stock is shared without double counting inventory totals or unrecruited defaults',()=>{
   const snapshot={inventory:[{id:1,quantity:2}],characters:[
     {id:1,joinStatus:'Join',usable:true,equipment:{weaponId:1,accessoryIds:[2]}},
@@ -205,6 +214,10 @@ test('normalizeGoal defaults and clamps', () => {
   assert.equal(n({incomingDamage: '12.9'}).incomingDamage, 12);
   assert.equal(n({}).incomingType, 'Physic');
   assert.equal(n({incomingType: 'Magic'}).incomingType, 'Magic');
+  assert.equal(n({actionId:'42'}).actionId,42);
+  assert.equal(n({actionId:Infinity}).actionId,0);
+  assert.deepEqual(n({requirements:{minHp:'6000.9',survive:true,element:'Water'}}).requirements,{minHp:6000,survive:true,element:'Water'});
+  assert.deepEqual(n({requirements:{minHp:-1,survive:'yes',element:'bogus'}}).requirements,{minHp:0,survive:false,element:''});
 });
 
 test('stockForSlot reserves other draft accessories but releases the slot being replaced',()=>{

@@ -11,12 +11,12 @@ test('single worker checkpoints only improving owned, unreserved completed candi
     scenario:{rounds:5},evidence:{formula:'Native arithmetic'},globalWarnings:['Known limitation']};
   const candidates=[
     {visionId:100,score:10},{visionId:101,score:500},{visionId:999,score:1000},
-    {visionId:100,score:9},{visionId:100,score:10},{visionId:102,score:11},
+    {visionId:100,score:9},{visionId:100,score:10},{visionId:100,score:10,cost:5},{visionId:102,score:11},
     {visionId:102,score:NaN},{visionId:-1,score:12},
-  ].map(row=>({...row,characterId:1,equipment:{weaponId:10,accessoryIds:[]},evaluation:{valid:true,skillId:1,equippedSkillIds:[5],warnings:['Known limitation','Local warning']}}));
+  ].map(row=>({...row,characterId:1,equipment:{weaponId:10,accessoryIds:[]},evaluation:{valid:true,skillCost:row.cost ?? 10,skillId:1,equippedSkillIds:[5],warnings:['Known limitation','Local warning']}}));
   const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
     self:{postMessage:message=>messages.push(message)},CompanionBattle:{createModel:(c,s,e,options)=>{modelOptions=options;return model;}},
-    CompanionSearch:{buildCandidates:(c,s,id,callbacks)=>{
+    CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:(c,s,id,callbacks)=>{
       for(const candidate of candidates){callbacks.candidate(candidate);assert.equal(evaluated,0,'A checkpoint cannot trigger another model evaluation');}
       return [];
     },finalizeBuilds:()=>[]}};
@@ -25,8 +25,9 @@ test('single worker checkpoints only improving owned, unreserved completed candi
     snapshot:{characters:[{id:1,equipment:{visionId:100}}],resonances:[{id:100},{id:101},{id:102}]},
     characterId:1,enemyId:1,taken:[101],available:[],options:{timeMs:1}}});
   const checkpoints=messages.filter(message=>message.type==='checkpoint');
-  assert.deepEqual(checkpoints.map(message=>message.result.results[0].score),[10,11,12]);
-  assert.deepEqual(checkpoints.map(message=>message.result.results[0].visionId),[100,102,-1]);
+  assert.deepEqual(checkpoints.map(message=>message.result.results[0].score),[10,10,11,12]);
+  assert.deepEqual(checkpoints.map(message=>message.result.results[0].visionId),[100,100,102,-1]);
+  assert.equal(checkpoints[1].result.results[0].evaluation.skillCost,5);
   assert.equal(checkpoints.every(message=>message.id===77),true);
   assert.equal(checkpoints[0].result.before,null);
   assert.equal(checkpoints[0].result.current,null);
@@ -60,7 +61,7 @@ test('single worker completes equipment alternatives before ranking and deduplic
   const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
     self:{postMessage:m=>messages.push(m)},CompanionBattle:{GENERAL_ENEMY_ID:'general',createModel:()=>({evaluate:()=>({valid:true}),explainAbilities:()=>[],
       scenario:{rounds:7},evidence:{formula:'Native arithmetic'},globalWarnings:['Active artifact effects are not modeled.']})},
-    CompanionSearch:{buildCandidates:()=>candidates,finalizeBuilds:(c,s,[x])=>{
+    CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:()=>candidates,finalizeBuilds:(c,s,[x])=>{
       finalized.push(x.equipment.weaponId);return [{...x,score:x.equipment.weaponId===11?199:x.score}];
     }}};
   vm.runInNewContext(source,context);
@@ -81,7 +82,7 @@ test('single worker compares the pre-Build draft with its exact fixed abilities 
   const model={evaluate:args=>{evaluated.push(args);return {valid:true,damage:args.equipment.weaponId};},explainAbilities:()=>[]};
   const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
     self:{postMessage:m=>messages.push(m)},CompanionBattle:{createModel:()=>model},
-    CompanionSearch:{buildCandidates:()=>[],finalizeBuilds:()=>[]}};
+    CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:()=>[],finalizeBuilds:()=>[]}};
   vm.runInNewContext(source,context);
   const baseline={weaponId:77,visionId:100,accessoryIds:[3],equippedSkillIds:[8,9]};
   await context.self.onmessage({data:{id:1,mode:'single',catalog:{enemies:[{id:1}]},
@@ -117,7 +118,7 @@ async function run({party=[1,2,3,4],invalid=[],partySize=4,partyState={}}={}){
   };
   const context={importScripts:()=>{},performance:{now:()=>0},
     fetch:async()=>({ok:true,json:async()=>({})}),self:{postMessage:message=>messages.push(message)},
-    CompanionBattle:{createModel:()=>model},CompanionSearch:{rankParties:()=>({results:[{
+    CompanionBattle:{createModel:()=>model},CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,rankParties:()=>({results:[{
       members:[{characterId:1,equipment:{},evaluation:{remainingMp:99,remainingHp:100,mpExhaustedRounds:[5],common:{attack:77},damage:10,resourceEvents:[{round:1,skillId:1}],stateLeafResults:[{skillId:1}],overheat:true,demonForm:true}}],
       evaluation:{mpExhaustedRounds:{1:[3,4,5]},remainingMp:{1:0},...partyState}
     }]})}

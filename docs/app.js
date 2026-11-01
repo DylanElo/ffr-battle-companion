@@ -1,5 +1,5 @@
 import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
-import {createOptimizerController} from './optimizer-controller.js?v=58';
+import {createOptimizerController} from './optimizer-controller.js?v=59';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=13';
 import {shareCard, partyImage} from './share-image.js?v=6';
 import {renderSlot, renderPicker, renderAbilityList, renderAbilityPicker} from './slot-ui.js?v=7';
@@ -8,6 +8,7 @@ import {describeItem, describeAbility} from './piece-details.js?v=2';
 import {readWorkspace, workspaceChoices, rememberWorkspace, revalidateWorkspace} from './workspace.js?v=2';
 import {renderResultExplanations} from './result-explanations.js?v=2';
 import {renderUnlockRecommendations} from './unlock-ui.js?v=2';
+import {buildMetric,renderBuildRequest,renderRequirementChecks} from './build-goal-ui.js?v=1';
 
 const C = globalThis.Companion;
 const $ = s => document.querySelector(s);
@@ -310,10 +311,10 @@ function takenVisions() {
 
 // Full search: the party engine for one character against one enemy (Resonance, gear, attack,
 // abilities and passives), scored on predicted damage or stagger. Runs in the search worker.
-let deepWorker = null, deepRun = 0, deepTimer = null;
+let deepWorker = null, deepRun = 0, deepTimer = null, deepStop = null;
 let unlockWorker = null, unlockRun = 0;
 function cancelUnlockSearch() { unlockRun++; unlockWorker?.terminate(); unlockWorker = null; ui.unlocks = null; }
-function cancelDeep() { deepRun++; clearTimeout(deepTimer); deepTimer = null; deepWorker?.terminate(); deepWorker = null; cancelUnlockSearch(); }
+function cancelDeep() { deepRun++; clearTimeout(deepTimer); deepTimer = null; deepStop = null; deepWorker?.terminate(); deepWorker = null; cancelUnlockSearch(); }
 
 function findUnlocks() {
   if (!draft || ui.deep?.busy) return;
@@ -323,7 +324,7 @@ function findUnlocks() {
   if (refusal) { ui.unlocks = {error: refusal}; render(); return; }
   const id = unlockRun, charId = ui.charId, g = goalFor(charId);
   ui.unlocks = {busy: true, progress: 'Checking your owned Resonances…'};
-  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=55', import.meta.url));
+  const worker = unlockWorker = new Worker(new URL('./optimizer-worker.js?v=56', import.meta.url));
   worker.onmessage = e => {
     if (id !== unlockRun || e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.unlocks.progress = e.data.message;
@@ -349,13 +350,30 @@ function deepSearch() {
   const beforeReason = C.validPlan(catalog, snapshot, charId, before, plans, ui.reserve)
     || validateAbilities(before.equippedSkillIds || [], learnedFor(before.visionId), index);
   const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
-  ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=55', import.meta.url));
-  let checkpoint = null;
-  const finish = result => {
+  ui.deep = { busy: true, progress: 'Starting…', before, beforeReason, enemyId, goals, pinned, request: g, pick: 0 };
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=56', import.meta.url));
+  let checkpoint = null, previewAt = 0;
+  const finish = (result,status='ready') => {
     ui.deep = { results: result.results, current: result.current, before, beforeReason, beforeEvaluation: result.before,
-      scenario: result.scenario, evidence: result.modelEvidence, pick: 0, enemyId, goals, pinned };
+      scenario: result.scenario, evidence: result.modelEvidence, pick: 0, enemyId, goals, pinned, request: g, status,
+      note:result.results.length?'':'No completed build matched this request within the search budget. Try relaxing a requirement or locking fewer pieces.' };
     cancelDeep(); if (ui.deep.results.length) applyDeep(0); render();
+  };
+  const fail = message => {
+    if (checkpoint) {
+      const member=checkpoint.results[0];
+      member.evaluation={...member.evaluation,searchTruncated:true,warnings:[...(member.evaluation.warnings || []),`Search interrupted: ${message} Using the best completed legal build.`]};
+      finish(checkpoint,'limited');
+      ui.deep.error=message; render();
+    } else { ui.deep={error:message}; cancelDeep(); render(); }
+  };
+  deepStop = () => {
+    if (checkpoint) {
+      const member=checkpoint.results[0];
+      member.evaluation={...member.evaluation,searchTruncated:true,warnings:[...(member.evaluation.warnings || []),'Search stopped early; using the best completed legal build.']};
+      finish(checkpoint,'stopped');
+    }
+    else { ui.deep = {note: 'Stopped before a build completed. Your draft is unchanged.'}; cancelDeep(); render(); }
   };
   // A stalled worker or data request must not leave Build running indefinitely.
   deepTimer = setTimeout(() => {
@@ -363,7 +381,7 @@ function deepSearch() {
     if (checkpoint) {
       const member = checkpoint.results[0];
       member.evaluation = {...member.evaluation, searchTruncated: true, warnings: [...(member.evaluation.warnings || []), 'Search time limit reached; using the best completed legal build.']};
-      finish(checkpoint);
+      finish(checkpoint,'limited');
     } else {
       ui.deep = {error: 'The search timed out before completing a legal build. Your draft is unchanged. Try again or lock a Resonance to narrow the search.'};
       cancelDeep(); render();
@@ -371,16 +389,21 @@ function deepSearch() {
   }, 12000);
   worker.onmessage = e => {
     if (id !== deepRun || e.data.id !== id || ui.charId !== charId) return;
-    if (e.data.type === 'checkpoint') { checkpoint = e.data.result; return; }
+    if (e.data.type === 'checkpoint') {
+      checkpoint = e.data.result;
+      Object.assign(ui.deep,{results:checkpoint.results,scenario:checkpoint.scenario,evidence:checkpoint.modelEvidence});
+      if (Date.now()-previewAt>=250) { previewAt=Date.now(); render(); }
+      return;
+    }
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;
-    else if (e.data.type === 'error') { ui.deep = { error: e.data.message }; cancelDeep(); }
-    else { finish(e.data.result); return; }
+    else if (e.data.type === 'error') { fail(e.data.message); return; }
+    else { const ev=e.data.result.results?.[0]?.evaluation; finish(e.data.result,ev?.searchTruncated || ev?.jointSearchTruncated?'limited':'ready'); return; }
     render();
   };
-  worker.onerror = e => { if (id === deepRun) { ui.deep = { error: e.message || 'The search couldn’t start.' }; cancelDeep(); render(); } };
+  worker.onerror = e => { if (id === deepRun && ui.charId === charId) fail(e.message || 'The search couldn’t start.'); };
   worker.postMessage({ id, mode: 'single', catalog, snapshot, characterId: charId, enemyId, baseline: beforeReason ? null : before, taken: [...takenVisions()],
     available: [...C.stock(snapshot, charId, plans, ui.reserve)],
-    options: { goals, difficulty: 'save', mpPercent: 100, incomingDamage: g.incomingDamage, incomingType: g.incomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
+    options: { goals, actionId:g.actionId,requirements:g.requirements,difficulty: 'save', mpPercent: 100, incomingDamage: g.incomingDamage, incomingType: g.incomingType, broken: false, critical: false, minHealers: 0, minProtectors: 0,
       perLoadoutBudget: 250, candidatesPerVision: 4, maxEvaluations: 5000, timeMs: 8000, visionSlices: true,
       visionIds: pins.visionIds, locks: pins.locks } });
   render();
@@ -486,14 +509,28 @@ function characters() {
     ${warning ? `<p class="note">${h(warning)}</p>` : ''}
   </section>`;
   const result = deepResult(), evaluation = ui.deep?.results?.[ui.deep.pick]?.evaluation;
-  const resultSummary = evaluation ? `Build ready · ${Math.round(evaluation.fightDamage ?? evaluation.damage ?? 0).toLocaleString()} estimated damage per round` : 'Build results';
+  const resultSummary = evaluation ? `${ui.deep.busy?'Best so far':ui.deep.status==='stopped'?'Stopped · best found':ui.deep.status==='limited'?'Search limit · best found':'Build ready'} · ${buildMetric(evaluation,ui.deep.goals)}` : 'Build results';
   return `<div class="chars">${roster}<div class="character-workspace">${card}<section class="window build-controls">${deepPanel(native)}</section>
-    ${result ? `<details class="window build-analysis" data-keep="build-analysis"><summary>${h(resultSummary)} <span class="dim small">— View details</span></summary>${result}</details>` : ''}
+    ${result ? `<details class="window build-analysis" data-keep="build-analysis"><summary data-key="build-analysis">${h(resultSummary)} <span class="dim small">— View details</span></summary>${result}</details>` : ''}
     <div class="loadout-grid">${equip}<section class="window ability-panel" aria-label="Abilities and effects">${equipTabs(native, v, available)}</section></div>
     ${renderUnlockRecommendations({state: ui.unlocks, indexes: index, parameterNames: globalThis.CompanionStats.parameterNames, buildBusy: !!ui.deep?.busy})}</div></div>${picker}`;
 }
 
 // The one build tool: Resonance (or the one you locked), gear, attack, abilities and passives, searched together.
+const buildActionCache = new WeakMap();
+function knownBuildActions() {
+  let cache=buildActionCache.get(snapshot);
+  if(!cache){cache=new Map();buildActionCache.set(snapshot,cache);}
+  if(cache.has(ui.charId))return cache.get(ui.charId);
+  const ids=new Set();
+  for(const visionId of [-1,...snapshot.resonances.map(row=>row.id)]){
+    const learned=globalThis.CompanionStats.learned(catalog,snapshot,ui.charId,visionId);
+    for(const id of [...learned.freeActiveIds,...learned.learnedActiveIds,...learned.masterSkillIds.flatMap(id=>index.masterSkills.get(id)?.grants?.activeIds || [])])ids.add(id);
+  }
+  const actions=[...ids].map(id=>index.skills.get(id)).filter(C.isOrdinaryAttack)
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  cache.set(ui.charId,actions);return actions;
+}
 function deepPanel(native) {
   const g = goalFor(ui.charId), d = ui.deep || {}, busy = !!d.busy, locked = draft.locks.vision && Number(draft.visionId) > 0;
   const enemies = catalog.enemies.filter(e => e.isBoss).sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
@@ -501,6 +538,7 @@ function deepPanel(native) {
     <div class="build-intro"><h3>Build ${h(native.name)}</h3><p class="dim small">Fill unlocked slots with your owned gear and abilities.</p></div>
     <div class="chips" role="group" aria-label="Build for">${[['damage', 'Damage'], ['stagger', 'Stagger'], ['limit', 'Limit Burst'], ['durability', 'Durability']].map(([id, label]) =>
       `<label class="chip-check"><input type="checkbox" name="deep-goal" value="${id}" ${g.goals.includes(id) ? 'checked' : ''} ${busy ? 'disabled' : ''}><span>${label}</span></label>`).join('')}</div>
+    ${renderBuildRequest({goal:g,actions:knownBuildActions(),busy})}
     <label class="against"><span class="dim small">Against</span>
       <select id="deep-enemy" ${busy ? 'disabled' : ''}>${opt('general', 'Any fight (a typical boss at your level)', g.enemyId === 'general')}${enemies.map(e => opt(e.id, `${e.name} (Lv ${e.level})`, e.id === g.enemyId)).join('')}</select></label>
     <details data-keep="deep-advanced"><summary>Expert scenario</summary>
@@ -509,9 +547,10 @@ function deepPanel(native) {
       <label class="small">Hit type <select id="deep-incoming-type" ${busy ? 'disabled' : ''}>${[['Physic','Physical'],['Magic','Magic']].map(([value,label])=>opt(value,label,g.incomingType===value)).join('')}</select></label>
     </details>
     ${locked ? `<p class="dim small">Builds around ${h(name('visions', draft.visionId))}.</p>` : ''}
-    <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.progress)}</span><button type="button" id="deep-cancel">Cancel</button>`
-      : `<button type="button" class="primary" id="deep">Build</button><button type="button" id="saved-gear">Reset</button>${d.before && d.results?.length ? `<button type="button" id="restore-build" ${d.restored ? 'disabled' : ''}>Restore pre-Build draft</button>${d.restored ? '<button type="button" id="retry-build">Try selected result</button>' : ''}` : ''}`}</div>
+    <div class="toolbar">${busy ? `<span class="dim small" role="status">${h(d.results?.length?'A completed build is available below.':d.progress)}</span><button type="button" id="deep-cancel" data-key="deep-cancel">${d.results?.length?'Stop and keep best':'Stop'}</button>`
+      : `<button type="button" class="primary" id="deep" data-key="deep-cancel">Build</button><button type="button" id="saved-gear">Reset</button>${d.before && d.results?.length ? `<button type="button" id="restore-build" ${d.restored ? 'disabled' : ''}>Restore pre-Build draft</button>${d.restored ? '<button type="button" id="retry-build">Try selected result</button>' : ''}` : ''}`}</div>
     ${d.error ? `<p class="bad small" role="alert">${h(d.error)}</p>` : ''}
+    ${d.note ? `<p class="dim small" role="status">${h(d.note)}</p>` : ''}
   </div>`;
 }
 
@@ -520,24 +559,26 @@ function deepResult() {
   const d = ui.deep;
   if (!d?.results) return '';
   const against = d.enemyId === 'general' ? 'any fight' : name('enemies', d.enemyId);
-  if (!d.results.length) return `<div class="deep-result"><p>${d.pinned ? 'Nothing fits with your pinned pieces.' : `No usable attack was found against ${h(against)}.`}</p></div>`;
+  if (!d.results.length) return `<div class="deep-result"><p>${d.request?.actionId || Object.values(d.request?.requirements || {}).some(Boolean)?'No build meeting this action and all requirements was found within the search budget. Try relaxing a requirement or locking fewer pieces.':d.pinned ? 'Nothing fits with your pinned pieces.' : `No usable attack was found against ${h(against)}.`}</p></div>`;
   const r = d.results[d.pick], ev = r.evaluation, limits = ev.limitUses || [], outOfMp = ev.mpExhaustedRounds || [];
   const n = v => Math.round(Number(v) || 0).toLocaleString();
   const facts = [ev.firstStagger ? `Staggers in round ${ev.firstStagger}` : '', limits.length ? `Limit Burst in round ${limits.map(u => u.round).join(', ')}` : '',
     outOfMp.length ? `Out of MP from round ${Math.min(...outOfMp)}` : ''].filter(Boolean);
   const alwaysOn = alwaysOnList(r, index);
-  return `<div class="deep-result" aria-busy="false">
+  return `<div class="deep-result" aria-busy="${!!d.busy}">
     ${d.results.length > 1 ? `<div class="tabs" role="tablist">${d.results.map((x, i) => `<button type="button" role="tab" aria-selected="${i === d.pick}" data-deep-pick="${i}">${i ? `Option ${i + 1}` : 'Top result'}</button>`).join('')}</div>` : ''}
     <div class="deep-head">${enemyFace(d.enemyId, 'sm')}<span>vs ${h(against)}</span>
-      <span class="deep-num"><b>${n(ev.fightDamage ?? ev.damage)}</b> damage per round</span></div>
+      <span class="deep-num"><b>${h(buildMetric(ev,d.goals))}</b></span></div>
+    ${renderRequirementChecks(ev,d.request)}
+    ${d.status==='stopped'?'<p class="note">Stopped early. This is the best completed build found before you stopped.</p>':''}
     ${renderResultExplanations({evaluation: ev, scenario: d.scenario, enemyName: against, goals: d.goals, pinned: d.pinned, evidence: d.evidence})}
     ${buildComparison(d, r)}
     <div class="member-hit">${moveDetails(ev, index)}</div>
     ${facts.length ? `<p class="dim small">${h(facts.join(' · '))}</p>` : ''}
     <h5>Abilities <span class="dim">${n(ev.skillCost)} / ${n(ev.skillBudget)} AP</span></h5>${abilityList(r, index)}
     ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
-    <p class="dim small">${d.restored ? 'Your pre-Build draft is restored. The comparison still shows the selected result.' : 'The Resonance and gear below are filled in. Keep them as a plan to equip them.'}</p>
-    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord">Copy image</button></div>
+    <p class="dim small">${d.busy?'Search is still running. Stop to use this completed build, or let the search continue. Your draft has not changed.':d.restored ? 'Your pre-Build draft is restored. The comparison still shows the selected result.' : 'The Resonance and gear below are filled in. Keep them as a plan to equip them.'}</p>
+    <div class="toolbar"><button type="button" class="ghost" id="share-build" title="A picture of this build to paste into Discord"${d.busy?' disabled':''}>Copy image</button></div>
   </div>`;
 }
 
@@ -930,7 +971,7 @@ document.addEventListener('click', e => {
   }
   if (t.id === 'retry-build' && ui.deep?.results?.length) { applyDeep(ui.deep.pick); render(); return; }
   if (t.id === 'share-build') { shareBuild(); return; }
-  if (t.id === 'deep-cancel') { cancelDeep(); ui.deep = null; render(); return; }
+  if (t.id === 'deep-cancel') { if(deepStop)deepStop(); else {cancelDeep();ui.deep=null;render();} return; }
   if (t.dataset.deepPick) { applyDeep(+t.dataset.deepPick); render(); return; }
   if (t.dataset.plan) {
     const v = index.visions.get(+t.dataset.plan);
@@ -985,6 +1026,11 @@ document.addEventListener('change', e => {
   else if (t.id === 'next-enemy') { if (t.value !== 'general') ui.enemyId = +t.value; optimizerController.setAgainst(t.value === 'general' ? 'general' : 'enemy'); }
   else if (t.id === 'deep-incoming-damage') { setGoal(ui.charId, { incomingDamage: t.value }); cancelDeep(); ui.deep = null; }
   else if (t.id === 'deep-incoming-type') { setGoal(ui.charId, { incomingType: t.value }); cancelDeep(); ui.deep = null; }
+  else if (t.id === 'deep-action') { setGoal(ui.charId, {actionId:+t.value}); cancelDeep(); ui.deep=null; }
+  else if (['deep-min-hp','deep-element','deep-survive'].includes(t.id)) {
+    const key={'deep-min-hp':'minHp','deep-element':'element','deep-survive':'survive'}[t.id];
+    setGoal(ui.charId,{requirements:{...goalFor(ui.charId).requirements,[key]:key==='survive'?t.checked:t.value}}); cancelDeep(); ui.deep=null;
+  }
   else if (t.id === 'deep-enemy') { cancelDeep(); ui.deep = null; setGoal(ui.charId, { enemyId: t.value === 'general' ? 'general' : +t.value }); }
   else return;
   render();

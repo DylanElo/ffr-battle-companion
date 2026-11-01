@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=26', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=42', 'search.js?v=34', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=27', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=43', 'search.js?v=35', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -25,16 +25,17 @@ self.onmessage = async event => {
     options.evaluationTimeMs=500;
     if(event.data.mode==='single'){options.seedEvaluationTimeMs=80;options.jointOptimization=true;}
     const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:true,fillAbilitySlots:event.data.mode==='single',jointOptimization:event.data.mode==='single'});
+    if(model.requestError)throw new Error(model.requestError);
     const start=performance.now();
     if(event.data.mode==='single'){
       // One character: Resonance, gear, and the best attack with its abilities/passives, for damage or stagger.
       // `available` is the item stock left after other characters' reservations; `taken` Resonances are in use elsewhere.
       const taken=new Set(event.data.taken || []);
       const owned=new Set((snapshot.resonances || []).map(row=>row.id));
-      let checkpointScore=-Infinity;
+      let checkpointBest=null;
       const checkpoint=candidate=>{
-        if(taken.has(candidate.visionId) || candidate.visionId>0 && !owned.has(candidate.visionId) || !Number.isFinite(candidate.score) || candidate.score<=checkpointScore)return;
-        checkpointScore=candidate.score;
+        if(taken.has(candidate.visionId) || candidate.visionId>0 && !owned.has(candidate.visionId) || !Number.isFinite(candidate.score) || checkpointBest && CompanionSearch.compareCandidates(candidate,checkpointBest)>=0)return;
+        checkpointBest=candidate;
         const member={...candidate,evaluation:{...candidate.evaluation,warnings:[...new Set([...(model.globalWarnings || []),...(candidate.evaluation.warnings || [])])]}};
         self.postMessage({id,type:'checkpoint',result:{results:[member],before:null,current:null,scenario:model.scenario,modelEvidence:model.evidence}});
       };
@@ -44,10 +45,10 @@ self.onmessage = async event => {
       const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options,candidate:checkpoint},
         options,available);
       // shortcut: complete a bounded shortlist; increase candidate budgets for a wider comparison.
-      const completed=candidates.filter(c=>!taken.has(c.visionId)).sort((a,b)=>b.score-a.score)
+      const completed=candidates.filter(c=>!taken.has(c.visionId)).sort(CompanionSearch.compareCandidates)
         .slice(0,Math.max(3,3*(options.candidatesPerVision || 6)))
         .map(c=>CompanionSearch.finalizeBuilds(catalog,snapshot,[c],available,{evaluate,enemy,options})[0])
-        .sort((a,b)=>b.score-a.score);
+        .sort(CompanionSearch.compareCandidates);
       const seen=new Set(),results=[];
       for(const c of completed){
         const key=`${c.visionId}:${c.evaluation.skillId}`;
@@ -55,7 +56,7 @@ self.onmessage = async event => {
         seen.add(key);results.push(c);
         if(results.length===3)break;
       }
-      results.sort((a,b)=>b.score-a.score);
+      results.sort(CompanionSearch.compareCandidates);
       for(const member of results){
         member.evaluation={...member.evaluation,warnings:[...new Set([...(model.globalWarnings || []),...(member.evaluation.warnings || [])])]};
         member.abilityReasons=Date.now()<options.deadline?model.explainAbilities(member):[];

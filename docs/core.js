@@ -74,6 +74,13 @@
     }
     return {fit, attacks};
   }
+  function isOrdinaryAttack(skill) {
+    if(!skill)return false;
+    const accuracy=Number(skill.accuracy),mag=Number(skill.mag);
+    return skill.relation==='Enemies' && clean(skill.parameterVariationType)==='Decrease' && clean(skill.parameterType)==='HitPoint' &&
+      (Number.isFinite(accuracy)?accuracy:100)>=100 && Number.isFinite(mag) && mag>0 &&
+      ['Physic','Magic','EscapeNum','SameLevel','GoodLuck'].includes(clean(skill.calcType)) && !['FinishBlow','LimitBurst','Summon','ThrowMoney'].includes(clean(skill.attr));
+  }
   function eligible(item, character, slot) {
     if (!item || !character) return false;
     const sex = clean(item.sexLimit);
@@ -292,10 +299,15 @@
   function normalizeGoal(raw,bossIds=[]) {
     const goals=GOAL_IDS.filter(g=>Array.isArray(raw?.goals)&&raw.goals.includes(g));
     const dmg=Math.trunc(Number(raw?.incomingDamage));
+    const actionId=Number(raw?.actionId),minHp=Math.trunc(Number(raw?.requirements?.minHp));
+    const element=raw?.requirements?.element;
     return {goals:goals.length?goals:['damage'],enemyId:raw?.enemyId!=='general'&&bossIds.includes(Number(raw?.enemyId))?Number(raw.enemyId):'general',
-      incomingDamage:Number.isFinite(dmg)?Math.max(0,Math.min(99999999,dmg)):0,incomingType:raw?.incomingType==='Magic'?'Magic':'Physic'};
+      incomingDamage:Number.isFinite(dmg)?Math.max(0,Math.min(99999999,dmg)):0,incomingType:raw?.incomingType==='Magic'?'Magic':'Physic',
+      actionId:Number.isSafeInteger(actionId)&&actionId>0?actionId:0,
+      requirements:{minHp:Number.isFinite(minHp)?Math.max(0,Math.min(99999999,minHp)):0,survive:raw?.requirements?.survive===true,
+        element:['None','Fire','Ice','Thunder','Water','Wind','Earth','Light','Dark'].includes(element)?element:''}};
   }
-  const api={normalizeGoal,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,ownedStock,stock,stockForSlot,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
+  const api={normalizeGoal,isOrdinaryAttack,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,ownedStock,stock,stockForSlot,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
