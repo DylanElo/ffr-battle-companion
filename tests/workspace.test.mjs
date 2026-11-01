@@ -26,6 +26,15 @@ test('keeps legal plans, pins and normalized goals without mutating the old work
   assert.deepEqual(workspace, before);
 });
 
+test('kept plans retain empty ability slots when reloaded or copied', () => {
+  const workspace = {plans: {1: plan(10, {equippedSkillIds: [-1, 5]})}};
+  const result = revalidateWorkspace(workspace, fixture());
+  assert.deepEqual(result.plans[1].equippedSkillIds, [-1, 5]);
+  assert.deepEqual(result.issues, []);
+  result.plans[1].equippedSkillIds[0] = 5;
+  assert.deepEqual(workspace.plans[1].equippedSkillIds, [-1, 5]);
+});
+
 test('valid swaps are checked together rather than against old equipped reservations', () => {
   const result = revalidateWorkspace({plans: {1: plan(20), 2: plan(10)}}, fixture());
   assert.deepEqual(Object.keys(result.plans), ['1', '2']);

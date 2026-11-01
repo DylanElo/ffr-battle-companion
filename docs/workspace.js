@@ -48,7 +48,7 @@ export function rememberWorkspace(storage, source) {
 function planShape(plan) {
   if (!record(plan) || !['weaponId', 'armorId', 'visionId'].every(key => itemId(plan[key])) ||
       !Array.isArray(plan.accessoryIds) || !plan.accessoryIds.every(itemId) ||
-      (plan.equippedSkillIds !== undefined && !abilityIds(plan.equippedSkillIds))) return 'Plan has invalid equipment or abilities.';
+      (plan.equippedSkillIds !== undefined && (!Array.isArray(plan.equippedSkillIds) || !plan.equippedSkillIds.every(id => itemId(id) && id !== 0)))) return 'Plan has invalid equipment or abilities.';
   const locks = plan.locks;
   if (locks !== undefined && (!record(locks) || !['weapon', 'armor', 'vision'].every(key => typeof locks[key] === 'boolean') ||
       !Array.isArray(locks.accessories) || locks.accessories.length !== plan.accessoryIds.length ||
@@ -72,6 +72,7 @@ export function revalidateWorkspace(workspace, { catalog, snapshot, indexes, sta
       try {
         const saved = snapshot.characters.find(c => c.id === id);
         const plan = core.withLocks(withAbilities(raw, saved), raw.accessoryIds.length);
+        plan.equippedSkillIds = [...(raw.equippedSkillIds ?? saved.equippedSkillIds ?? [])];
         reason = validateAbilities(plan.equippedSkillIds, learnedForBuild(stats, catalog, snapshot, id, plan), indexes);
         if (!reason) plans[id] = plan;
       } catch { reason = 'Abilities could not be validated for this build.'; }

@@ -16,8 +16,8 @@ function fixture() {
     ui: {charId: 1, deep: null, reserve: false},
     draft: {weaponId: 10, armorId: 20, accessoryIds: [30], visionId: 100, equippedSkillIds: [],
       locks: {vision: true, weapon: true, armor: true, accessories: [true], skillIds: []}},
-    render() {}, storePlans() {}, setDraft() {}, toast() {}, name: () => 'Fixture', takenVisions: () => [],
-    validateAbilities: () => '', canEquip: () => '', learnedFor: () => ({}), index: {},
+    render() {}, storePlans() {}, setDraft() {}, closePicker() {}, toast() {}, name: () => 'Fixture', takenVisions: () => [],
+    validateAbilities: () => '', canEquip: () => '', learnedFor: () => ({maxSkillSlots: 8}), index: {},
     goalFor: () => ({goals: ['damage'], enemyId: 'general', incomingDamage: 0, incomingType: 'Physic'}),
     setGoal() {}, optimizerController: {setAgainst() {}},
     Worker: class { constructor() { workers.push(this); } postMessage(message) { this.message = message; } terminate() { this.terminated = true; } },
@@ -180,9 +180,10 @@ test('unlock recommendations stay outside the draft and kept plans', () => {
 for (const [label, data] of [
   ['goal change', {change: {name: 'deep-goal', value: 'stagger', checked: true}}],
   ['explicit cancel', {click: {id: 'unlock-cancel'}}],
-  ['ability edit', {click: {dataset: {abilityToggle: '42'}}}],
+  ['ability edit', {click: {dataset: {pickAbility: '42'}}}],
 ]) test(`${label} cancels unlock work and ignores its queued result`, () => {
   const {context, workers, click, change} = fixture();
+  context.ui.openSlot = 'skill:0';
   click({id: 'find-unlocks'});
   const worker = workers.at(-1);
   if (data.change) change(data.change); else click(data.click);
@@ -190,6 +191,40 @@ for (const [label, data] of [
   assert.equal(context.ui.unlocks, null);
   worker.onmessage({data: {id: worker.message.id, type: 'result', result: {results: [{required: 95}]}}});
   assert.equal(context.ui.unlocks, null);
+});
+
+test('ability replacement frees its slot before checking AP and transfers its pin', () => {
+  const {context, click} = fixture();
+  context.ui.openSlot = 'skill:0';
+  context.draft.equippedSkillIds = [10, 20, 30, 40, 50, 60, 70, 80];
+  context.draft.locks.skillIds = [10, 20];
+  context.canEquip = (id, remaining) => { assert.equal(id, 42); assert.deepEqual([...remaining], [20, 30, 40, 50, 60, 70, 80]); return ''; };
+  click({dataset: {pickAbility: '42'}});
+  assert.deepEqual([...context.draft.equippedSkillIds], [42, 20, 30, 40, 50, 60, 70, 80]);
+  assert.deepEqual([...context.draft.locks.skillIds], [42, 20]);
+});
+
+test('emptying and filling a chosen ability slot preserves other positions and clears its pin', () => {
+  const {context, click} = fixture();
+  context.ui.openSlot = 'skill:0';
+  context.draft.equippedSkillIds = [10, 20]; context.draft.locks.skillIds = [10];
+  click({dataset: {pickAbility: '-1'}});
+  assert.deepEqual([...context.draft.equippedSkillIds], [-1, 20]);
+  assert.deepEqual([...context.draft.locks.skillIds], []);
+  context.ui.openSlot = 'skill:7';
+  click({dataset: {pickAbility: '42'}});
+  assert.deepEqual([...context.draft.equippedSkillIds], [-1, 20, -1, -1, -1, -1, -1, 42]);
+});
+
+test('blocked or duplicate ability choices leave the draft intact', () => {
+  const {context, click} = fixture();
+  context.ui.openSlot = 'skill:0'; context.draft.equippedSkillIds = [10, 20];
+  const before = JSON.stringify(context.draft);
+  click({dataset: {pickAbility: '20'}});
+  assert.equal(JSON.stringify(context.draft), before);
+  context.canEquip = () => 'Not enough AP.';
+  click({dataset: {pickAbility: '42'}});
+  assert.equal(JSON.stringify(context.draft), before);
 });
 
 test('unlock search refuses a reserved draft and cannot run alongside Build', () => {

@@ -482,7 +482,11 @@ ul.plain { display: grid; gap: 8px; padding-left: 18px; }
 .slot-current summary { font-size: 13px; }
 .ability-panel .tabs { flex-wrap: wrap; overflow: visible; }
 .ability-panel .tabs button { padding: 6px 8px; font-size: 13px; }
-.ability-section { font-size: 14px; color: var(--dim); margin: 16px 0 8px; }
+.ability-slot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ability-slot-grid .slot { min-width: 0; }
+.ability-slot-grid .slot-head { flex-wrap: wrap; }
+.ability-slot-grid .slot-current { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .ability-slot-grid { grid-template-columns: minmax(0, 1fr); } }
 .ability-head { flex-wrap: wrap; }
 .ability-head strong { min-width: 100px; }
 .ability-head button { font-size: 13px; min-height: 32px; }
