@@ -111,7 +111,7 @@ test('unlock worker routes an isolated preview without invoking the ordinary bui
 });
 
 async function run({party=[1,2,3,4],invalid=[],partySize=4,partyState={}}={}){
-  const messages=[],compared=[];
+  const messages=[],compared=[];let modelOptions;
   const model={
     evaluate:({characterId})=>({valid:!invalid.includes(characterId),damage:10}),
     evaluateParty:members=>{compared.push(members.map(m=>m.characterId));return {damage:members.length*10};},
@@ -119,7 +119,7 @@ async function run({party=[1,2,3,4],invalid=[],partySize=4,partyState={}}={}){
   };
   const context={importScripts:()=>{},performance:{now:()=>0},
     fetch:async()=>({ok:true,json:async()=>({})}),self:{postMessage:message=>messages.push(message)},
-    CompanionBattle:{createModel:()=>model},CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,rankParties:()=>({results:[{
+    CompanionBattle:{createModel:(c,s,e,options)=>{modelOptions=options;return model;}},CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,rankParties:()=>({results:[{
       members:[{characterId:1,equipment:{},evaluation:{remainingMp:99,remainingHp:100,mpExhaustedRounds:[5],common:{attack:77},damage:10,resourceEvents:[{round:1,skillId:1}],stateLeafResults:[{skillId:1}],overheat:true,demonForm:true}}],
       evaluation:{mpExhaustedRounds:{1:[3,4,5]},remainingMp:{1:0},...partyState}
     }]})}
@@ -128,8 +128,17 @@ async function run({party=[1,2,3,4],invalid=[],partySize=4,partyState={}}={}){
   await context.self.onmessage({data:{id:1,catalog:{enemies:[{id:1}]},snapshot:{party,characters:[1,2,3,4].map(id=>({id,equipment:{visionId:-1}}))},enemyId:1,options:{partySize}}});
   const result=messages.find(message=>message.type==='result');
   assert.ok(result,JSON.stringify(messages));
-  return {result:result.result,compared};
+  return {result:result.result,compared,modelOptions};
 }
+
+test('party mode enables joint passive search while retaining required role support',async()=>{
+  const {modelOptions}=await run();
+  assert.equal(modelOptions.jointOptimization,true);
+  assert.equal(modelOptions.includeSupportOptions,true);
+  assert.equal(modelOptions.fillAbilitySlots,false);
+  assert.equal(modelOptions.seedEvaluationTimeMs,80);
+  assert.ok(modelOptions.deadline>Date.now());
+});
 
 test('worker never compares a partially evaluable saved party against a complete recommendation',async()=>{
   const {result,compared}=await run({invalid:[3]});

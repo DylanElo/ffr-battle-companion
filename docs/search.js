@@ -423,38 +423,69 @@
   }
   function rankParties(catalog,snapshot,callbacks) {
     const options=defaults(callbacks.options || {}),state=stateFor(options);
+    const globalDeadline=Number.isFinite(options.deadline)?options.deadline:Infinity;
+    state.deadline=Math.min(globalDeadline,deadlineAfter(options.timeMs));
     if (typeof callbacks.evaluate!=='function') throw new Error('A native-mechanics evaluator is required.');
     if (!Number.isInteger(options.partySize) || options.partySize<1 || options.partySize>8) throw new Error('Party size must be between 1 and 8.');
     const native=new Set(catalog.characters.map(c=>c.id));
-    const people=snapshot.characters.filter(c=>C.joined(c)&&native.has(c.id)).map(c=>c.id);
+    const availablePeople=snapshot.characters.filter(c=>C.joined(c)&&native.has(c.id)).map(c=>c.id);
     const fixed=(options.fixedCharacterIds || []).map(Number);
-    if (fixed.some(id=>!people.includes(id)) || new Set(fixed).size!==fixed.length || fixed.length>options.partySize) throw new Error('Fixed characters must be available, unique, and fit the party.');
+    if (fixed.some(id=>!availablePeople.includes(id)) || new Set(fixed).size!==fixed.length || fixed.length>options.partySize) throw new Error('Fixed characters must be available, unique, and fit the party.');
+    const people=fixed.length===options.partySize?fixed:availablePeople;
     const teams=combinations(people.filter(id=>!fixed.includes(id)),options.partySize-fixed.length).map(ids=>[...fixed,...ids]);
     const results=[],candidateCache=new Map();
     const visionCount=1+catalog.visions.filter(v=>(snapshot.resonances || []).some(o=>o.id===v.id)).length;
     const fairBudget=Math.floor(options.maxEvaluations/Math.max(1,people.length*visionCount*(options.reserveNonParty?teams.length:1)));
     options.perLoadoutBudget=Math.min(options.perLoadoutBudget,Math.max(2,fairBudget));
     // Preserve one saved setup per character; alternative Resonances belong to the bounded search.
-    const seedState=stateFor({...options,timeMs:0}),fallback=new Map();
+    const seedState=stateFor({...options,timeMs:0,deadline:globalDeadline}),fallback=new Map();
     for(const id of people){
       const person=snapshot.characters.find(c=>c.id===id);
-      fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,perLoadoutBudget:0,visionIds:[Number(person.equipment.visionId)]},inventory(snapshot),seedState));
+      fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,jointOptimization:false,perLoadoutBudget:0,visionIds:[Number(person.equipment.visionId)]},inventory(snapshot),seedState));
     }
-    state.cache=seedState.cache;state.evaluations=seedState.evaluations;
+    state.cache=seedState.cache;state.cacheBudgets=seedState.cacheBudgets;state.evaluations=seedState.evaluations;
     let considered=0,teamCount=0,reported=0;
     const progress=(message,force)=>{if(force || Date.now()-reported>=250){reported=Date.now();callbacks.progress?.(message);}};
     const nameOf=id=>catalog.characters.find(c=>c.id===id)?.name || `#${id}`;
     const sumOf=members=>({score:members.reduce((sum,m)=>sum+m.score,0),evaluation:null});
-    const partyScore=(members,samples)=>{
-      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options,...(samples?{samples}:{})});
-      return detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:sumOf(members);
+    const partyScore=(members,samples,deadline=globalDeadline)=>{
+      if(Date.now()>=globalDeadline){state.truncated=true;state.reasons.add('time budget');return null;}
+      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options,deadline:Math.min(globalDeadline,deadline),...(samples?{samples}:{})});
+      return callbacks.evaluateParty?(detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:null):sumOf(members);
     };
     const stockFor=team=>options.reserveNonParty?reserveOutside(snapshot,team,inventory(snapshot)):inventory(snapshot);
+    let checkpointBest=null;
+    const partyCost=result=>result.members.reduce((sum,member)=>sum+(Number(member.evaluation?.skillCost)||0),0);
+    const checkpoint=result=>{
+      if(!Number.isFinite(result.score) || validateParty(catalog,snapshot,result.members,options) ||
+        checkpointBest && (result.score<checkpointBest.score || result.score===checkpointBest.score && partyCost(result)>=partyCost(checkpointBest)))return;
+      checkpointBest={...result,members:result.members.slice()};
+      callbacks.checkpoint?.({results:[checkpointBest]});
+    };
+    const baselineIds=(snapshot.party || []).filter(id=>people.includes(id)).slice(0,options.partySize);
+    let baseline=null;
+    // Establish a fully simulated stock-safe incumbent before spending time on alternative gear and Resonances.
+    for(const team of [fixed.length===options.partySize?fixed:baselineIds,...teams]){
+      if(team.length!==options.partySize || new Set(team).size!==team.length)continue;
+      const members=team.map(id=>(fallback.get(id)||[])[0]),stock=stockFor(team);
+      if(!members.every(Boolean) || validateParty(catalog,snapshot,members,options) ||
+        [...countsOf(members.flatMap(member=>C.equipmentIds(member.equipment)))].some(([id,count])=>count>(stock.get(id)||0)))continue;
+      const scored=partyScore(members,undefined,Math.min(globalDeadline,Date.now()+1000));
+      if(!scored)break;
+      const result={members,...scored,stock,estimated:false};
+      results.push(result);checkpoint(result);
+      if(team.length===baselineIds.length && team.every(id=>baselineIds.includes(id)))baseline={...result,valid:true,warning:''};
+      break;
+    }
     const candidatesFor=(id,stock)=>{
       const key=`${id}:${[...stock].sort((a,b)=>a[0]-b[0]).map(([item,n])=>`${item}:${n}`).join(',')}`;
       if(!candidateCache.has(key)) {
         const generated=stopped(state)?[]:buildCandidates(catalog,snapshot,id,callbacks,options,stock,state);
-        const combined=new Map([...generated,...(fallback.get(id)||[]).filter(c=>fits(c.equipment,stock))].map(c=>[c.key,c]));
+        const combined=new Map();
+        for(const candidate of [...generated,...(fallback.get(id)||[]).filter(c=>fits(c.equipment,stock))]){
+          const previous=combined.get(candidate.key);
+          if(!previous || compareCandidates(candidate,previous)<0)combined.set(candidate.key,candidate);
+        }
         candidateCache.set(key,[...combined.values()]);
       }
       return candidateCache.get(key);
@@ -475,22 +506,22 @@
     }
     // A full party simulation costs tens to hundreds of milliseconds. After this deadline the beam ranks the
     // remaining parties by their members' own scores, so every team is still compared and the search ends.
-    const partyDeadline=deadlineAfter(options.partyTimeMs ?? options.timeMs);
+    const partyBudget=options.partyTimeMs ?? options.timeMs,partyDeadline=Math.min(globalDeadline,deadlineAfter(partyBudget));
+    const comparisonDeadline=partyDeadline-(options.jointOptimization && partyBudget>0?Math.min(3000,partyBudget*.5):0);
     const rank=members=>{
-      if(Date.now()<partyDeadline)return {...partyScore(members,QUICK_SAMPLES),estimated:true};
+      if(Date.now()<comparisonDeadline)return {...(partyScore(members,QUICK_SAMPLES,comparisonDeadline) || sumOf(members)),estimated:true};
       state.truncated=true;state.reasons.add('party time budget');
       return {...sumOf(members),estimated:true};
     };
-    const baselineIds=(snapshot.party || []).filter(id=>people.includes(id)).slice(0,options.partySize);
-    let baseline=null;
-    if(baselineIds.length===options.partySize) {
+    if(!baseline && baselineIds.length===options.partySize) {
       const members=baselineIds.map(id=>{
         const person=snapshot.characters.find(c=>c.id===id);
         return (fallback.get(id)||[]).find(c=>c.visionId===Number(person.equipment.visionId) && keyOf(c.equipment)===keyOf(person.equipment));
       });
       if(members.every(Boolean)) {
         const warning=validateParty(catalog,snapshot,members,options);
-        baseline={members,...partyScore(members),valid:!warning,warning};
+        const scored=partyScore(members);
+        if(scored){baseline={members,...scored,valid:!warning,warning};if(!warning)checkpoint(baseline);}
       }
     }
     for (const team of teams) {
@@ -527,19 +558,65 @@
     // Compare the leading finalists on every sample: the beam ranked them on a few, or on members' own scores after
     // its deadline. The rest are spares for duplicates, and each party kept below is re-scored in full anyway.
     results.sort((a,b)=>b.score-a.score);
-    for(const result of results.slice(0,options.maxResults*2))if(result.estimated)Object.assign(result,partyScore(result.members),{estimated:false});
+    for(const result of results.slice(0,options.jointOptimization?1:options.maxResults*2))if(result.estimated){
+      const scored=partyScore(result.members,undefined,options.jointOptimization?comparisonDeadline:globalDeadline);
+      if(scored){Object.assign(result,scored,{estimated:false});checkpoint(result);}
+    }
     results.sort((a,b)=>b.score-a.score);
     progress('Finishing the top parties…',true);
+    if(options.jointOptimization){
+      for(const result of results.filter(result=>!result.estimated).slice(0,1)){
+      const proposals=[],originalMembers=result.members;
+      const refineDeadline=partyDeadline-Math.min(1000,Math.max(0,(partyDeadline-Date.now())*.35));
+      let remaining=result.members.length;
+      for(let n=0;n<result.members.length;n++){
+        const member=result.members[n],left=refineDeadline-Date.now(),share=left/Math.max(1,remaining--);
+        if(left<=0 || state.evaluations>=options.maxEvaluations || !member.evaluation?.turn)continue;
+        progress(`Refining ${nameOf(member.characterId)} in a complete party…`);
+        state.evaluations++;
+        const supportRoles=['healer','protector'].filter(role=>{
+          const minimum=role==='healer'?options.minHealers:options.minProtectors;
+          return result.members.filter((other,index)=>index!==n && other.roles.includes(role)).length<minimum;
+        });
+        const evaluation=(callbacks.refine || callbacks.evaluate)({characterId:member.characterId,visionId:member.visionId,equipment:member.equipment,
+          refineEvaluation:member.evaluation,supportRoles,evaluationTimeMs:Math.min(500,Math.max(1,share*.85)),
+          ...(options.locks?.skillIds?.length?{lockedSkillIds:options.locks.skillIds}:{})});
+        if(!evaluation || evaluation.valid===false || !Number.isFinite(Number(evaluation.score)))continue;
+        const candidate={...member,evaluation,score:Number(evaluation.score),roles:rolesOf(evaluation)};
+        proposals.push({n,candidate});
+      }
+      const quickScore=members=>partyScore(members,QUICK_SAMPLES,Math.min(globalDeadline,Date.now()+Math.max(1,Math.min(250,(partyDeadline-Date.now())*.15))));
+      let members=result.members,quick=proposals.length?quickScore(members):null;
+      for(const {n,candidate} of proposals){
+        const member=members[n],next=members.slice();next[n]=candidate;
+        if(!fits(candidate.equipment,result.stock) || validateParty(catalog,snapshot,next,options))continue;
+        const scored=quick?quickScore(next):null;
+        if(!scored || scored.score<quick.score)continue;
+        if(scored.score===quick.score && (Number(candidate.evaluation.skillCost)||0)>(Number(member.evaluation.skillCost)||0))continue;
+        members=next;quick=scored;
+      }
+      if(members!==originalMembers){
+        const scored=partyScore(members);
+        if(scored && scored.score>=result.score){result.members=members;Object.assign(result,scored);checkpoint(result);}
+      }
+      }
+      results.sort((a,b)=>b.score-a.score);
+    }
     const seen=new Set(),unique=[];
     for(const result of results) {
       if(unique.length>=options.maxResults)break;
+      const previousMembers=result.members;
       result.members=finalizeBuilds(catalog,snapshot,result.members,result.stock,callbacks,state);
       const key=result.members.map(m=>`${m.characterId}:${m.visionId}:${keyOf(m.equipment)}`).sort().join('|');
       if(seen.has(key))continue;
-      seen.add(key);unique.push(Object.assign(result,partyScore(result.members)));
+      let scored=partyScore(result.members);
+      if(!scored && !result.estimated){result.members=previousMembers;scored={score:result.score,evaluation:result.evaluation};}
+      if(!scored)continue;
+      seen.add(key);unique.push(Object.assign(result,scored));checkpoint(result);
     }
     unique.sort((a,b)=>b.score-a.score);
     results.length=0;results.push(...unique);
+    if(!results.length && checkpointBest)results.push(checkpointBest);
     return {approximate:state.truncated,considered,evaluations:state.evaluations,truncated:state.truncated,
       reasons:[...state.reasons],teamsConsidered:teamCount,totalTeams:teams.length,
       results:results.map(({members,score,evaluation})=>({members,score,evaluation})),baseline,elapsedMs:Date.now()-state.started};

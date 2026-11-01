@@ -25,6 +25,7 @@ function memberCard(member, indexes, support) {
   const low = evaluation.damageMin ?? evaluation.damage?.min, high = evaluation.damageMax ?? evaluation.damage?.max;
   const limits = list(evaluation.limitUses);
   const ev = member.explanationEvaluation || evaluation, alwaysOn = alwaysOnList(member, indexes);
+  const passiveSearch=evaluation.jointPassiveCoverage;
   return `<article class="member">
     <div class="member-who">${character ? face(`unit${character.id}`, 'md') : ''}<div>
       <h4>${h(character?.name || `#${member.characterId}`)}</h4>
@@ -37,6 +38,7 @@ function memberCard(member, indexes, support) {
     ${gearExplanation(member, indexes)}
     <h5>Abilities <span class="dim">${num(ev.skillCost)} / ${num(ev.skillBudget)} AP</span></h5>
     ${abilityList(member, indexes)}
+    ${passiveSearch?`<details class="small"><summary>Passive search: ${list(passiveSearch.triedIds).length} / ${list(passiveSearch.eligibleIds).length} sources</summary><p>Sources appearing in completed trials for this recipe.${passiveSearch.complete?'':' Search budget limited coverage.'} This does not guarantee optimal combinations or support for every native effect. <a href="model-notes.md#damage-passive-search-coverage">Model limits</a></p></details>`:''}
     ${alwaysOn ? `<h5>Always on</h5>${alwaysOn}` : ''}
   </article>`;
 }
@@ -102,7 +104,7 @@ export function renderOptimizer({ catalog, snapshot, state = {}, result = null, 
           <label class="check"><input type="checkbox" id="optimizer-critical" ${state.critical ? 'checked' : ''} ${off}> Assume critical hits</label>
         </div></details>
       </div></details>
-      ${busy ? '<button type="button" data-cancel-party>Cancel</button>' : `<button type="button" class="primary" data-solve-party ${people.length < 4 ? 'disabled' : ''}>${result ? 'Search again' : 'Find the best party'}</button>`}
+      ${busy ? `<button type="button" data-cancel-party data-key="party-build-action">${results.length?'Stop and keep best':'Stop'}</button>` : `<button type="button" class="primary" data-solve-party data-key="party-build-action" ${people.length < 4 ? 'disabled' : ''}>${result ? 'Search again' : 'Find the best party'}</button>`}
     </div>`;
   let body;
   if (busy) body = `<p class="dim" role="status">${h(state.progress || 'Searching your characters, Resonances, gear and abilities…')}</p>`;

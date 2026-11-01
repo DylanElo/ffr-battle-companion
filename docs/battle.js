@@ -1141,7 +1141,7 @@
       }
       yield* walk(0,[]);
     }
-    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds,lockedSkillIds,refineEvaluation,evaluationTimeMs=options.evaluationTimeMs}){
+    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds,lockedSkillIds,refineEvaluation,supportRoles,evaluationTimeMs=options.evaluationTimeMs}){
       if(requestError)return {valid:false,score:-Infinity,reason:requestError};
       if(actionId && !indexes.skills.has(actionId))return {valid:false,score:-Infinity,reason:`Requested action ${actionId} is unknown.`};
       const prepared=prep(characterId,visionId,current,equippedSkillIds);
@@ -1225,7 +1225,9 @@
           for(const action of affordable){
             const alreadyFree=packageFree.has(action.id) || activeSelected.includes(action.id) || selected.includes(action.id);
             if(!alreadyFree && !prepared.learn.learnedActiveIds.includes(action.id))continue;
-            const unscoredRole=options.fillAbilitySlots && ['healer','protector'].includes(role);
+            const unscoredRole=['healer','protector'].includes(role) && (options.fillAbilitySlots ||
+              Array.isArray(supportRoles) && !supportRoles.includes(role) || options.jointOptimization &&
+              (role==='healer' && options.minHealers===0 || role==='protector' && options.minProtectors===0));
             if((prepared.fixed || !options.includeSupportOptions || unscoredRole) && !alreadyFree)continue;
             const extra=alreadyFree?0:number(action.equipCost),extraSlots=alreadyFree?0:1;
             if(supportCost+extra>calculated.skillBudget || slotsUsed+extraSlots>calculated.maxSkillSlots)continue;
@@ -1495,20 +1497,24 @@
       if(timedOut){best.searchTruncated=true;best.warnings=[...best.warnings,'Search time reached; this is the best completed legal build.'];}
       return best;
     }
-    function evaluateParty(members,{samples=Infinity}={}){
+    function evaluateParty(members,{samples=Infinity,deadline=options.deadline ?? Infinity}={}){
       const baseline=members.reduce((sum,m)=>sum+m.evaluation.damage,0);
       const baselineBreak=members.reduce((sum,m)=>sum+number(m.evaluation.breakDamage),0);
       let damage=baseline,breakDamage=baselineBreak,supportDescription='',supportUsed=null,actionOverrides={};
+      const expired=Symbol('party support deadline');let completed=false,supportTruncated=false;
       const simulate=overrides=>simulateFight(members.map(m=>{
         const override=overrides[m.characterId];
         const e=override?.supportedTurn?{...m.evaluation,supportSourceId:override.supportSourceId,supportedTurn:override.supportedTurn,supportedActionPlan:override.supportedActionPlan,supportedFinishContext:override.supportedFinishContext}:{...m.evaluation,...override};
         return {id:m.characterId,agility:e.baseAgility ?? e.stats.Agility,setupAgility:e.setupAgility,damage:e.damage,brokenDamage:e.brokenDamage,breakDamage:number(e.breakDamage),hits:e.hits,limit:e.limit,availableMp:e.availableMp,turnMp:e.turnMp,setupLimit:e.setupLimit,setupDuration:e.turn?.setupDuration,actionPlan:e.actionPlan,fallbackActionPlan:e.fallbackActionPlan,finish:e.finish,bonusLimit:e.bonusLimit,supportedActionPlan:e.supportedActionPlan,supportedFinishContext:e.supportedFinishContext,
           passiveIds:unique([...(e.alwaysPassiveIds || []),...(e.passiveIds || [])]),passiveIdOccurrences:e.passiveIdOccurrences,supportSourceId:e.supportSourceId,supportedTurn:e.supportedTurn};
-      }),samples);
+      }),samples,()=>{if(completed && Date.now()>=deadline)throw expired;});
       let fight=simulate({});
+      completed=true;
       const fightScore=f=>goalScore({damage:f.damage,breakDamage:f.breakDamage,gauge:members.reduce((sum,m)=>sum+number(f.gauge[m.characterId]),0)/Math.max(1,members.length)});
+      try {
       // Call replaces the normal command; the selected ally's paid additional turn is queued by the native phase model.
       for(const caster of members)for(const action of caster.evaluation.supportActions || []){
+        if(Date.now()>=deadline)throw expired;
         if(action.kind!=='bonusPhase' || action.skillId!==401140)continue;
         const source=caster.evaluation,original=source.actionPlan || source.fallbackActionPlan;
         if(!original?.turn)continue;
@@ -1536,6 +1542,7 @@
       for(const caster of members){
         if(!goals.has('damage'))break;
         for(const action of caster.evaluation.supportActions || []){
+          if(Date.now()>=deadline)throw expired;
           if(!['damagePercent','statPercent'].includes(action.kind))continue;
           if(clean(action.rootTarget)==='Self' || clean(action.bundleTarget)==='Self')continue;
           if(isAttack(indexes.skills.get(action.skillId)))continue;
@@ -1593,12 +1600,13 @@
           }
         }
       }
+      } catch(error){if(error!==expired)throw error;supportTruncated=true;}
       const roundDamage=damage,roundBreakDamage=breakDamage;
       damage=fight.damage;breakDamage=fight.breakDamage;
       const defenseScore=members.reduce((sum,m)=>{const hp=m.evaluation.actionPlan || m.evaluation.fallbackActionPlan?number(fight.remainingHp[m.characterId],m.evaluation.stats.MaxHitPoint):number(m.evaluation.stats.MaxHitPoint);return sum+(hp>0?hp*.01+defenseSum(m.evaluation.stats,m.evaluation.passiveAnalysis?.modifiers)*.5:0);},0);
       const gaugePerRound=members.reduce((sum,m)=>sum+number(fight.gauge[m.characterId]),0)/Math.max(1,members.length);
       const score=goalScore({damage,breakDamage,gauge:gaugePerRound,durability:defenseScore});
-      return {score,damage,breakDamage,roundDamage,roundBreakDamage,limitUses:fight.uses,gauge:fight.gauge,mpExhaustedRounds:fight.mpExhaustedRounds,remainingMp:fight.remainingMp,remainingHp:fight.remainingHp,hpSpent:fight.hpSpent,resourceSkips:fight.resourceSkips,stateLeafResults:fight.stateLeafResults,resourceEvents:fight.resourceEvents,remainingGoodLuck:fight.remainingGoodLuck,overclockCharges:fight.overclockCharges,overclockStates:fight.overclockStates,overheat:fight.overheat,demonForm:fight.demonForm,staggers:fight.staggers,firstStagger:fight.firstStagger,rounds:scenario.rounds,supportUsed,supportDescription,actionOverrides,warnings:globalWarnings,
+      return {score,damage,breakDamage,roundDamage,roundBreakDamage,limitUses:fight.uses,gauge:fight.gauge,mpExhaustedRounds:fight.mpExhaustedRounds,remainingMp:fight.remainingMp,remainingHp:fight.remainingHp,hpSpent:fight.hpSpent,resourceSkips:fight.resourceSkips,stateLeafResults:fight.stateLeafResults,resourceEvents:fight.resourceEvents,remainingGoodLuck:fight.remainingGoodLuck,overclockCharges:fight.overclockCharges,overclockStates:fight.overclockStates,overheat:fight.overheat,demonForm:fight.demonForm,staggers:fight.staggers,firstStagger:fight.firstStagger,rounds:scenario.rounds,supportUsed,supportDescription,actionOverrides,supportSearchTruncated:supportTruncated,warnings:supportTruncated?[...globalWarnings,'Party support comparison reached its time limit; the last fully sampled party was retained.']:globalWarnings,
         initiativeSamples:fight.initiativeSamples,gambleSamples:fight.gambleSamples,combatSamples:fight.combatSamples,extraActions:fight.extraActions,expectedExtraActions:fight.expectedExtraActions,finishUses:fight.finishUses || {},expectedFinishUses:fight.expectedFinishUses || {},finishCount:Object.values(fight.finishUses || {}).reduce((sum,uses)=>sum+uses.length,0),remainingGuards:fight.remainingGuards || {},phaseEvents:fight.phaseEvents,sampleKind:fight.sampleKind,representativeSample:fight.representativeSample,usesAreRepresentative:true,expectedLimitUses:fight.expectedLimitUses,
         baselineDamage:baseline,goals:[...goals],objectiveWeights:'Sum of shares filled per round: enemy HP (damage), enemy stagger bar (stagger), average LB gauge (limit), durability in enemy-HP units.'};
     }
