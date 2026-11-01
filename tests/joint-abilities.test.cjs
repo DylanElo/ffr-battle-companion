@@ -37,6 +37,48 @@ function evaluateFixed(model,input,ids){
   return result;
 }
 
+test('a full-AP warm start cannot hide a later history-scaled passive behind depth-first combinations',()=>{
+  const flow=source.effects.find(effect=>effect.id===12909);
+  const effects=[source.effects.find(effect=>effect.id===16001),
+    {...flow,id:92001,params:[1,50,5,...flow.params.slice(3)]},
+    {...flow,id:92002,params:[50,50,5,...flow.params.slice(3)]}];
+  const passives=[passive(90000,16001),...Array.from({length:30},(_,i)=>passive(90001+i,i===29?92002:92001))];
+  const f=fixture(passives,effects,{budget:20});
+  const model=B.createModel(f.catalog,f.snapshot,f.enemy,f.options);
+  const strongest=evaluateFixed(model,f.input,[90030]);
+  const warm=evaluateFixed(model,f.input,[90000]);
+  assert.ok(strongest.score>warm.score,'native Skill Flow uses the paid current action history');
+  const chosen=model.evaluate(f.input);
+  assert.equal(chosen.valid,true);
+  assert.deepEqual(chosen.equippedSkillIds,[90030]);
+  assert.equal(chosen.score,strongest.score);
+  assert.equal(chosen.skillCost,20);
+  assert.equal(chosen.jointPassiveCoverage.complete,true);
+  assert.equal(chosen.jointPassiveCoverage.eligibleIds.length,31);
+  assert.deepEqual(chosen.jointPassiveCoverage.omittedIds,[]);
+});
+
+test('refinement tries an owned high-ID Spirit alongside useful direct damage passives',()=>{
+  const direct=[passive(90000,16001),...Array.from({length:100},(_,i)=>passive(90001+i,16021))];
+  const spirit=source.masterSkills.find(row=>row.id===1310200); // Native Spirit of Onion Knight.
+  const granted=source.passives.filter(row=>spirit.grants.passiveIds.includes(row.id));
+  const effectIds=new Set([16001,16021,...granted.flatMap(row=>row.effects)]);
+  const f=fixture(direct,source.effects.filter(row=>effectIds.has(row.id)),{budget:120});
+  f.catalog.passives.push(...granted);
+  f.catalog.masterSkills=[spirit];
+  f.catalog.visions=[{id:13102,awakening:[],synchro:[{requiredPoints:1,grants:[{type:'MasterSkill',id:spirit.id,value:-1}]}]}];
+  f.snapshot.resonances=[{id:13102,sync:[{characterId:1001,points:1}],awakeningPoints:0}];
+  const model=B.createModel(f.catalog,f.snapshot,f.enemy,f.options);
+  const baseline=evaluateFixed(model,f.input,[90000]);
+  const result=model.evaluate(f.input);
+  assert.equal(result.valid,true);
+  assert.ok(result.equippedSkillIds.includes(90000));
+  assert.ok(result.equippedSkillIds.includes(spirit.id));
+  assert.ok(result.fightDamage>baseline.fightDamage);
+  assert.ok(result.jointPassiveCoverage.triedIds.includes(spirit.id));
+  assert.ok(result.skillCost<=result.skillBudget);
+});
+
 test('joint selection finds an imbue and elemental power pair with zero standalone benefit',()=>{
   // Native1147 imbues Fire only onto None; native12955 adds20% Fire damage.
   const f=fixture([passive(IMBUE,1147),passive(FIRE_POWER,12955)],
@@ -56,6 +98,32 @@ test('joint selection finds an imbue and elemental power pair with zero standalo
   assert.equal(chosen.score,paired.score);
   assert.equal(chosen.skillCost,40);
   assert.equal(JSON.stringify({catalog:f.catalog,snapshot:f.snapshot}),before);
+});
+
+test('internal refinement scores only the completed recipe while preserving pins and recalculating its abilities',()=>{
+  const f=fixture([passive(IMBUE,1147),passive(FIRE_POWER,12955)],
+    [1147,12955].map(id=>source.effects.find(row=>row.id===id)));
+  const initial=B.createModel(f.catalog,f.snapshot,f.enemy,{...f.options,jointAbilityBudget:1}).evaluate(f.input);
+  const before=JSON.stringify(initial);
+  const refined=B.createModel(f.catalog,f.snapshot,f.enemy,f.options).evaluate({...f.input,
+    refineEvaluation:initial,lockedSkillIds:[IMBUE],evaluationTimeMs:1000});
+  assert.equal(refined.valid,true,JSON.stringify(refined));
+  assert.equal(refined.skillId,initial.skillId);
+  assert.deepEqual(refined.turn,initial.turn);
+  assert.deepEqual(sorted(refined.equippedSkillIds),[IMBUE,FIRE_POWER]);
+  assert.ok(refined.score>initial.score);
+  assert.equal(refined.skillCost,40);
+  assert.equal(refined.jointPassiveCoverage.complete,true);
+  assert.equal(JSON.stringify(initial),before);
+  const limited=B.createModel(f.catalog,f.snapshot,f.enemy,{...f.options,jointAbilityBudget:1}).evaluate({...f.input,
+    refineEvaluation:initial,lockedSkillIds:[IMBUE]});
+  assert.equal(limited.valid,true);
+  assert.ok(limited.equippedSkillIds.includes(IMBUE));
+  assert.ok(limited.jointAbilityEvaluations<=1);
+  const invalid=B.createModel(f.catalog,f.snapshot,f.enemy,f.options).evaluate({...f.input,
+    refineEvaluation:{...initial,equippedSkillIds:[99999999]}});
+  assert.equal(invalid.valid,false);
+  assert.match(invalid.reason,/refinement/);
 });
 
 test('joint packages use actual gear and do not reuse the saved-gear package across loadouts',()=>{
@@ -180,6 +248,10 @@ test('a tiny joint budget retains a fully scored affordable incumbent and marks 
   assert.equal(chosen.valid,true,JSON.stringify(chosen));
   assert.equal(chosen.jointSearchTruncated,true);
   assert.ok(chosen.jointAbilityEvaluations<=1);
+  assert.equal(chosen.jointPassiveCoverage.complete,false);
+  assert.ok(chosen.jointPassiveCoverage.omittedIds.length>0);
+  assert.deepEqual(sorted([...chosen.jointPassiveCoverage.triedIds,...chosen.jointPassiveCoverage.omittedIds]),
+    chosen.jointPassiveCoverage.eligibleIds);
   assert.ok(chosen.skillCost<=chosen.skillBudget);
   assert.ok(chosen.equippedSkillIds.length<=chosen.maxSkillSlots);
   const fixed=evaluateFixed(model,f.input,chosen.equippedSkillIds);

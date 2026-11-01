@@ -42,6 +42,12 @@ Percentage-stat effects use the verified native pre-effect additive parameter as
 
 Exceptional action restrictions, state-specific ultimate actions, enemy turn scripts, encounter overrides, probabilistic reactions, identical-effect multi-copy stacking, unknown active artifacts and unsupported calculation types are not fabricated. Their absence can change the real best build. Fully automated battle strategy, multi-turn MP regeneration, summoned Espers and simultaneous finishers are outside this model.
 
+## Damage passive search coverage
+
+The character builder compares learned passive and Spirit sources in complete action recipes, subject to its time and assignment budgets. Result details report which sources reached a completed trial for the selected recipe. A source reaching a trial does not mean every combination was searched or every effect on that source is supported.
+
+Known unsupported damage-related effects include Scion Sorceress's Skill Flow enhancement, Dark Rite's HP scaling, Area Effect Adept's area penalty change, Aggravation, Improvement and Versatility. Passive MP cost changes such as Half MP Cost and Unlock Magic also need verified native handling. These omissions can change the real best damage build; the search does not assign invented bonuses to them.
+
 ## Validation and handoff
 
 Current Goal: reliable, explainable owned-build recommendations using supported native damage and passive rules.

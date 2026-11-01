@@ -45,3 +45,12 @@ test('missing data stays unknown and does not manufacture scenario or coverage',
   assert.doesNotMatch(html, /Starting MP|Difficulty:|5 rounds|0 unsupported|All effects/);
   assert.doesNotThrow(() => renderResultExplanations({evaluation: null, scenario: null, evidence: null}));
 });
+
+test('reports completed source coverage separately from native effect and combination coverage',()=>{
+  const html=renderResultExplanations({evaluation:{jointPassiveCoverage:{eligibleIds:[1,2,3],triedIds:[1,2],omittedIds:[3],complete:false}}});
+  assert.match(html,/2 \/ 3 learned passive and Spirit sources/);
+  assert.match(html,/budget ended before every source/);
+  assert.match(html,/does not prove every combination was searched or every native effect is modeled/);
+  const full=renderResultExplanations({evaluation:{jointPassiveCoverage:{eligibleIds:[1,2],triedIds:[1,2],omittedIds:[],complete:true}}});
+  assert.doesNotMatch(full,/budget ended before every source/);
+});

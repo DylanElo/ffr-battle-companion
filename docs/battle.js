@@ -1086,7 +1086,42 @@
         yield {ids,masterIds,passiveIds,equippedIds:physical,freeActiveIds:[...free].filter(id=>!locked.includes(id)),cost,activeCost:activeFree?0:number(skill.equipCost),activeSlots:activeFree?0:1,reservedIds};
       }
       yield* emit(seedIds);
+      if(!state.refine)return;
       yield* emit([]);
+      const removals=new Map(),initial=state.incumbentIds || seedIds;
+      for(const id of initial){
+        if(required.includes(id))continue;
+        const chosen=initial.filter(sourceId=>sourceId!==id);
+        yield* emit(chosen);
+        removals.set(id,state.scores.get(unique([...required,...chosen]).sort((a,b)=>a-b).join(',')) ?? -Infinity);
+        if(state.truncated)return;
+      }
+      // Give each source a complete trial before depth-first combinations spend the node budget.
+      const direct=pool.filter(id=>!indexes.masterSkills.has(id)).sort((a,b)=>a-b),spirits=pool.filter(id=>indexes.masterSkills.has(id)).sort((a,b)=>a-b),coverage=[];
+      // Interleave grants with direct passives so their larger IDs do not postpone every Spirit.
+      for(let n=0;n<Math.max(Math.ceil(direct.length/3),spirits.length);n++)coverage.push(...direct.slice(n*3,n*3+3),...spirits.slice(n,n+1));
+      const start=state.sourceCursor || 0;
+      for(let n=0;n<coverage.length;n++){
+        const at=(start+n)%coverage.length;
+        const id=coverage[at],incumbent=state.incumbentIds || seedIds,before=state.evaluated;
+        if(incumbent.includes(id)){state.nextSourceCursor=(at+1)%coverage.length;continue;}
+        yield* emit([...incumbent,id]);
+        const replacementOrder=incumbent.slice().sort((a,b)=>(removals.get(b) ?? -Infinity)-(removals.get(a) ?? -Infinity));
+        if(state.evaluated===before && !state.truncated)for(const replaced of replacementOrder){
+          if(replaced===id || required.includes(replaced))continue;
+          yield* emit([...incumbent.filter(seedId=>seedId!==replaced),id]);
+          if(state.evaluated>before || state.truncated)break;
+        }
+        if(state.evaluated===before && !state.truncated)yield* emit([id]);
+        if(state.truncated)return;
+        state.nextSourceCursor=(at+1)%coverage.length;
+      }
+      // A full seed must allow a useful late source to replace an incumbent, not only add to it.
+      for(const id of pool)for(const replaced of seedIds){
+        if(id===replaced || seedIds.includes(id))continue;
+        yield* emit([...seedIds.filter(seedId=>seedId!==replaced),id]);
+        if(state.truncated)return;
+      }
       // Try conditional pairs even when neither source improves the attack on its own.
       const enablers=pool.filter(conditional);
       for(const id of enablers){yield* emit([...seedIds,id]);if(state.truncated)return;}
@@ -1106,7 +1141,7 @@
       }
       yield* walk(0,[]);
     }
-    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds,lockedSkillIds,evaluationTimeMs=options.evaluationTimeMs}){
+    function evaluate({characterId,visionId,equipment,current=false,equippedSkillIds,lockedSkillIds,refineEvaluation,evaluationTimeMs=options.evaluationTimeMs}){
       if(requestError)return {valid:false,score:-Infinity,reason:requestError};
       if(actionId && !indexes.skills.has(actionId))return {valid:false,score:-Infinity,reason:`Requested action ${actionId} is unknown.`};
       const prepared=prep(characterId,visionId,current,equippedSkillIds);
@@ -1121,6 +1156,15 @@
       const requested=prepared.fixed?[]:unique(lockedSkillIds || []);
       if(requested.some(id=>!allowed.has(id)))return {valid:false,score:-Infinity,reason:'A pinned ability is an unknown or unlearned ability with this Resonance.'};
       const locked=options.jointOptimization?requested:requested.filter(id=>!prepared.free.has(id));
+      if(refineEvaluation){
+        const previous=refineEvaluation,turn=previous.turn,ids=previous.equippedSkillIds;
+        if(!options.jointOptimization || prepared.fixed || !prepared.active.some(skill=>skill.id===previous.skillId) ||
+          actionId && previous.skillId!==actionId || !Array.isArray(ids) || ids.some(id=>!Number.isInteger(id) || id<=0 || !allowed.has(id)) ||
+          !turn || !Array.isArray(turn.leaves) || !turn.leaves.length || !Array.isArray(turn.steps) || !Array.isArray(turn.reservedIds) ||
+          !Number.isFinite(turn.mp) || turn.mp<0 || [...turn.leaves,...turn.steps].some(leaf=>!prepared.legal.has(leaf.skillId)) ||
+          turn.reservedIds.some(id=>!allowed.has(id) && !prepared.legal.has(id)))
+          return {valid:false,score:-Infinity,reason:'The completed action supplied for refinement is unavailable or malformed.'};
+      }
       if(locked.length && !options.jointOptimization){
         const stats0=S.characterStats(catalog,snapshot,characterId,equipment,[]);
         const granted=new Set(locked.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || []));
@@ -1131,7 +1175,10 @@
       const freeIds=unique([...prepared.borrowed,...gearPassives(equipment)]),results=[],rollByContext=new Map(),failedRequirements=new Set();
       const deadline=Math.min(Number.isFinite(options.deadline)?options.deadline:Infinity,evaluationTimeMs>0?Date.now()+evaluationTimeMs:Infinity),expired=Symbol('search deadline');
       const checkDeadline=()=>{if(Date.now()>=deadline)throw expired;};
-      let timedOut=false,jointTruncated=false,jointEvaluations=0,jointAttempts=0,jointPhase=false;
+      let timedOut=false,jointTruncated=false,jointEvaluations=0,jointAttempts=0,jointPhase=false,jointSourceCursor=0;
+      const resultPackages=new WeakMap(),passiveCoverage=new Map(),eligibleSources=unique([...prepared.learned,...prepared.learn.masterSkillIds])
+        .filter(id=>indexes.passives.has(id) || indexes.masterSkills.has(id)).sort((a,b)=>a-b);
+      const recipeKey=(skill,turn)=>`${skill.id}:${JSON.stringify(turn.steps || turn.leaves)}`;
       const scorePackage=(skill,turn,packageInfo)=>{
         if(results.length)checkDeadline();
         if(!packageInfo)return;
@@ -1206,6 +1253,11 @@
         const historyScaled=allPassives.some(id=>(indexes.passives.get(id)?.effectBundles || []).some(bundle=>clean(indexes.effects.get(Number(bundle.effectId))?.type)==='DmgMulSkillNum'));
         const actionPlan=scenario.incomingDamage>0 || historyScaled || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo' || (indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(id))) || allPassives.some(id=>[1511,1499,1404].includes(id))?fallbackActionPlan:null;
         const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,passiveIdOccurrences,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan,fallbackActionPlan,finish:prepared.finish}],Infinity,()=>{if(results.length)checkDeadline();});
+        if(options.jointOptimization && !prepared.fixed){
+          const key=recipeKey(skill,turn);
+          if(!passiveCoverage.has(key))passiveCoverage.set(key,new Set());
+          for(const id of packageInfo.equippedIds)if(eligibleSources.includes(id))passiveCoverage.get(key).add(id);
+        }
         const durability=number(fight.remainingHp[characterId],stats.MaxHitPoint)>0?(survivability+.02*(number(fight.remainingHp[characterId],stats.MaxHitPoint)-number(stats.MaxHitPoint)))*.5:0;
         const minimumRemainingHp=fight.minimumRemainingHp[characterId];
         const damageElements=[...new Set([...leafRolls.filter(leaf=>leaf.kind!=='support').flatMap(leaf=>[leaf.normal.element,leaf.broken.element]),
@@ -1233,29 +1285,46 @@
           canHeal,canProtect:canProtect || !!turn.reactionSetup,supportTags:supports.map(s=>s.role),supportSkillIds:supports.map(s=>s.skillId),supportActions,
           appliedSynergies:passiveAnalysis.applied.map(t=>({name:t.passiveName || t.type,reason:`${t.passiveName || t.type}: ${t.kind} ${t.value ?? t.element} ${t.parameter || ''}`})),
           passiveAnalysis,criticalAnalysis,criticalStats,coverage:passiveAnalysis.coverage,warnings,availableMp});
+        resultPackages.set(results.at(-1),packageInfo);
       };
-      const consider=(skill,turn)=>{
+      const consider=(skill,turn,seedOverride)=>{
         checkDeadline();
         const joint=options.jointOptimization && !prepared.fixed;
-        if(joint && jointAttempts>=Math.max(1,number(options.jointAbilityBudget,128))){jointTruncated=true;return;}
+        const attemptLimit=Math.max(1,number(options.jointAbilityBudget,Math.max(128,eligibleSources.length*2)));
+        if(joint && jointAttempts>=attemptLimit){jointTruncated=true;return;}
         const started=Date.now(),remaining=deadline-started;
         const packageTime=jointPhase?Math.min(120,remaining*.4):Math.min(25,number(evaluationTimeMs,500)/10);
         const seedDeadline=joint?Math.min(deadline,started+packageTime):deadline;
-        const seed=passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked,()=>{
+        const seed=seedOverride || passivePackage(prepared,visionId,skill,equipment,freeIds,turn,locked,()=>{
           const stop=Date.now()>=seedDeadline;
           if(stop && !joint)timedOut=true;
           return stop;
         });
         if(!joint){scorePackage(skill,turn,seed);return;}
         // The surrogate is only an incumbent; every returned alternative is scored by the complete fight model.
-        const sliceEnd=Math.min(deadline,started+(jointPhase?Math.max(20,remaining*.6):Math.max(10,number(evaluationTimeMs,500)/12)));
-        const state={visited:0,evaluated:0,limit:Math.max(1,number(options.jointAbilityBudget,128))-jointAttempts,truncated:false,stop:()=>Date.now()>=sliceEnd};
+        const sliceEnd=Math.min(deadline,started+(jointPhase?Math.max(20,remaining*.9):Math.max(10,number(evaluationTimeMs,500)/12)));
+        const state={visited:0,evaluated:0,limit:attemptLimit-jointAttempts,truncated:false,
+          refine:jointPhase || !!actionId || requirements.minHp>0 || requirements.survive || !!requirements.element || !seed,
+          sourceCursor:jointSourceCursor,scores:new Map(),stop:()=>Date.now()>=sliceEnd};
         for(const packageInfo of jointAbilityPackages(prepared,skill,turn,equipment,freeIds,locked,seed,state)){
           const before=results.length;scorePackage(skill,turn,packageInfo);jointEvaluations+=results.length-before;
+          if(results.length>before){
+            const candidate=results.at(-1);
+            state.scores.set(packageInfo.equippedIds.slice().sort((a,b)=>a-b).join(','),candidate.score);
+            if(!state.incumbent || candidate.score>state.incumbent.score || candidate.score===state.incumbent.score && candidate.skillCost<state.incumbent.skillCost){
+              state.incumbent=candidate;state.incumbentIds=packageInfo.equippedIds;
+            }
+          }
         }
         jointAttempts+=state.evaluated;jointTruncated ||= state.truncated;
+        jointSourceCursor=state.nextSourceCursor ?? jointSourceCursor;
       };
       try {
+      if(refineEvaluation){
+        jointPhase=true;
+        consider(indexes.skills.get(refineEvaluation.skillId),refineEvaluation.turn,
+          {equippedIds:refineEvaluation.equippedSkillIds.filter(id=>indexes.passives.has(id) || indexes.masterSkills.has(id))});
+      }else{
       // A bounded comparison must try strong legal actions before catalog order spends its time.
       let active=(actionId?prepared.active.filter(skill=>skill.id===actionId):prepared.active);
       if(Number.isFinite(deadline))active=active.slice().sort((a,b)=>number(b.mag)-number(a.mag) || number(a.cost)-number(b.cost));
@@ -1288,7 +1357,8 @@
       if(options.jointOptimization && !prepared.fixed){
         jointPhase=true;
         const recipes=results.slice().sort((a,b)=>b.score-a.score).slice(0,3);
-        for(const result of recipes)consider(indexes.skills.get(result.skillId),result.turn);
+        // Give leading complete recipes a fresh bounded refinement allowance after broad action comparisons.
+        for(const result of recipes){if(options.jointAbilityBudget===undefined)jointAttempts=0;consider(indexes.skills.get(result.skillId),result.turn,resultPackages.get(result));}
       }
       // Preserve repeated baselines, then test at most four mixed recipes from damage/stagger/MP leaders.
       const bestBySkill=new Map();
@@ -1409,6 +1479,7 @@
           consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
         }
       }
+      }
       } catch(error){if(error!==expired)throw error;timedOut=true;}
       if(!results.length)return {valid:false,score:-Infinity,reason:failedRequirements.size?
         `No fully evaluated build met the selected requirements: ${[...failedRequirements].join(', ')}.${timedOut?' Search time reached.':''}`:
@@ -1417,6 +1488,9 @@
       const stableIds=result=>JSON.stringify([result.skillId,...result.equippedSkillIds.slice().sort((a,b)=>a-b),result.recipeSteps?.map(step=>step.skillId)]);
       const best=results.sort((a,b)=>b.score-a.score || a.skillCost-b.skillCost || stableIds(a).localeCompare(stableIds(b)))[0];
       if(options.jointOptimization && !prepared.fixed){best.jointAbilityEvaluations=jointEvaluations;best.jointSearchTruncated=jointTruncated;
+        const tried=passiveCoverage.get(recipeKey(indexes.skills.get(best.skillId),best.turn)) || new Set();
+        const omitted=eligibleSources.filter(id=>!tried.has(id));
+        best.jointPassiveCoverage={eligibleIds:eligibleSources,triedIds:[...tried].sort((a,b)=>a-b),omittedIds:omitted,complete:omitted.length===0};
         if(jointTruncated)best.warnings.push('Joint ability search reached its bound; this is the best fully scored combination visited.');}
       if(timedOut){best.searchTruncated=true;best.warnings=[...best.warnings,'Search time reached; this is the best completed legal build.'];}
       return best;
