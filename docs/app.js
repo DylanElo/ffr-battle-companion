@@ -1,10 +1,10 @@
-import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=4';
-import {createOptimizerController} from './optimizer-controller.js?v=49';
+import { readSave, savedWithPlans, SAVE_CHANGED } from './save-io.js?v=5';
+import {createOptimizerController} from './optimizer-controller.js?v=54';
 import {comparison} from './optimizer-ui.js?v=43';
 import {abilityList, alwaysOnList, moveDetails} from './build-details.js?v=12';
 import {shareCard, partyImage} from './share-image.js?v=5';
-import {renderSlot, renderAbilityList} from './slot-ui.js?v=2';
-import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=4';
+import {renderSlot, renderAbilityList} from './slot-ui.js?v=5';
+import {equippableAbilities, abilityLoad, canEquip, dropUnavailable, withAbilities, learnedForBuild, applyBuildResult} from './abilities.js?v=5';
 import {describeItem, describeAbility} from './piece-details.js?v=1';
 
 const C = globalThis.Companion;
@@ -267,7 +267,7 @@ function deepSearch() {
   if (refusal) { ui.deep = { error: refusal }; render(); return; }
   const pinned = !!(pins.locks.visionId || pins.locks.weaponId || pins.locks.armorId || pins.locks.accessoryIds.length || pins.locks.skillIds.length);
   ui.deep = { busy: true, progress: 'Starting…' };
-  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=46', import.meta.url));
+  const worker = deepWorker = new Worker(new URL('./optimizer-worker.js?v=51', import.meta.url));
   worker.onmessage = e => {
     if (e.data.id !== id || ui.charId !== charId) return;
     if (e.data.type === 'progress') ui.deep.progress = e.data.message;

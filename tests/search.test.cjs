@@ -26,6 +26,40 @@ test('a budget exhausted by initial evaluations still returns the saved Resonanc
     {maxEvaluations:1,timeMs:0,perLoadoutBudget:1,candidatesPerVision:1});
   assert.ok(result.some(c=>c.visionId===snapshot.characters[0].equipment.visionId));
 });
+
+test('budget exhaustion preserves every completed Resonance seed, including the better one',()=>{
+  const {catalog,snapshot}=fixture(2),seen=[];
+  const result=S.buildCandidates(catalog,snapshot,1,{evaluate:({visionId})=>{
+    seen.push(visionId);return {score:visionId===101?100:1};
+  }},{visionIds:[100,101],maxEvaluations:2,perLoadoutBudget:250,timeMs:0});
+  assert.deepEqual(seen,[100,101]);
+  assert.ok(result.some(c=>c.visionId===101 && c.score===100));
+});
+
+test('large accessory spaces preserve the baseline before a tiny time budget expires',()=>{
+  const {catalog,snapshot}=fixture(1);
+  catalog.equipment=Array.from({length:96},(_,i)=>({id:1000+i,name:'Accessory',type:'Accessory',stats:{}}));
+  snapshot.inventory=catalog.equipment.map(e=>({id:e.id,quantity:4}));
+  snapshot.characters[0].equipment.accessoryIds=[-1,-1,-1,-1];
+  let calls=0;
+  const started=Date.now();
+  const result=S.buildCandidates(catalog,snapshot,1,{evaluate:()=>{calls++;return {score:1};}},
+    {visionIds:[100],maxEvaluations:1,perLoadoutBudget:1,timeMs:1});
+  assert.ok(Date.now()-started<500,'preparing combinations must not enumerate millions of arrays');
+  assert.equal(calls,1);
+  assert.equal(result.length,1);
+});
+
+test('search ownership includes equipped-only items without double-counting inventory ownership',()=>{
+  const {catalog,snapshot}=fixture(1);
+  snapshot.characters[0].equipment.weaponId=10;
+  snapshot.inventory=snapshot.inventory.filter(item=>item.id!==10);
+  assert.equal(S.inventory(snapshot).get(10),1);
+  const candidates=S.buildCandidates(catalog,snapshot,1,{evaluate:({equipment})=>({score:equipment.weaponId===10?100:0})},options);
+  assert.ok(candidates.some(c=>c.equipment.weaponId===10));
+  snapshot.inventory.push({id:10,quantity:1});
+  assert.equal(S.inventory(snapshot).get(10),1);
+});
 test('evaluates passive accessory pairs together instead of discarding individually weak effects',()=>{
   const {catalog,snapshot}=fixture(1);
   const candidates=S.buildCandidates(catalog,snapshot,1,{evaluate:({equipment})=>({score:
@@ -34,6 +68,50 @@ test('evaluates passive accessory pairs together instead of discarding individua
   const best=candidates.sort((a,b)=>b.score-a.score)[0];
   assert.equal(best.score,100);
   assert.deepEqual(best.equipment.accessoryIds,[30,31]);
+});
+
+test('a bounded search improves every accessory slot instead of spending its budget on low item IDs',()=>{
+  const {catalog,snapshot}=fixture(1);
+  catalog.equipment=Array.from({length:20},(_,i)=>({id:30+i,name:`Accessory ${i}`,type:'Accessory',sexLimit:'None',stats:{}}));
+  snapshot.inventory=catalog.equipment.map(e=>({id:e.id,quantity:3}));
+  snapshot.characters[0].equipment.accessoryIds=[-1,-1,-1];
+  let evaluations=0;
+  const candidates=S.buildCandidates(catalog,snapshot,1,{evaluate:({equipment})=>{
+    evaluations++;
+    return {score:equipment.accessoryIds.reduce((sum,id)=>sum+(id>0?id:0),0)};
+  }},{...options,visionIds:[100],perLoadoutBudget:250});
+  const best=candidates.sort((a,b)=>b.score-a.score)[0];
+  assert.deepEqual(best.equipment.accessoryIds,[49,49,49]);
+  assert.equal(best.score,147);
+  assert.ok(evaluations<=251,'the existing budget plus one saved-loadout seed is respected');
+});
+
+test('bounded slot improvements combine weapon, armor and accessories while preserving pinned copies',()=>{
+  const {catalog,snapshot}=fixture(1);
+  catalog.equipment.push(...Array.from({length:20},(_,i)=>({id:40+i,name:`Accessory ${i}`,type:'Accessory',sexLimit:'None',stats:{}})));
+  snapshot.inventory.push(...catalog.equipment.filter(e=>e.id>=40).map(e=>({id:e.id,quantity:1})));
+  snapshot.characters[0].equipment.accessoryIds=[30,-1,-1];
+  const candidates=S.buildCandidates(catalog,snapshot,1,{evaluate:({equipment:e})=>({score:
+    (e.weaponId===10?100:0)+(e.armorId===20?100:0)+e.accessoryIds.reduce((sum,id)=>sum+(id>0?id:0),0)})},
+  {...options,visionIds:[100],perLoadoutBudget:250,locks:{accessoryIds:[30]}});
+  const best=candidates.sort((a,b)=>b.score-a.score)[0];
+  assert.equal(best.equipment.weaponId,10);
+  assert.equal(best.equipment.armorId,20);
+  assert.deepEqual(best.equipment.accessoryIds.slice().sort((a,b)=>a-b),[30,58,59]);
+});
+
+test('single-build finalization keeps pinned equipment and forwards required abilities to completion probes',()=>{
+  const {catalog,snapshot}=fixture(1), locks={weaponId:10,armorId:20,accessoryIds:[30],skillIds:[99]};
+  const callbacks={options:{locks},evaluate:args=>{
+    if (!args.equippedSkillIds) assert.deepEqual(args.lockedSkillIds,[99]);
+    return {score:0,equippedSkillIds:[99]};
+  }};
+  const member={characterId:1,visionId:100,equipment:{weaponId:10,armorId:20,accessoryIds:[30,-1]},score:0,roles:[],evaluation:{equippedSkillIds:[99]}};
+  const [complete]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),callbacks);
+  assert.equal(complete.equipment.weaponId,10);
+  assert.equal(complete.equipment.armorId,20);
+  assert.equal(complete.equipment.accessoryIds[0],30);
+  assert.deepEqual(complete.evaluation.equippedSkillIds,[99]);
 });
 test('joint party search obeys stock and conservative distinct Resonance reservations',()=>{
   const {catalog,snapshot}=fixture();
@@ -116,6 +194,20 @@ test('single-character finalization fills neutral accessories left empty by a sc
   assert.ok(result.equipment.accessoryIds.every(id=>id>0));
   assert.equal(result.gearReasons.filter(r=>r.slot==='accessory').every(r=>r.reason==='neutral-model'),true);
   assert.equal(S.validateParty(catalog,snapshot,[result],{partySize:1}),'');
+});
+
+test('damage builds replace neutral accessories with damage upgrades and leave remaining neutral slots empty',()=>{
+  const {catalog,snapshot}=fixture(1);
+  const callbacks={options:{goals:['damage']},evaluate:({equipment})=>({score:10+equipment.accessoryIds.filter(id=>id===32).length*4})};
+  const stock=new Map([[30,1],[32,1]]);
+  const candidate=S.buildCandidates(catalog,snapshot,1,callbacks,{...options,visionIds:[100],maxEvaluations:1},stock)[0];
+  candidate.equipment.accessoryIds=[30,-1];
+  const [result]=S.finalizeBuilds(catalog,snapshot,[candidate],stock,callbacks);
+  assert.deepEqual(result.equipment.accessoryIds,[32,-1]);
+  assert.equal(result.score,14);
+  const pinned={...callbacks,options:{goals:['damage'],locks:{accessoryIds:[30]}}};
+  const [kept]=S.finalizeBuilds(catalog,snapshot,[candidate],stock,pinned);
+  assert.deepEqual(kept.equipment.accessoryIds,[30,32]);
 });
 
 test('finalization respects reserved stock and explains unavailable accessory copies',()=>{

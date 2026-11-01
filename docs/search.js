@@ -9,10 +9,7 @@
     return counts;
   };
   function inventory(snapshot) {
-    const counts = new Map();
-    for (const item of snapshot.inventory || []) if (positive(item.id) && Number(item.quantity)>0)
-      counts.set(Number(item.id),(counts.get(Number(item.id))||0)+Math.floor(Number(item.quantity)));
-    return counts;
+    return C.ownedStock(snapshot);
   }
   function fits(equipment, available) {
     return [...countsOf(C.equipmentIds(equipment))].every(([id,n])=>(available.get(id)||0)>=n);
@@ -50,10 +47,10 @@
     if (reason) { state.truncated=true;state.reasons.add(reason);return true; }
     return false;
   }
-  function evaluateOne(state, callbacks, characterId, visionId, equipment) {
+  function evaluateOne(state, callbacks, characterId, visionId, equipment, baseline=false) {
     const key = `${characterId}:${visionId}:${keyOf(equipment)}`;
     if (state.cache.has(key)) return state.cache.get(key);
-    if (stopped(state)) return null;
+    if (stopped(state) && !(baseline && state.evaluations===0 && state.options.maxEvaluations>0)) return null;
     state.evaluations++;
     const evaluation = callbacks.evaluate({characterId,visionId,equipment,enemy:callbacks.enemy,options:state.options,
       ...(state.options.locks?.skillIds?.length?{lockedSkillIds:state.options.locks.skillIds}:{})});
@@ -65,19 +62,35 @@
     state.cache.set(key,candidate);
     return candidate;
   }
-  function accessorySets(items, slots, available) {
-    const out=[];
-    function visit(start, chosen, counts) {
-      if (chosen.length===slots) {out.push(chosen.slice());return;}
-      for (let i=start;i<items.length;i++) {
-        const id=items[i],n=(counts.get(id)||0)+1;
-        if (id>0 && n>(available.get(id)||0)) continue;
-        counts.set(id,n);chosen.push(id);visit(i,chosen,counts);chosen.pop();
-        counts.set(id,n-1);
+  // Count legal suffixes once; unrank only the combinations the bounded search actually visits.
+  function accessorySets(items, slots, available, locked=[]) {
+    const remaining=new Map(available),memo=new Map(),freeSlots=slots-locked.length;
+    for(const id of locked)remaining.set(id,(remaining.get(id)||0)-1);
+    const copies=(i,left)=>Math.min(left,items[i]>0?(remaining.get(items[i])||0):left);
+    const count=(i,left)=>{
+      if(!left)return 1;
+      if(i===items.length)return 0;
+      const key=`${i}:${left}`;
+      if(!memo.has(key)){
+        let n=0;
+        for(let take=0;take<=copies(i,left);take++)n+=count(i+1,left-take);
+        memo.set(key,n);
       }
-    }
-    visit(0,[],new Map());
-    return out;
+      return memo.get(key);
+    };
+    return {
+      get length(){return count(0,freeSlots);},
+      at(rank){
+        const chosen=[...locked];let left=freeSlots;
+        for(let i=0;i<items.length && left;i++)for(let take=copies(i,left);take>=0;take--){
+          const size=count(i+1,left-take);
+          if(rank>=size){rank-=size;continue;}
+          chosen.push(...Array(take).fill(items[i]));left-=take;break;
+        }
+        return chosen;
+      },
+      *[Symbol.iterator](){for(let rank=0;rank<this.length;rank++)yield this.at(rank);},
+    };
   }
   function buildCandidates(catalog,snapshot,characterId,callbacks,options={},availableArg,stateArg) {
     options=defaults(options);
@@ -101,7 +114,7 @@
     if (slots>4) throw new Error('Unsupported accessory slot count.');
     if (lockedAcc.length>slots) return [];
     const holdsLocks=set=>{const have=countsOf(set);return [...lockedCounts].every(([id,n])=>(have.get(id)||0)>=n);};
-    const accessories=accessorySets(accessoryIds,slots,available).filter(holdsLocks);
+    const accessories=accessorySets(accessoryIds,slots,available,lockedAcc);
     const base={weaponId:positive(locks.weaponId)?Number(locks.weaponId):legal(saved.equipment.weaponId,'weapon')?saved.equipment.weaponId:-1,
       armorId:positive(locks.armorId)?Number(locks.armorId):legal(saved.equipment.armorId,'armor')?saved.equipment.armorId:-1,
       accessoryIds:(saved.equipment.accessoryIds || []).map(id=>legal(id,'accessory')?id:-1)};
@@ -119,14 +132,15 @@
     if (positive(locks.visionId) && !owned.has(Number(locks.visionId))) return [];
     const pool=[...(positive(locks.visionId)?[Number(locks.visionId)]:options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
       .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
-    const seeds=new Map(pool.map(id=>[id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id})]));
+    const seeds=new Map(pool.map(id=>[id,evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id},true)]));
     const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || (seeds.get(b)?.score ?? -Infinity)-(seeds.get(a)?.score ?? -Infinity));
-    const all=[];
+    const all=new Map([...seeds.values()].filter(Boolean).map(c=>[c.key,c]));
     for (const [n,visionId] of visions.entries()) {
       const local=new Map();
       // Native timing checks can exhaust the budget during seeding; retain that completed comparison.
       if(seeds.get(visionId))local.set(keyOf(base),seeds.get(visionId));
       let attempts=0;
+      let best=seeds.get(visionId);
       const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())/(visions.length-n):Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
         if ((positive(locks.weaponId) && weaponId!==weaponIds[0]) || (positive(locks.armorId) && armorId!==armorIds[0]) || !holdsLocks(accessoryIds)) return true;
@@ -137,16 +151,41 @@
         attempts++;
         const candidate=evaluateOne(state,callbacks,saved.id,visionId,equip);
         local.set(key,candidate);
+        if (candidate && (!best || candidate.score>best.score)) best=candidate;
         return true;
       };
       // Seed the saved loadout before pruning so a search budget never hides its comparison.
       consider(base.weaponId,base.armorId,base.accessoryIds);
       consider(-1,-1,Array(slots).fill(-1));
-      for (const weapon of weaponIds) if (!consider(weapon,base.armorId,base.accessoryIds)) break;
-      for (const armor of armorIds) if (!consider(base.weaponId,armor,base.accessoryIds)) break;
-      // Evaluate accessory pairs together: individually weak passives may have a strong combined effect.
-      for (const pair of accessories) if (!consider(base.weaponId,base.armorId,pair)) break;
       const total=weaponIds.length*armorIds.length*accessories.length;
+      if (total>options.perLoadoutBudget) {
+        // Give every editable slot a share before a large accessory list can spend the whole budget.
+        const probes=[];
+        if (!positive(locks.weaponId)) probes.push({ids:weaponIds,set:(e,id)=>({...e,weaponId:id})});
+        if (!positive(locks.armorId)) probes.push({ids:armorIds,set:(e,id)=>({...e,armorId:id})});
+        for (let i=lockedAcc.length;i<slots;i++) probes.push({ids:accessoryIds,
+          set:(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>i===j?id:x)})});
+        const sample=(values,limit)=>{
+          const count=Math.min(values.length,Math.max(0,limit));
+          return Array.from({length:count},(_,i)=>values.at(count===1?0:Math.floor(i*(values.length-1)/(count-1))));
+        };
+        const perSlot=Math.floor(options.perLoadoutBudget/2/Math.max(1,probes.length));
+        for (const probe of probes) {
+          const start=best?.equipment || base;
+          for (const id of sample(probe.ids,perSlot)) {
+            const e=probe.set(start,id);
+            if (!consider(e.weaponId,e.armorId,e.accessoryIds)) break;
+          }
+        }
+        // Keep joint passive combinations in the search, spread across the catalog rather than low IDs first.
+        const start=best?.equipment || base;
+        for (const set of sample(accessories,Math.floor(options.perLoadoutBudget/4)))
+          if (!consider(start.weaponId,start.armorId,set)) break;
+      } else {
+        for (const weapon of weaponIds) if (!consider(weapon,base.armorId,base.accessoryIds)) break;
+        for (const armor of armorIds) if (!consider(base.weaponId,armor,base.accessoryIds)) break;
+        for (const set of accessories) if (!consider(base.weaponId,base.armorId,set)) break;
+      }
       let enumerated=0;
       // shortcut: the bounded sweep samples large spaces; raise budgets or use exact search for proof of optimality.
       const gcd=(a,b)=>b?gcd(b,a%b):a;
@@ -156,7 +195,7 @@
         const flat=(n*stride)%total,ai=flat%accessories.length;
         const remainder=Math.floor(flat/accessories.length),ri=remainder%armorIds.length;
         const wi=Math.floor(remainder/armorIds.length);
-        if (!consider(weaponIds[wi],armorIds[ri],accessories[ai])) break;
+        if (!consider(weaponIds[wi],armorIds[ri],accessories.at(ai))) break;
         enumerated++;
       }
       if (enumerated<total) {state.truncated=true;state.reasons.add('loadout budget');}
@@ -182,10 +221,10 @@
       const empty=local.get(keyOf({weaponId:-1,armorId:-1,accessoryIds:Array(slots).fill(-1),visionId}));
       if (empty)keep.set(empty.key,empty);
       if (ranked.length>keep.size) {state.truncated=true;state.reasons.add('candidate pruning');}
-      all.push(...keep.values());
+      for(const c of keep.values())all.set(c.key,c);
       if (stopped(state))break;
     }
-    return all;
+    return [...all.values()];
   }
   function validateParty(catalog,snapshot,members,options={}) {
     options=defaults(options);
@@ -239,6 +278,8 @@
       .filter(effect=>(item?.passiveIds || []).includes(effect.passiveId));
     const fillState=state?{...state,options:{...state.options,maxEvaluations:Infinity,timeMs:0}}:
       stateFor({...defaults(callbacks.options || {}),maxEvaluations:Infinity,timeMs:0});
+    const damageOnly=fillState.options.goals?.length===1 && fillState.options.goals[0]==='damage';
+    const pinnedAccessories=countsOf(fillState.options.locks?.accessoryIds || []);
     const slotsOf=equipment=>[['weapon',0,e=>e.weaponId,(e,id)=>({...e,weaponId:id})],['armor',0,e=>e.armorId,(e,id)=>({...e,armorId:id})],
       ...equipment.accessoryIds.map((_,i)=>['accessory',i,e=>e.accessoryIds[i],(e,id)=>({...e,accessoryIds:e.accessoryIds.map((x,j)=>j===i?id:x)})])];
     const out=members.slice();
@@ -250,6 +291,17 @@
       const member=out[memberIndex];
       const native=catalog.characters.find(c=>c.id===member.characterId);
       let best=member;
+      if(damageOnly)for(let i=0;i<best.equipment.accessoryIds.length;i++){
+        const id=best.equipment.accessoryIds[i],counts=countsOf(best.equipment.accessoryIds);
+        if(!(id>0) || (counts.get(id)||0)<=(pinnedAccessories.get(id)||0))continue;
+        const equipment={...best.equipment,accessoryIds:best.equipment.accessoryIds.map((value,n)=>n===i?-1:value)};
+        const without=evaluateOne(fillState,callbacks,member.characterId,member.visionId,equipment);
+        if(!without || without.score<best.score || !best.roles.every(role=>without.roles.includes(role)))continue;
+        const next=out.slice();next[memberIndex]=without;
+        const before=partyScore(out),after=partyScore(next);
+        if(!Number.isFinite(before) || !Number.isFinite(after) || after<before)continue;
+        used.set(id,(used.get(id)||0)-1);best=without;out[memberIndex]=best;
+      }
       for (const [slot,index,get,set] of slotsOf(best.equipment)) {
         if (Number(get(best.equipment))>0) continue;
         let pick=null;
@@ -262,6 +314,7 @@
           const next=out.slice();next[memberIndex]=c;
           const nextPartyScore=partyScore(next);
           if (!Number.isFinite(nextPartyScore) || nextPartyScore<previousPartyScore) continue;
+          if (damageOnly && slot==='accessory' && nextPartyScore<=previousPartyScore) continue;
           if (!pick || nextPartyScore>pick.partyScore || (nextPartyScore===pick.partyScore && (c.score>pick.c.score || c.score===pick.c.score && worth(item.id)>worth(pick.id))))pick={c,id:item.id,partyScore:nextPartyScore};
         }
         // The cache keys accessories unordered, so keep this slot order rather than the cached one.

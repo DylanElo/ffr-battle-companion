@@ -1,5 +1,6 @@
 // Reading a save into a snapshot, and writing plans back into a copy of it. No DOM: runs in the browser and Node.
 import * as S from './save.js?v=21';
+import { validateAbilities, learnedForBuild } from './abilities.js?v=5';
 
 export const SAVE_CHANGED = 'Your save changed after you loaded it (the game probably saved again). '
   + 'Load it again so your newer progress isn’t overwritten.';
@@ -65,26 +66,36 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
   const index = Object.fromEntries(['characters', 'visions', 'equipment', 'skills', 'passives', 'masterSkills']
     .map(kind => [kind, new Map((catalog[kind] || []).map(row => [row.id, row]))]));
   const name = (kind, id) => index[kind].get(Number(id))?.name ?? (Number(id) > 0 ? `New entry #${id}` : 'Empty');
-  const people = snap.characters.filter(C.joined), inventory = snap.inventory;
+  const people = snap.characters.filter(C.joined);
   const save = await S.openSave(bytes);
   let data = save.data;
   const fields = S.parse(data), at = new Map(fields.map(f => [f.path, f]));
   const set = (path, value) => { const f = at.get(path); if (!f) throw new Error(`The save has no ${path}.`); data = S.writeField(data, f, value); };
-  const have = new Map(inventory.map(i => [i.id, i.quantity])), used = new Map(), taken = new Map(), removed = [];
-  // Some gear (Fina's Loxley Bow) exists only as equipped, with no inventory entry; it is still owned.
-  const loose = new Map();
-  for (const c of snap.characters) for (const item of C.equipmentIds(c.equipment).map(Number)) if (item > 0 && !inventory.some(i => i.id === item)) loose.set(item, (loose.get(item) || 0) + 1);
-  for (const [item, n] of loose) have.set(item, n);
+  const have = C.ownedStock(snap), used = new Map(), taken = new Map(), removed = [];
   const use = item => {
     const n = (used.get(item) || 0) + 1;
     if (n > (have.get(item) || 0)) throw new Error(`Your plans use ${name('equipment', item)} ${n} times, but you own ${have.get(item) || 0}.`);
     used.set(item, n);
   };
   for (const [id, plan] of Object.entries(plans)) {
+    if (!people.some(c => c.id === Number(id))) throw new Error('Character is not available.');
+    if (!plan || !Array.isArray(plan.accessoryIds) || ![plan.weaponId, plan.armorId, plan.visionId, ...plan.accessoryIds].every(n => Number.isInteger(n) && n >= -1)
+      || ('equippedSkillIds' in plan && (!Array.isArray(plan.equippedSkillIds) || !plan.equippedSkillIds.every(n => Number.isInteger(n) && n >= -1))))
+      throw new Error(`${name('characters', id)} has an invalid plan.`);
     for (const item of C.equipmentIds(plan)) use(Number(item));
     const v = Number(plan.visionId);
     if (v > 0 && taken.has(v)) throw new Error(`${name('characters', taken.get(v))} and ${name('characters', id)} are both planned with ${name('visions', v)}.`);
     if (v > 0) taken.set(v, Number(id));
+  }
+  // Validate at the write boundary too: restored browser plans have not passed the current UI checks.
+  for (const [id, plan] of Object.entries(plans)) {
+    const why = C.validPlan(catalog, snap, Number(id), plan, {}, false);
+    if (why) throw new Error(`${name('characters', id)}: ${why}`);
+    if (plan.visionId > 0 && !index.visions.has(plan.visionId)) throw new Error('Unknown Resonance.');
+    if (Array.isArray(plan.equippedSkillIds)) {
+      const why = validateAbilities(plan.equippedSkillIds, learnedForBuild(stats, catalog, snap, Number(id), plan), index);
+      if (why) throw new Error(`${name('characters', id)}'s planned abilities don't fit: ${why}`);
+    }
   }
   // Characters without a plan give up anything a plan needs, as the game's own equip screen would.
   const changes = { ...plans };
@@ -108,9 +119,6 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
     plan.accessoryIds.forEach((a, i) => set(`${p}EquipAccessoryIdList[${i}]`, a));
     const explicit = Array.isArray(plan.equippedSkillIds), wanted = (plan.equippedSkillIds || []).map(Number);
     // A plan that lists abilities is exact (an empty list clears them); one without keeps what is on while it still fits.
-    const on = saved.equippedSkillIds.map(Number).filter(id => id > 0), want = wanted.filter(id => id > 0);
-    const same = explicit ? want.length === on.length && want.every(id => on.includes(id)) : true;
-    if (same && Number(plan.visionId) === Number(saved.equipment.visionId)) continue;
     // The plan's abilities first, then the ones already on, while they're learned and fit the slots and EquipCost budget.
     const cost = id => Number((index.skills.get(id) || index.passives.get(id) || index.masterSkills.get(id))?.equipCost || 0);
     const learn = stats.learned(catalog, snap, saved.id, plan.visionId), known = new Set([...learn.learnedPassiveIds, ...learn.learnedActiveIds, ...learn.masterSkillIds]);
@@ -119,10 +127,10 @@ export async function savedWithPlans(bytes, snap, plans, { catalog, core: C, sta
     let spent = 0;
     for (const id of (explicit ? wanted : [...wanted, ...saved.equippedSkillIds]).map(Number)) {
       if (!(id > 0) || skills.includes(id) || skills.length >= slots || spent + cost(id) > budget) continue;
-      if (!wanted.includes(id) && !known.has(id)) continue;
+      if (!known.has(id)) continue;
       skills.push(id); spent += cost(id);
     }
-    if (wanted.some(id => !skills.includes(id))) throw new Error(`${name('characters', id)}'s planned abilities don't fit its slots.`);
+    if (wanted.filter(id => id > 0).some(id => !skills.includes(id))) throw new Error(`${name('characters', id)}'s planned abilities don't fit its slots.`);
     for (let i = 0; i < slots; i++) set(`${p}equipSkillList[${i}]`, skills[i] ?? -1);
   }
   return { bytes: await S.encodeSave(save, data), removed };

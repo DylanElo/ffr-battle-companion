@@ -160,12 +160,41 @@ test('an abilities-only plan over the AP budget is refused', async () => {
   await assert.rejects(savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight), /planned abilities don't fit/);
 });
 
-test('a plan matching a padded save is skipped, even with no AP budget', async () => {
+test('a plan matching a padded save is still validated against the AP budget', async () => {
   const { file, snapshot, skill } = await withSkill();
   assert.ok(character(snapshot, 1001).equippedSkillIds.includes(-1), 'saved list is padded with -1');
   const tight = { ...deps, stats: { ...stats, characterStats: (...args) => ({ ...stats.characterStats(...args), skillBudget: 0 }) } };
-  const { bytes } = await savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight);
-  assert.deepEqual(bytes, file);
+  await assert.rejects(savedWithPlans(file, snapshot, { 1001: { ...planFor(snapshot, 1001, {}), equippedSkillIds: [skill] } }, tight), /planned abilities don't fit/);
+});
+
+test('save export rejects unknown and unlearned explicit abilities before returning encoded bytes', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  const learned = stats.learned(catalog, snapshot, 1001, amelia);
+  const known = new Set([...learned.learnedActiveIds, ...learned.learnedPassiveIds, ...learned.masterSkillIds]);
+  const unlearned = catalog.skills.find(s => !known.has(s.id) && s.equipCost > 0 && s.equipCost <= 100).id;
+  for (const id of [987654321, unlearned]) {
+    await assert.rejects(savedWithPlans(file, snapshot, {1001: {...planFor(snapshot, 1001, {}), equippedSkillIds:[id]}}, deps), /not available|unknown ability/i);
+  }
+});
+
+test('save export rejects incompatible gear, unowned Resonances and unavailable characters', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  for (const [id, patch, reason] of [[1001, {weaponId:katana}, /not compatible/], [1001, {visionId:987654321}, /not owned|unknown Resonance/i], [987654321, {}, /not available/]]) {
+    await assert.rejects(savedWithPlans(file, snapshot, {[id]:planFor(snapshot, 1001, patch)}, deps), reason);
+  }
+});
+
+test('explicit duplicate abilities are rejected rather than silently discarded', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  const id = stats.learned(catalog, snapshot, 1001, amelia).learnedActiveIds.find(costly);
+  await assert.rejects(savedWithPlans(file, snapshot, {1001:{...planFor(snapshot, 1001, {}),equippedSkillIds:[id,id]}}, deps), /more than once/);
+});
+
+test('malformed restored plans are rejected at the write boundary', async () => {
+  const file = await gameSave(), snapshot = await load(file);
+  for (const patch of [{weaponId:1.5}, {accessoryIds:null}, {equippedSkillIds:{}}, {equippedSkillIds:[NaN]}]) {
+    await assert.rejects(savedWithPlans(file, snapshot, {1001:planFor(snapshot,1001,patch)}, deps), /invalid plan/);
+  }
 });
 
 test('a plan whose set differs from a padded save is still written', async () => {

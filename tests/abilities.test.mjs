@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { equippableAbilities, abilityLoad, canEquip, dropUnavailable } from '../docs/abilities.js';
+import { equippableAbilities, abilityLoad, canEquip, validateAbilities, dropUnavailable } from '../docs/abilities.js';
 
 const indexes = {
   skills: new Map([[1, { id: 1, name: 'Free Strike', equipCost: 0 }], [2, { id: 2, name: 'Fira', equipCost: 20 }], [3, { id: 3, name: 'Cure', equipCost: 10 }]]),
@@ -21,6 +21,19 @@ test('canEquip refuses when slots are full', () => {
 });
 test('canEquip allows when AP and a slot are free', () => {
   assert.equal(canEquip(3, [4], learned(), indexes), '');
+});
+
+test('canEquip rejects abilities unavailable with this Resonance even with free AP and slots', () => {
+  assert.equal(canEquip(2, [], learned({ learnedActiveIds: [3] }), indexes), 'Not available with this Resonance.');
+  assert.equal(canEquip(999, [], learned(), indexes), 'Not available with this Resonance.');
+});
+
+test('validateAbilities catches reduced AP, slots and abilities unavailable after a gear or Resonance change', () => {
+  assert.equal(validateAbilities([2, 3], learned(), indexes), '');
+  assert.match(validateAbilities([2, 3], learned({skillBudget:20}), indexes), /Not enough AP/);
+  assert.match(validateAbilities([2, 3], learned({maxSkillSlots:1}), indexes), /No free ability slot/);
+  assert.match(validateAbilities([2], learned({learnedActiveIds:[]}), indexes), /Not available/);
+  assert.match(validateAbilities([2, 2], learned(), indexes), /more than once/);
 });
 test('dropUnavailable drops ids the new Resonance no longer teaches', () => {
   assert.deepEqual(dropUnavailable([2, 3, 4], learned({ learnedActiveIds: [3] , learnedPassiveIds: [4]})), { kept: [3, 4], dropped: [2] });

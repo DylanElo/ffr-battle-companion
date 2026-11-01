@@ -221,7 +221,7 @@ test('no pins, or an empty pin list, leaves the evaluation unchanged',()=>{
   assert.deepEqual(plain(run(undefined)),base);
 });
 
-test('a pinned free ability costs nothing and an unknown pin is ignored',()=>{
+test('a pinned free ability costs nothing and unavailable pins invalidate the build',()=>{
   const {run,attack}=pinFixture();
   const base=plain(run());
   const freePin=run([attack.id]);
@@ -229,7 +229,6 @@ test('a pinned free ability costs nothing and an unknown pin is ignored',()=>{
   assert.equal(freePin.skillCost,base.skillCost);
   assert.deepEqual(freePin.equippedSkillIds,base.equippedSkillIds);
   const unknown=run([987654321]);
-  assert.equal(unknown.valid,true);
-  assert.equal(unknown.skillCost,base.skillCost);
-  assert.deepEqual(unknown.equippedSkillIds,base.equippedSkillIds);
+  assert.equal(unknown.valid,false);
+  assert.match(unknown.reason,/unlearned ability/);
 });

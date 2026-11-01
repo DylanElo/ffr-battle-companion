@@ -2,6 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const core = require('../docs/core.js');
 
+test('equipped-only stock is shared without double counting inventory totals or unrecruited defaults',()=>{
+  const snapshot={inventory:[{id:1,quantity:2}],characters:[
+    {id:1,joinStatus:'Join',usable:true,equipment:{weaponId:1,accessoryIds:[2]}},
+    {id:2,joinStatus:'Join',usable:true,equipment:{weaponId:1,accessoryIds:[2]}},
+    {id:3,joinStatus:'NotJoin',usable:false,equipment:{weaponId:3,accessoryIds:[]}}]};
+  assert.deepEqual([...core.ownedStock(snapshot)],[[1,2],[2,2]]);
+  assert.equal(core.stock(snapshot,1).get(2),1);
+  assert.equal(core.stock(snapshot,1).has(3),false);
+});
+
 function fixture() {
   const equipment = [
     {id:101,name:'Sword',type:'Weapon',detailType:'Sword',sexLimit:'None',stats:{PhysicalAttack:40}},
@@ -195,4 +205,12 @@ test('normalizeGoal defaults and clamps', () => {
   assert.equal(n({incomingDamage: '12.9'}).incomingDamage, 12);
   assert.equal(n({}).incomingType, 'Physic');
   assert.equal(n({incomingType: 'Magic'}).incomingType, 'Magic');
+});
+
+test('stockForSlot reserves other draft accessories but releases the slot being replaced',()=>{
+  const available=new Map([[30,1],[31,2]]),build={weaponId:-1,armorId:-1,accessoryIds:[30,31,-1]};
+  const empty=core.stockForSlot(available,build,'accessory',2);
+  assert.equal(empty.get(30),0);assert.equal(empty.get(31),1);
+  assert.equal(core.stockForSlot(available,build,'accessory',0).get(30),1);
+  assert.equal(available.get(30),1);
 });

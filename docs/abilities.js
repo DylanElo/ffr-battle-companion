@@ -15,9 +15,21 @@ export function abilityLoad(ids, learned, indexes) {
 
 /** '' when the ability fits, otherwise the reason it does not. */
 export function canEquip(id, ids, learned, indexes) {
+  if (!learnedIds(learned).includes(id) || !describeAbility(id, indexes)) return 'Not available with this Resonance.';
   const load = abilityLoad(ids, learned, indexes), cost = costOf(id, indexes);
   if (load.slots >= load.maxSlots) return 'No free ability slot.';
   if (load.used + cost > load.budget) return `Not enough AP (needs ${cost}, ${load.budget - load.used} left).`;
+  return '';
+}
+
+export function validateAbilities(ids, learned, indexes) {
+  if (!learned) return 'Abilities could not be validated for this build.';
+  const equipped = [];
+  for (const id of ids.filter(id => id > 0)) {
+    const reason = equipped.includes(id) ? 'Ability is equipped more than once.' : canEquip(id, equipped, learned, indexes);
+    if (reason) return `${describeAbility(id, indexes)?.name || id}: ${reason}`;
+    equipped.push(id);
+  }
   return '';
 }
 

@@ -241,10 +241,11 @@
       const divisor=[...contextCounts.values()].reduce((factor,entry)=>gcd(factor,entry.count),0);
       // Surrogate values average the leaves: repetition count and sibling order do not change that average.
       const contextKey=JSON.stringify([...contextCounts].sort(([a],[b])=>a.localeCompare(b)).map(([key,entry])=>[key,entry.count/divisor]));
-      const key=`${prepared.saved.id}:${visionId}:${prepared.current}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}:${contextKey}${locked.length?`:pins=${locked.join(',')}`:''}`;
+      const baselineKey=freeIds.slice().sort((a,b)=>a-b).join(',');
+      const key=`${prepared.saved.id}:${visionId}:${prepared.current}:${skill.id}:${effectiveElement}:${totalBudget}:${totalSlots}:${goalKey}:${turn.reservedIds.join(',')}:${contextKey}:free=${baselineKey}${locked.length?`:pins=${locked.join(',')}`:''}`;
       if(packageCache.has(key))return packageCache.get(key);
       const reference=prepared.saved.equipment;
-      const baseIds=unique(prepared.borrowed),baseAnalysis=analysis(baseIds,skill,turn.context);
+      const baseIds=unique(freeIds),baseAnalysis=analysis(baseIds,skill,turn.context);
       const baseFinal=S.characterStats(catalog,snapshot,prepared.saved.id,reference,baseAnalysis.terms);
       // One roll per (leaf skill, context, passive set) on the saved gear; recipes and Resonances reuse it.
       function referenceRoll(ids,leafSkill,context){
@@ -268,7 +269,7 @@
       }
       const baseline=referenceDamage(baseIds);
       // A passive set's value uses the saved reference gear, so it is shared across loadouts, budgets and reserved abilities.
-      const valuePrefix=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${contextKey}:`;
+      const valuePrefix=`${prepared.saved.id}:${visionId}:${skill.id}:${effectiveElement}:${contextKey}:free=${baselineKey}:`;
       function valueOf(ids){
         const valueKey=valuePrefix+ids.slice().sort((a,b)=>a-b).join(',');
         if(!valueCache.has(valueKey) && valueCache.size<200000)valueCache.set(valueKey,computeValue(ids));
@@ -292,7 +293,7 @@
       const requiredIds=unique([skill.id,...turn.reservedIds]);
       const forced=[null,...masters.filter(m=>(m.grants.activeIds || []).some(id=>requiredIds.includes(id)))];
       // Pins already reserved by the turn (or the attack itself) are charged there, not twice.
-      const pins=locked.filter(id=>id!==skill.id && !turn.reservedIds.includes(id) && !baseIds.includes(id));
+      const pins=locked.filter(id=>id!==skill.id && !turn.reservedIds.includes(id));
       const pinPackage=pins.filter(id=>source(id)),pinActives=pins.filter(id=>!source(id));
       let result=null,bestValue=-Infinity;
       for(const fixed of forced){
@@ -1014,8 +1015,10 @@
       if(prepared.fixed){
         if(prepared.equippedIds.some(id=>!allowed.has(id)))return {valid:false,score:-Infinity,reason:'The fixed ability loadout contains an unknown or unlearned ability.'};
       }
-      // A fixed loadout (current/equippedSkillIds) already is the loadout, so pins add nothing there. Unknown or unlearned pins are ignored.
-      const locked=prepared.fixed?[]:unique(lockedSkillIds || []).filter(id=>allowed.has(id) && !prepared.free.has(id));
+      // A fixed loadout already supplies its abilities. A search must satisfy every requested pin.
+      const requested=prepared.fixed?[]:unique(lockedSkillIds || []);
+      if(requested.some(id=>!allowed.has(id)))return {valid:false,score:-Infinity,reason:'A pinned ability is an unknown or unlearned ability with this Resonance.'};
+      const locked=requested.filter(id=>!prepared.free.has(id));
       if(locked.length){
         const stats0=S.characterStats(catalog,snapshot,characterId,equipment,[]);
         const granted=new Set(locked.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || []));
@@ -1215,8 +1218,8 @@
       }
 
       // Retry the best turns with LB gauge passives reserved; they only pay off through Limit Bursts in the fight simulation.
-      // Only the strongest learned fill-rate passive is tried (Triple over Double), on the best turn.
-      const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)).slice(-1),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
+      // Each learned tier competes on its actual AP/slot cost; the strongest tier may not fit.
+      const charges=LB_CHARGE_IDS.filter(id=>prepared.learned.includes(id)),extras=LB_EXTRA_IDS.filter(id=>prepared.learned.includes(id));
       if(!prepared.fixed && (prepared.limits.length || (goals.has('limit') && prepared.limitMax>0)) && charges.length+extras.length){
         const sets=[];
         for(const charge of [null,...charges])for(let mask=0;mask<(1<<extras.length);mask++){
@@ -1224,7 +1227,7 @@
           if(ids.length)sets.push(ids);
         }
         for(const base of results.slice().sort((a,b)=>b.score-a.score).slice(0,1))for(const ids of sets){
-          const reservedIds=[...base.turn.reservedIds,...ids];
+          const reservedIds=unique([...base.turn.reservedIds,...ids]);
           consider(indexes.skills.get(base.skillId),{...base.turn,reservedIds,reservedCost:equipCostOf(reservedIds)});
         }
       }

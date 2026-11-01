@@ -83,8 +83,21 @@
     return slot === 'accessory' && item.type === 'Accessory';
   }
   function equipmentIds(equipment) { return [equipment?.weaponId,equipment?.armorId,...(equipment?.accessoryIds || [])].filter(id=>Number(id)>0); }
+  function ownedStock(snapshot) {
+    const counts=new Map(),recorded=new Set();
+    for(const item of snapshot.inventory || []){
+      const id=Number(item.id),quantity=Number(item.quantity);
+      if(!Number.isInteger(id) || id<=0)continue;
+      recorded.add(id);
+      if(Number.isFinite(quantity) && quantity>0)counts.set(id,(counts.get(id)||0)+Math.floor(quantity));
+    }
+    // Equipped-only items are owned too; inventory rows already count total copies, including equipped gear.
+    for(const person of snapshot.characters || [])if(joined(person))for(const id of equipmentIds(person.equipment).map(Number))
+      if(!recorded.has(id))counts.set(id,(counts.get(id)||0)+1);
+    return counts;
+  }
   function stock(snapshot, selectedId, plans={}, reserve=true) {
-    const available = new Map((snapshot.inventory || []).map(item=>[Number(item.id),Number(item.quantity)]));
+    const available = ownedStock(snapshot);
     for (const character of snapshot.characters || []) {
       if (Number(character.id) === Number(selectedId) || !joined(character)) continue;
       const plan = plans[character.id];
@@ -92,6 +105,13 @@
       for (const id of equipmentIds(plan || character.equipment)) available.set(id,Math.max(0,(available.get(id)||0)-1));
     }
     return available;
+  }
+  function stockForSlot(available, build, slot, slotIndex=0) {
+    const remaining=new Map(available);
+    const ids=[slot==='weapon'?-1:build.weaponId,slot==='armor'?-1:build.armorId,
+      ...(build.accessoryIds || []).filter((_,i)=>slot!=='accessory' || i!==slotIndex)];
+    for(const id of ids.filter(id=>Number(id)>0))remaining.set(Number(id),Math.max(0,(remaining.get(Number(id))||0)-1));
+    return remaining;
   }
   function candidates(catalog, character, available, slot, goal) {
     return (catalog.equipment || []).filter(item=>(available.get(item.id)||0)>0 && eligible(item,character,slot)).sort((a,b)=>score(b,goal)-score(a,goal)||a.name.localeCompare(b.name));
@@ -275,7 +295,7 @@
     return {goals:goals.length?goals:['damage'],enemyId:raw?.enemyId!=='general'&&bossIds.includes(Number(raw?.enemyId))?Number(raw.enemyId):'general',
       incomingDamage:Number.isFinite(dmg)?Math.max(0,Math.min(99999999,dmg)):0,incomingType:raw?.incomingType==='Magic'?'Magic':'Physic'};
   }
-  const api={normalizeGoal,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,stock,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
+  const api={normalizeGoal,clean,joined,goals,statLabels,stats,score,priorityStats,priorityGoal,kitProfile,resonanceFit,skillFacts,resonanceFacts,matchFacts,eligible,equipmentIds,ownedStock,stock,stockForSlot,candidates,recommend,validPlan,emptyLocks,withLocks,lockedPieces,searchOptionsFor,checkLocks,mastery,accessibleSkills,encounterOptions};
   if(typeof module!=='undefined') module.exports=api;
   else root.Companion=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
