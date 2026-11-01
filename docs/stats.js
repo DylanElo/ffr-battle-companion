@@ -161,8 +161,28 @@
         else if(grant.type==='PassiveSkill')alwaysPassiveIds.push(grant.id);
       }
     }
+    // Native1452510D0/14524FDE0 also gather reached equipped-Vision Sync
+    // PassiveSkill/ActiveSkill grants automatically (145021000). MasterSkill
+    // bundles and permanent BaseParameter grants follow their separate paths.
+    const syncRecord=(own?.sync||[]).find(row=>Number(row.characterId)===Number(charId));
+    const syncPoints=syncRecord?Number(syncRecord.points):-1;
+    if(vision&&own&&Number.isFinite(syncPoints)&&syncPoints>=0)for(const stage of vision.synchro||[]){
+      const required=Number(stage.requiredPoints??stage.masteryPoint);
+      if(!Number.isFinite(required)||syncPoints<required)continue;
+      for(const grant of stage.grants||[]){
+        if(grant.type==='ActiveSkill')freeActiveIds.push(grant.id);
+        else if(grant.type==='PassiveSkill')alwaysPassiveIds.push(grant.id);
+      }
+    }
     const base=characterStats(catalog,snapshot,charId,saved.equipment);
     return {freeActiveIds:positiveIds(freeActiveIds),learnedActiveIds:positiveIds(learnedActiveIds),alwaysPassiveIds:positiveIds(alwaysPassiveIds),learnedPassiveIds:positiveIds(learnedPassiveIds),masterSkillIds:positiveIds(masterSkillIds),skillBudget:base.skillBudget,maxSkillSlots:base.maxSkillSlots,warnings:[...new Set([...warnings,...base.warnings])]};
+  }
+  // Native/Awakening/Sync references stay unique; each gear slot and equipped ability is a separate known source.
+  function passiveIdOccurrences(catalog,alwaysPassiveIds,equipment,equippedIds=[]){
+    const index=catalogIndex(catalog);
+    return [...positiveIds(alwaysPassiveIds),
+      ...[equipment?.weaponId,equipment?.armorId,...(equipment?.accessoryIds || [])].flatMap(id=>positiveIds(index.equipment.get(Number(id))?.passiveIds)),
+      ...positiveIds(equippedIds).flatMap(id=>positiveIds(index.masterSkills.get(id)?.grants?.passiveIds || (index.passives.has(id)?[id]:[])))];
   }
   const buildStatsCache=new WeakMap();
   function buildStats(catalog,snapshot,charId,build){
@@ -173,11 +193,9 @@
     if(!cache)buildStatsCache.set(context,cache=new Map());
     if(cache.has(key))return cache.get(key);
     const index=catalogIndex(catalog),pool=learned(catalog,snapshot,charId,gear.visionId);
-    const gearIds=[gear.weaponId,gear.armorId,...(gear.accessoryIds || [])];
-    const passiveIds=positiveIds([...pool.alwaysPassiveIds,...gearIds.flatMap(id=>index.equipment.get(Number(id))?.passiveIds || []),
-      ...equipped.flatMap(id=>index.masterSkills.get(id)?.grants?.passiveIds || (index.passives.has(id)?[id]:[]))]);
+    const occurrences=passiveIdOccurrences(catalog,pool.alwaysPassiveIds,gear,equipped),passiveIds=positiveIds(occurrences);
     // No action or combat state is assumed in the editor; conditional stat changes remain deferred.
-    const passiveAnalysis=passiveModel.analyze(catalog,passiveIds);
+    const passiveAnalysis=passiveModel.analyze(catalog,passiveIds,{passiveIdOccurrences:occurrences});
     const deferredStatEffects=passiveAnalysis.deferred.filter(record=>{
       const kind=record.kind || (index.effects.has(record.effectId)?passiveModel.decode(index.effects.get(record.effectId)).kind:'');
       return ['statFlat','statPercent','statScale','primaryStatScale'].includes(kind);
@@ -185,7 +203,7 @@
     const result={...characterStats(catalog,snapshot,charId,gear,passiveAnalysis.terms),passiveAnalysis,deferredStatEffects};
     cache.set(key,result);return result;
   }
-  const api={parameterNames,normalize,effectDelta,growth,permanentSync,characterStats,buildStats,learned};
+  const api={parameterNames,normalize,effectDelta,growth,permanentSync,characterStats,buildStats,learned,passiveIdOccurrences};
   if(typeof module!=='undefined')module.exports=api;
   else root.CompanionStats=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

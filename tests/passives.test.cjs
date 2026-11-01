@@ -127,6 +127,43 @@ test('already-applied party buffs join the same native bucket as passive damage 
   assert.equal(debuff.modifiers.statPercent.Defence,-30);
 });
 
+test('distinct active DamageMultiplier instances with identical IDs sum in the native bucket',()=>{
+  const ultima=catalog.skills.find(s=>s.id===220340);
+  const result=P.analyze(catalog,[],{...context,skill:ultima,activeEffectIds:[16011,16011]});
+  assert.equal(result.modifiers.damagePercent,20);
+  assert.equal(result.damageFactor,1.2);
+  assert.equal(result.applied.filter(t=>t.effectId===16011).length,2);
+  assert.equal(result.deferred.length,0);
+  assert.equal(result.coverage.effects,2);
+  assert.equal(result.identicalEffectStackingVerified,false,'Other effect-type stacking remains unverified');
+});
+
+test('active DamageMultiplier copies still require matching type, conditions, layout and activation',()=>{
+  const inactive=P.analyze(catalog,[],{...context,activeEffectIds:[16011,16011]});
+  assert.equal(inactive.damageFactor,1);
+  assert.equal(inactive.applied.length,0);
+  const missing=P.analyze(catalog,[],{skill,activeEffectIds:[12924,12924]});
+  assert.equal(missing.damageFactor,1);
+  assert.ok(missing.deferred.some(t=>/hpPercent/.test(t.reason)));
+  for(const overrides of [{activationProbability:50},{params:[10]}]){
+    const effect={...catalog.effects.find(e=>e.id===16001),...overrides};
+    const excluded=P.analyze({...catalog,effects:[effect]},[],{...context,activeEffectIds:[16001,16001]});
+    assert.equal(excluded.damageFactor,1);
+    assert.equal(excluded.applied.length,0);
+    assert.equal(excluded.deferred.length+excluded.unsupported.length,2);
+  }
+});
+
+test('other identical active effects and repeated semantic passive references remain conservative',()=>{
+  const stat=P.analyze(catalog,[],{...context,activeEffectIds:[16301,16301]});
+  assert.equal(stat.modifiers.statPercent.HitPoint,10);
+  assert.match(stat.deferred[0].reason,/identical-effect stacking has not been verified/);
+  const magic=passiveFor(16011),ultima=catalog.skills.find(s=>s.id===220340);
+  const references=P.analyze(catalog,[magic,magic],{...context,skill:ultima});
+  assert.equal(references.damageFactor,1.1);
+  assert.match(references.deferred[0].reason,/Duplicate native effect/);
+});
+
 test('fresh native state rules exclude story-only finishers and wrong-form actions',()=>{
   const get=id=>catalog.skills.find(s=>s.id===id);
   const normal={demonForm:false,extraPhase:false,awakeningPower:false,hasEscaped:false,lbPercent:0};
