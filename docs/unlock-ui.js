@@ -1,6 +1,6 @@
 import {h} from './build-details.js?v=13';
 import {describeAbility} from './piece-details.js?v=2';
-import {renderResultExplanations} from './result-explanations.js?v=2';
+import {renderResultExplanations} from './result-explanations.js?v=3';
 
 const n = value => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: 1}) : '—';
 const score = value => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumSignificantDigits: 4}) : '—';

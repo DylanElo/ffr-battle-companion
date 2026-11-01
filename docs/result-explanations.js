@@ -34,11 +34,14 @@ export function renderResultExplanations({evaluation = {}, scenario = {}, enemyN
   const coverageLine = ['applied', 'deferred', 'unsupported'].filter(key => numeric(coverage[key]))
     .map(key => `${coverage[key]} ${key}`).join(' · ');
   const warnings = texts(evaluation.warnings);
+  const passiveSearch=evaluation.jointPassiveCoverage;
+  const passiveTrials=passiveSearch?`${list(passiveSearch.triedIds).length} / ${list(passiveSearch.eligibleIds).length} learned passive and Spirit sources appeared in completed trials for the selected action recipe.${passiveSearch.complete?'':' The budget ended before every source received a trial.'} Source coverage does not prove every combination was searched or every native effect is modeled.`:'';
   const sources = ['formula', 'stats', 'passives', 'search', 'calibration'].map(key => evidence[key]).filter(text => typeof text === 'string' && text.trim());
   return `<section class="result-explanations" aria-label="Estimate assumptions and limitations">
     <p class="note"><strong>Estimate, not a live-fight prediction.</strong> Battle sequencing has not been calibrated against a live fight. This bounded search shows the strongest builds found under these conditions, not a proven global optimum.</p>
     <details><summary>Assumptions and model limits</summary>
       ${assumptions.length ? bullets(assumptions) : '<p>Scenario settings were not supplied with this result; its assumptions cannot be shown.</p>'}
+      ${passiveTrials?`<h5>Passive search coverage</h5><p>${h(passiveTrials)}</p>`:''}
       <h5>Effects in the initial damage calculation</h5>
       ${coverageLine ? `<p>${h(coverageLine)}. These counts describe this calculation, not a confidence rating.</p>` : '<p>Passive coverage was not supplied with this result.</p>'}
       ${applied.length ? `<p>Applied effects:</p>${bullets(applied)}` : ''}

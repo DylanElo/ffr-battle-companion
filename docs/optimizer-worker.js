@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=27', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=44', 'search.js?v=36', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=27', 'passives.js?v=25', 'damage.js?v=6', 'stats.js?v=24', 'battle.js?v=45', 'search.js?v=36', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -44,9 +44,19 @@ self.onmessage = async event => {
       const evaluate=args=>model.evaluate(args);
       const available=new Map(event.data.available);
       // Leave part of the same budget to complete and compare the returned gear sets.
-      const candidateOptions={...options,deadline:options.deadline-Math.min(1000,budgetMs*.2)};
+      const candidateOptions={...options,deadline:options.deadline-Math.min(2000,budgetMs*.25)};
       const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options:candidateOptions,candidate:checkpoint},
         candidateOptions,available);
+      const leader=candidates.filter(c=>!taken.has(c.visionId)).sort(CompanionSearch.compareCandidates)[0];
+      const refinementMs=Math.min(1500,options.deadline-Date.now()-250);
+      if(leader && refinementMs>0){
+        const refinement={...options,deadline:Date.now()+refinementMs,maxEvaluations:1,seedEvaluationTimeMs:refinementMs,
+          visionIds:[leader.visionId],locks:{...options.locks,visionId:leader.visionId,weaponId:leader.equipment.weaponId,
+            armorId:leader.equipment.armorId,accessoryIds:leader.equipment.accessoryIds?.filter(id=>id>0) || []}};
+        const refineEvaluate=args=>model.evaluate({...args,refineEvaluation:leader.evaluation});
+        candidates.push(...CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,
+          {evaluate:refineEvaluate,enemy,options:refinement,candidate:checkpoint},refinement,available));
+      }
       // shortcut: complete a bounded shortlist; increase candidate budgets for a wider comparison.
       const completed=candidates.filter(c=>!taken.has(c.visionId)).sort(CompanionSearch.compareCandidates)
         .slice(0,Math.max(3,3*(options.candidatesPerVision || 6)))
