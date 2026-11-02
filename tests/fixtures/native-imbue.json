@@ -1,0 +1,163 @@
+{
+  "evidence": "Full installed effective-element collector14523DD20 plus actual forced/whenNone native getters executed in private Unicorn memory. Only global/table services, allocation/free and cookie-check environment supplied; gate branches and collection logic unmodified. No game process access or game/save writes.",
+  "exeSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "effect": {
+    "id": 40202,
+    "row": "無属性攻撃時に火属性付与（永続）",
+    "type": "AddElementWhenNoneElement",
+    "params": [
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+    ],
+    "status": "None",
+    "prob": 100,
+    "activationProbability": 100,
+    "duration": -1,
+    "applyTiming": "None",
+    "proceedTiming": "None",
+    "condition": {
+      "Condition": "None",
+      "param1": -1,
+      "param2": -1,
+      "param3": -1
+    }
+  },
+  "vectors": [
+    {
+      "baseElement": 0,
+      "damageType": 0,
+      "nativeEffectiveElements": []
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "nativeEffectiveElements": [
+        1
+      ]
+    },
+    {
+      "baseElement": 0,
+      "damageType": 2,
+      "nativeEffectiveElements": []
+    },
+    {
+      "baseElement": 1,
+      "damageType": 0,
+      "nativeEffectiveElements": [
+        1
+      ]
+    },
+    {
+      "baseElement": 1,
+      "damageType": 1,
+      "nativeEffectiveElements": [
+        1
+      ]
+    },
+    {
+      "baseElement": 1,
+      "damageType": 2,
+      "nativeEffectiveElements": [
+        1
+      ]
+    },
+    {
+      "baseElement": 8,
+      "damageType": 0,
+      "nativeEffectiveElements": [
+        8
+      ]
+    },
+    {
+      "baseElement": 8,
+      "damageType": 1,
+      "nativeEffectiveElements": [
+        8
+      ]
+    },
+    {
+      "baseElement": 8,
+      "damageType": 2,
+      "nativeEffectiveElements": [
+        8
+      ]
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 1,
+      "variation": 3,
+      "elementCalculationEnabled": true,
+      "forcedElement": 0,
+      "nativeEffectiveElements": [
+        1
+      ]
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 1,
+      "variation": 2,
+      "elementCalculationEnabled": true,
+      "forcedElement": 0,
+      "nativeEffectiveElements": []
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 2,
+      "variation": 1,
+      "elementCalculationEnabled": true,
+      "forcedElement": 0,
+      "nativeEffectiveElements": []
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 1,
+      "variation": 1,
+      "elementCalculationEnabled": false,
+      "forcedElement": 0,
+      "nativeEffectiveElements": []
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 1,
+      "variation": 1,
+      "elementCalculationEnabled": true,
+      "forcedElement": 2,
+      "nativeEffectiveElements": [
+        2
+      ]
+    },
+    {
+      "baseElement": 0,
+      "damageType": 1,
+      "parameter": 1,
+      "variation": 1,
+      "elementCalculationEnabled": true,
+      "forcedElement": 1,
+      "nativeEffectiveElements": [
+        1
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic skill/calculation rows; no live damage capture.",
+    "Oracle tests native doCalcElement eligibility flag but not all calculation table rows."
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "scope": "Private Unicorn, actual installed HP aggregator14523E3E0 with actual Mundanity handler; copied original break aggregator addss and scalar HP/BP instruction blocks. Environment/table services inherited explicitly from mundanity-native-oracle. Not live combat.",
+  "nativeHpFactor": 1.4000000953674316,
+  "nativeBreakFactor": 0.5000001192092896,
+  "aggregation": [
+    "HP14523E47D loads1;14523E528 calls getter;14523E536 addss;14523E5C2 adds other bucket0;14523E5D5 max0. No normalization.",
+    "BP145232093 loads1 toXMM7;145232110 copies1 toXMM11;145232183 calls getter;145232186 addss;14523226E mulss uses resultingXMM11. No normalization."
+  ],
+  "hpExample": {
+    "stats": {
+      "attack": 75,
+      "defense": 10,
+      "level": 55,
+      "calcType": "Magic",
+      "mag": 200
+    },
+    "preOutgoing": 34117.85546875,
+    "results": [
+      {
+        "factor": 1.4,
+        "nativeRaw": 47764.99609375,
+        "truncatedAmount": 47764
+      },
+      {
+        "factor": 1.4000000953674316,
+        "nativeRaw": 47765.0,
+        "truncatedAmount": 47765
+      }
+    ]
+  },
+  "bpExample": {
+    "breakDmg": 1792,
+    "level": 55,
+    "targetLevel": 10,
+    "levelFactor": 1.9815843105316162,
+    "results": [
+      {
+        "factor": 0.5,
+        "nativeBeforeInteger": 1775.99951171875,
+        "nativeAmount": 1775
+      },
+      {
+        "factor": 0.5000001192092896,
+        "nativeBeforeInteger": 1776.0,
+        "nativeAmount": 1776
+      }
+    ]
+  },
+  "limits": [
+    "Base HP and level factor supplied from existing verified scalar model/native fixtures; oracle isolates aggregator and downstream rounding, not complete battle state.",
+    "Do not generalize additive decoder fix to unverified effect families or change all rounding paths based only on this case."
+  ]
+}

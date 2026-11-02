@@ -1,0 +1,317 @@
+{
+  "evidence": "Installed native handlers and common filter code executed in isolated Unicorn; no process opened, no target calls, no game/save writes. Environment/table services supplied synthetic owner and base skill row; HP ratio fixed full. Native gate branches and f32 arithmetic unchanged.",
+  "exeSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "effects": [
+    {
+      "id": 12944,
+      "row": "無属性時ダメージ倍率+40%(無の境地)",
+      "type": "DamageMultiplier",
+      "params": [
+        40,
+        0,
+        -1,
+        0,
+        -1,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 15126,
+      "row": "無属性攻撃時ブレイクダメージ-50%(無の境地)",
+      "type": "BreakDamageVariation",
+      "params": [
+        -50,
+        -1,
+        -1,
+        0,
+        -1,
+        -1,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "BreakDmgCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "effectId": 12944,
+      "baseSkillElement": 0,
+      "damageType": 0,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 0,
+      "damageType": 1,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 1,
+      "damageType": 0,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 1,
+      "damageType": 1,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 8,
+      "damageType": 0,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 8,
+      "damageType": 1,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "baseSkillElement": 8,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 0,
+      "damageType": 0,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 0,
+      "damageType": 1,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 1,
+      "damageType": 0,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 1,
+      "damageType": 1,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 8,
+      "damageType": 0,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 8,
+      "damageType": 1,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "baseSkillElement": 8,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": -1,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": -1,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 0,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 0,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 1,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 1,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 2,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0.40000009536743164
+    },
+    {
+      "effectId": 12944,
+      "filterParam": 14,
+      "filterValue": 2,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": -1,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": -1,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 0,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 0,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 1,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 1,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 2,
+      "baseSkillElement": 0,
+      "damageType": 2,
+      "nativeAdditiveContribution": -0.49999988079071045
+    },
+    {
+      "effectId": 15126,
+      "filterParam": 11,
+      "filterValue": 2,
+      "baseSkillElement": 1,
+      "damageType": 2,
+      "nativeAdditiveContribution": 0
+    }
+  ],
+  "limits": [
+    "This is a synthetic handler oracle, not a live end-to-end combat capture.",
+    "Effective imbue does not enter either non-element gate: both read base skill row +0x7E. Native effective-element production is a separate path.",
+    "HP contribution is additive to other applicable DamageCalculation modifiers; +40% does not mean final damage x1.4 with all other effects present."
+  ]
+}

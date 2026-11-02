@@ -69,7 +69,7 @@
       if(Number(p[10])>=0)requireValue('critical',Number(p[10])!==0);
       if(Number(p[12])>=0)requireValue('notTargeted',Number(p[12])!==0);
       if(Number(p[13])>=0)requireValue('mpPercent',Number(p[13]),'min');
-      if(Number(p[14])>=0)requireValue('element','None');
+      if(Number(p[14])>=0)requireValue('skill.element','None');
       if(clean(effect.applyTiming)==='DamageCalculationOnBreak')requireValue('broken',true);
       term.kind='damagePercent';term.value=Number(p[0]);return term;
     }
@@ -117,7 +117,7 @@
       if(Number(p[6])>0)requireValue('hpPercent',Number(p[6]),'min');
       if(Number(p[7])>0)requireValue('skill.dmgType',damageTypes[p[7]]);
       if(Number(p[9])>=0)requireValue('critical',Number(p[9])!==0);
-      if(Number(p[11])>=0)requireValue('element','None');
+      if(Number(p[11])>=0)requireValue('skill.element','None');
       if(Number(p[12])>=0)requireValue('commandId',Number(p[12]));
       if(Number(p[13])>=0)requireValue('protectedOrShelled',Number(p[13])!==0);
       if(Number(p[14])>=0)return reject('Unmodeled trailing break multiplier filter.');
@@ -127,6 +127,7 @@
       if(!elements[p[0]] || (type==='AddElementWhenNoneElement' && !allDefault(1)))return reject('Unrecognized imbue layout.');
       if(type==='AddElement' && !allDefault(2))return reject('Unrecognized forced imbue layout.');
       if(type==='AddElement' && Number(p[1])>=0)requireValue('skill.id',Number(p[1]));
+      if(type==='AddElementWhenNoneElement'){requireValue('skill.element','None');requireValue('skill.parameterType','HitPoint');requireValue('skill.parameterVariationType',['Decrease','RatioDecrease'],'oneOf');requireValue('skill.dmgType','Physic');}
       term.kind='imbue';term.element=elements[p[0]];term.whenNoneOnly=type==='AddElementWhenNoneElement';return term;
     }
     if(type==='AddElementResistance'){
@@ -277,16 +278,21 @@
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
       if(term.whenNoneOnly && originalElement!=='None'){result.inactive.push({...term,reason:'The skill already has an element.'});continue;}
+      if(term.whenNoneOnly && catalog.skillRules?.damageCalc?.[clean(context.skill?.calcType)]?.doCalcElement===false){result.inactive.push({...term,reason:'Native calculation rules disable element calculation.'});continue;}
       if(!term.whenNoneOnly && !['Fight','Ability','MagicSword'].includes(clean(context.skill?.attr))){result.deferred.push({...term,reason:'Forced imbue scope is limited to fight/ability/magic-sword actions.'});continue;}
       potential.push(term);
     }
-    const uniqueElements=[...new Set(potential.map(t=>t.element))];
+    // Native forced elements suppress the separate when-None getter.
+    const forced=potential.filter(term=>!term.whenNoneOnly);
+    const resolved=forced.length?forced:potential;
+    if(forced.length)for(const term of potential.filter(term=>term.whenNoneOnly))result.inactive.push({...term,reason:'A forced element takes precedence over a when-None imbue.'});
+    const uniqueElements=[...new Set(resolved.map(t=>t.element))];
     if(uniqueElements.length>1){
-      for(const term of potential)result.deferred.push({...term,reason:'Conflicting imbues; native precedence is not verified.'});
+      for(const term of resolved)result.deferred.push({...term,reason:'Conflicting imbues; native precedence is not verified.'});
       context.element=originalElement;result.elementAmbiguous=true;
     }else{
       context.element=uniqueElements[0] || originalElement;
-      for(const term of potential){modifiers.imbues.push({element:term.element,whenNoneOnly:term.whenNoneOnly,effectId:term.effectId});result.applied.push(term);result.terms.push(term);}
+      for(const term of resolved){modifiers.imbues.push({element:term.element,whenNoneOnly:term.whenNoneOnly,effectId:term.effectId});result.applied.push(term);result.terms.push(term);}
     }
     modifiers.element=context.element;
     // Native Skill Flow reads this product for both its value and cap, independent of effect-list order.
@@ -368,8 +374,11 @@
     }
     result.coverage.applied=result.applied.length;result.coverage.deferred=result.deferred.length;result.coverage.unsupported=result.unsupported.length;
     result.complete=result.deferred.length===0 && result.unsupported.length===0 && !result.elementAmbiguous;
-    result.damageFactor=Math.max(0,1+(modifiers.damagePercent+modifiers.elementDamagePercent)/100);
-    result.breakFactor=Math.max(0,1+(modifiers.breakPercent+modifiers.elementBreakPercent)/100);
+    // shortcut: preserve epsilon for verified Mundanity getters; extend after tracing other effect families.
+    const nativeCorrection=effectId=>result.terms.filter(term=>term.effectId===effectId)
+      .reduce((sum,term)=>sum+f(f(f(term.value)*f(.01))+EPS)-term.value/100,0);
+    result.damageFactor=Math.max(0,1+(modifiers.damagePercent+modifiers.elementDamagePercent)/100+nativeCorrection(12944));
+    result.breakFactor=Math.max(0,1+(modifiers.breakPercent+modifiers.elementBreakPercent)/100+nativeCorrection(15126));
     return result;
   }
   function supportActions(catalog,skillIds){
