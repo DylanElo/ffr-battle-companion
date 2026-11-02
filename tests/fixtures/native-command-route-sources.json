@@ -1,0 +1,20 @@
+{
+  "evidence": {
+    "method": "Installed-executable instructions executed in isolated Unicorn memory; synthetic metadata/environment inputs are explicit in the standalone scratch oracles. No target process access or game/save writes.",
+    "exeSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+    "nativeChecks": 112,
+    "checks": {"offeredSources":24,"childLists":36,"awakeningQualification":35,"globalRoot":10,"parentFlatten":7},
+    "sourceTable": "Unit/DT_UnitBattleCmd, freshly extracted from installed Paks; eight rows",
+    "sourceRowsSha256": "E0CB7D3DF2EC749B09DF1B812805F5B1649DC2D3F1C6F304D0B0B5AAF43ADB87",
+    "addresses": {"offeredSources":"14524FC90", "childList":"145240060", "awakeningGrantList":"1450180E0", "awakeningRemapPredicate":"145023E50", "globalRoot":"145167CC0", "childParentWriter":"14515A10F-14515A112 / 14515A48B-14515A48F", "flattenParentKey":"145165409"},
+    "limits": ["Fresh Blueprint selection and live combat were not replayed.","Mimic, item, forced-command and exceptional Finish routes remain outside these ordinary-menu source rules."]
+  },
+  "vectors": [
+    {"case":"generic paid Spirit Sync pool","rootCommandId":1,"ownerActiveIds":[400450,400360,220380],"childIds":[400450,400360,220380]},
+    {"case":"Amelia Awakening zero","rootCommandId":202,"awakeningPoints":0,"childIds":[220010,220210,230080]},
+    {"case":"Arms inner Vision","globalCommandId":1,"hierarchy":[1,400650,202],"skillId":220010,"parentActionId":202},
+    {"case":"Arms inner generic","globalCommandId":1,"hierarchy":[1,400650,1],"skillId":220380,"parentActionId":1},
+    {"case":"direct Arms parent","globalCommandId":1,"hierarchy":[1,400650],"skillId":220010,"parentActionId":400650},
+    {"case":"sequential wrapper remaps reached AW only","globalCommandId":1,"parentActionId":400360,"reachedAwSkillId":220010,"mappedCommandId":202,"syncOnlySkillId":400450,"syncMappedCommandId":1}
+  ]
+}

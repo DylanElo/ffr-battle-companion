@@ -113,26 +113,36 @@
       if(!mpCostCache.has(key))mpCostCache.set(key,M.costForSkill(catalog,costOccurrences,skill,costContext));
       return mpCostCache.get(key);
     }
-    function commandTurn(turn,characterId,equipment){
-      const vision=indexes.visions.get(Number(equipment.visionId)),owned=(snapshot.resonances || []).find(row=>row.id===Number(equipment.visionId));
-      const unlocked=new Set((vision?.awakening || []).filter(stage=>Number(stage.requiredPoints ?? stage.masteryPoint)<=Number(owned?.awakeningPoints ?? -1))
+    const nativeActiveCache=new Map();
+    function commandTurn(turn,prepared,equipment,packageInfo,skillId){
+      const characterId=prepared.saved.id,vision=indexes.visions.get(Number(equipment.visionId));
+      const owned=(snapshot.resonances || []).find(row=>row.id===Number(equipment.visionId));
+      const awakened=new Set((vision?.awakening || []).filter(stage=>Number(stage.requiredPoints ?? stage.masteryPoint)<=Number(owned?.awakeningPoints ?? -1))
         .flatMap(stage=>(stage.grants || []).filter(grant=>grant.type==='ActiveSkill').map(grant=>grant.id)));
-      const steps=turn.steps || turn.leaves,root=steps.find(step=>!step.nativeRepeat),sequential=catalog.skillRules?.general?.sequentialSelectedSkills || [];
-      const canSelectVision=root && (root.kind!=='wrapper' || sequential.includes(root.skillId));
-      const ancestry=[],contexts=[];
+      if(!nativeActiveCache.has(characterId))nativeActiveCache.set(characterId,unique([...(prepared.saved.activeSkillIds || []),
+        ...S.growth(catalog,indexes.characters.get(characterId),prepared.saved.experience).skillIds.filter(id=>indexes.skills.has(id))]));
+      const physical=prepared.fixed?prepared.equippedIds:unique([...packageInfo.equippedIds,...(packageInfo.reservedIds || turn.reservedIds),
+        ...(packageInfo.freeActiveIds.includes(skillId)?[]:[skillId])]);
+      const generic=new Set([...nativeActiveCache.get(characterId),...equippedSyncActiveIds(characterId,equipment),
+        ...physical.filter(id=>indexes.skills.has(id)),...physical.flatMap(id=>indexes.masterSkills.get(id)?.grants?.activeIds || [])]);
+      const menuFor=id=>awakened.has(id)?vision.commandId:generic.has(id) && (indexes.skills.get(id)?.commandIds || []).includes(1)?1:undefined;
+      const steps=turn.steps || turn.leaves,root=steps.find(step=>!step.nativeRepeat),initialCommandId=menuFor(root?.skillId);
+      const sequential=catalog.skillRules?.general?.sequentialSelectedSkills || [],ancestry=[],contexts=[];
       const projected=steps.map(step=>{
         if(step.nativeRepeat)return step;
         const depth=number(step.depth,step.kind==='wrapper'?0:ancestry.length);ancestry.length=depth;
-        if(step.kind==='wrapper'){ancestry[depth]=step.skillId;return step;}
-        // Use an explicit reached-Awakening Vision command; paid and Spirit menu routes remain unproved.
-        const command=canSelectVision && unlocked.has(step.skillId)?vision.commandId:undefined;
-        const {hierarchySkills,queuedCommandId,commandId,...originalContext}=step.context || {};
-        const context={...originalContext,hierarchySkills:ancestry.slice(0,depth),...(command!==undefined?{queuedCommandId:command,commandId:command}:{})};
+        // Arms opens another root menu; other selectors retain their immediate wrapper parent.
+        const wrapper=ancestry.at(-1),parentActionId=wrapper && wrapper!==ARMS_AKIMBO?wrapper:menuFor(step.skillId);
+        const command=vision && (parentActionId===vision.commandId || sequential.includes(parentActionId) && awakened.has(step.skillId))?vision.commandId:initialCommandId;
+        const {hierarchySkills,queuedCommandId,commandId,initialCommandId:oldInitial,parentActionId:oldParent,...original}=step.context || {};
+        const context={...original,hierarchySkills:ancestry.slice(0,depth),initialCommandId,parentActionId,
+          ...(command!==undefined?{queuedCommandId:command,commandId:command}:{})};
+        if(step.kind==='wrapper'){ancestry[depth]=step.skillId;return {...step,context};}
         contexts.push(context);return {...step,context};
       });
       let index=0;
       const leaves=turn.leaves.map(leaf=>leaf.nativeRepeat?leaf:{...leaf,context:contexts[index++] || {...leaf.context,hierarchySkills:[]}});
-      return {...turn,leaves,steps:projected,nativeCommandName:leaves.some(leaf=>leaf.context?.queuedCommandId===vision?.commandId)?vision?.name:undefined};
+      return {...turn,leaves,steps:projected,nativeCommandName:vision && leaves.some(leaf=>leaf.context?.queuedCommandId===vision.commandId)?vision.name:undefined};
     }
     function repeatedTurn(turn,passiveIds,occurrences,context={}){
       const baseLeaves=turn.leaves.filter(leaf=>!leaf.nativeRepeat),baseSteps=(turn.steps || turn.leaves).filter(step=>!step.nativeRepeat);
@@ -179,7 +189,7 @@
     if(unknownArtifacts.length)globalWarnings.push(`Unmapped active artifact IDs ${unknownArtifacts.map(a=>a.id).join(', ')}: their battle effects are not inferred.`);
     if(activeNativeArtifacts.length)globalWarnings.push(`Active artifacts ${activeNativeArtifacts.map(a=>a.name || a.id).join(', ')} are listed but their modifiers are not modeled.`);
     globalWarnings.push('Damage arithmetic was checked against the installed executable. Actual encounter stats and battle timing can differ from the five-round model; see combat-verification.md.');
-    globalWarnings.push('Numeric rankings exclude attacks below 100 native accuracy. Enemy evasion and unconfigured enemy actions are not simulated.');
+    globalWarnings.push('Ordinary accuracy and matching physical/magic evasion use native hit checks. Misses and conditional combat events use reproducible samples; enemy actions occur only when configured.');
     globalWarnings.push('Five-turn throughput assumes enemies stay alive. Enemy HP depletion and earlier kills are not simulated; actual kills can remove later Finish opportunities.');
     globalWarnings.push('LB starts at zero plus modeled opening effects. Native command expiry and duplicate queue order are applied for normal targeted commands. Received-damage LB and supported counters require explicit incoming-hit settings.');
     function equippedFinishFor(visionId){
@@ -242,8 +252,7 @@
       prepCache.set(key,result);return result;
     }
     const syncCommandCache=new Map();
-    function equippedCommandActiveCount(characterId,equipment,equippedIds){
-      if(!Array.isArray(equippedIds))return undefined;
+    function equippedSyncActiveIds(characterId,equipment){
       const key=`${characterId}:${equipment.visionId}`;
       if(!syncCommandCache.has(key)){
         const vision=indexes.visions.get(Number(equipment.visionId)),owned=(snapshot.resonances || []).find(row=>row.id===Number(equipment.visionId));
@@ -252,7 +261,11 @@
           .flatMap(stage=>(stage.grants || []).filter(grant=>grant.type==='ActiveSkill').map(grant=>grant.id)):[];
         syncCommandCache.set(key,unique(ids));
       }
-      return equippedIds.filter(id=>id>=100000 && id<1000000).length+syncCommandCache.get(key).length;
+      return syncCommandCache.get(key);
+    }
+    function equippedCommandActiveCount(characterId,equipment,equippedIds){
+      if(!Array.isArray(equippedIds))return undefined;
+      return equippedIds.filter(id=>id>=100000 && id<1000000).length+equippedSyncActiveIds(characterId,equipment).length;
     }
     function normalAttack(skillId,characterId){
       return Number(skillId)===NORMAL_ATTACK_IDS[characterId] || (catalog.skillRules?.general?.normalAttackSkills || []).includes(Number(skillId));
@@ -277,7 +290,7 @@
       if(analysisCache.has(key))return analysisCache.get(key);
       const context={skill,element:clean(skill.element),hpPercent:100,mpPercent:scenario.mpPercent,lbPercent:0,
         broken:scenario.broken,extraPhase:false,critical:scenario.critical,analyzed:false,notTargeted:false,statusIds:[],targetStatusIds:[],
-        targetCount:scenario.enemyCount,buffCount:0,currentSkillIds:[skill.id],skillHistory:[],...extra};
+        accuracyModeled:isAttack(skill),targetCount:scenario.enemyCount,buffCount:0,currentSkillIds:[skill.id],skillHistory:[],...extra};
       if(isGambleSkill(skill))context.activeEffectIds=unique([...(context.activeEffectIds || []),13201]);
       let result=P.analyze(catalog,ids,context);
       const resistance=resolvedResistance(skill,result.modifiers.element || clean(skill.element)),weakness=resistance==='Weakness';
@@ -285,6 +298,21 @@
       // Prevent an unbounded optimization cache while retaining commonly repeated effect sets.
       if(analysisCache.size<25000)analysisCache.set(key,result);
       return result;
+    }
+    function accuracyOptionsFor(skill,modifiers,target){
+      const damageType=clean(skill.dmgType),status=clean(skill.statusCondition || 'None');
+      return {accuracyBonus:number(modifiers.accuracyBonus),evasion:number(target.modifiers[damageType==='Magic'?'magicEvasionPercent':'physicalEvasionPercent']),
+        maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.[status])+(status==='None'?number(target.modifiers.statusResists?.[0]):0)};
+    }
+    function ordinaryHitProbability(skill,options,context){
+      if(options.statusResistance>=100)return 0;
+      if(context.broken || context.extraPhase)return 1;
+      return D.skillHitProbability(number(skill.accuracy),options);
+    }
+    function ordinaryHitSuccess(skill,options,context,draw){
+      if(options.statusResistance>=100)return false;
+      if(context.broken || context.extraPhase)return true;
+      return D.skillHitSuccess(number(skill.accuracy),draw(),options);
     }
     function rollDamage(stats,skill,passiveAnalysis,context={}){
       const magical=clean(skill.calcType)==='Magic',lightMagic=magical && clean(skill.element)==='Light';
@@ -319,13 +347,14 @@
       const critRate=number(skill.criticalHitRate)+number(passiveAnalysis.modifiers.critRatePercent);
       const gamble=!!passiveAnalysis.modifiers.gambleShot;
       const gambleStageProbability=gamble?(common.broken || context.extraPhase?1:D.gambleHitProbability(number(context.goodLuck),number(passiveAnalysis.modifiers.accuracyBonus))):1;
-      const accuracyOptions={accuracyBonus:number(passiveAnalysis.modifiers.accuracyBonus),evasion:number(targetAnalysis.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
-      const accuracyProbability=gamble?(common.broken || context.extraPhase?1:D.skillHitProbability(number(skill.accuracy,100),accuracyOptions)):1;
+      const accuracyOptions=accuracyOptionsFor(skill,passiveAnalysis.modifiers,targetAnalysis);
+      const accuracyProbability=ordinaryHitProbability(skill,accuracyOptions,{...context,broken:common.broken});
       const hitProbability=gambleStageProbability*accuracyProbability;
-      const criticalChance=gamble?hitProbability:scenario.critical?1:D.criticalProbability(critRate);
+      const canCritical=!['Halved','Absorb'].includes(resistance);
+      const criticalChance=gamble?hitProbability:canCritical?(scenario.critical?1:D.criticalProbability(critRate)):0;
       for(const [hitIndex,hitRatio] of useRatios.entries()){
-        const accuracyWeight=!gamble && Array.isArray(context.attackHitOutcomes)?(common.broken || context.extraPhase?1:Number(context.attackHitOutcomes[hitIndex])):1;
-        const hitChance=gamble?(common.broken || context.extraPhase?1:Array.isArray(context.gambleHitOutcomes)?Number(context.gambleHitOutcomes[hitIndex]):hitProbability):Array.isArray(context.criticalOutcomes)?Number(context.criticalOutcomes[hitIndex]):criticalChance;
+        const accuracyWeight=gamble?1:Array.isArray(context.attackHitOutcomes)?(accuracyOptions.statusResistance<100 && (common.broken || context.extraPhase)?1:Number(context.attackHitOutcomes[hitIndex])):accuracyProbability;
+        const hitChance=gamble?(accuracyOptions.statusResistance>=100?0:common.broken || context.extraPhase?1:Array.isArray(context.gambleHitOutcomes)?Number(context.gambleHitOutcomes[hitIndex]):hitProbability):!canCritical?0:Array.isArray(context.criticalOutcomes)?Number(context.criticalOutcomes[hitIndex]):criticalChance;
         const critAnalysis=context.criticalAnalysis || passiveAnalysis;
         const criticalInput={...common,elementFactor:Math.fround(baseElementFactor+number(critAnalysis.modifiers.weaknessFactorAdd)),hitRatio,critical:true,
           attack:attackFor(context.criticalStats || stats,critAnalysis.modifiers),
@@ -333,23 +362,24 @@
           criticalBonus:number(critAnalysis.modifiers.critDamagePercent)/100,coefficientScale:1+number(critAnalysis.modifiers.coefficientPerLevel)*Math.trunc(number(stats.level || context.level,1))+number(critAnalysis.modifiers.coefficientScalePercent)/100,coefficientAdd:number(critAnalysis.modifiers.coefficientAdd)+number(critAnalysis.modifiers.coefficientPerLuck)*number(context.goodLuck),damageCap:critAnalysis.modifiers.damageCapRaised?RAISED_DAMAGE_CAP:DAMAGE_CAP};
         const normal=D.damage({...common,hitRatio,critical:false}),critical=D.damage(criticalInput);
         if(!normal.supported)return {...normal,damage:0,damageMin:0,damageMax:0};
-        if(normal.healsTarget)return {supported:true,damage:0,damageMin:0,damageMax:0,breakDamage:0,hits:[{damage:0,breakDamage:0}],breakVerified:true,absorbed:true,element,resistance,common};
-        const hitDamage=accuracyWeight*((gamble?0:normal.amount*(1-hitChance))+critical.amount*hitChance);
+        const normalAmount=normal.healsTarget?0:normal.amount,criticalAmount=critical.healsTarget?0:critical.amount;
+        const hitDamage=accuracyWeight*((gamble?0:normalAmount*(1-hitChance))+criticalAmount*hitChance);
         expected+=hitDamage;
-        min+=accuracyWeight*(gamble?(hitChance===1?critical.min:0):hitChance===1?critical.min:normal.min);
-        max+=accuracyWeight*(gamble?(hitChance>0?critical.max:0):hitChance>0?critical.max:normal.max);
-        let hitBreak=0;
+        min+=normal.healsTarget?0:accuracyWeight===1?(gamble?(hitChance===1?critical.min:0):hitChance===1?critical.min:normal.min):0;
+        max+=normal.healsTarget?0:accuracyWeight>0?(gamble?(hitChance>0?critical.max:0):hitChance>0?critical.max:normal.max):0;
+        let hitBreak=0,normalBreakAmount=0,criticalBreakAmount=0;
         if(typeof D.breakDamage==='function'){
           const breakFactor=number(catalog.battleRules.breakElementResistanceValues?.[`eResistance::${resistance}`] ?? catalog.battleRules.breakElementResistanceValues?.[resistance],{None:1,Weakness:3,Halved:.5,Invalid:0,Absorb:0}[resistance]??1);
           const input={skill:{...skill,breakDmg:Math.fround(number(skill.breakDmg)*Math.fround(1+number(passiveAnalysis.modifiers.baseBreakScalePercent)/100))},level:common.level,targetLevel:number(enemy.level,1),elementFactor:Math.fround(breakFactor+number(passiveAnalysis.modifiers.weaknessFactorAdd)),outgoingFactor:passiveAnalysis.breakFactor,flatBonus:number(passiveAnalysis.modifiers.baseBreakAdd),rules:catalog.battleRules,hitRatio,ignoreAllDamagePenalty:!!passiveAnalysis.modifiers.ignoreAreaReduction};
           const normalBreak=D.breakDamage({...input,critical:false}),criticalBreak=D.breakDamage({...input,skill:{...skill,breakDmg:Math.fround(number(skill.breakDmg)*Math.fround(1+number(critAnalysis.modifiers.baseBreakScalePercent)/100))},elementFactor:Math.fround(breakFactor+number(critAnalysis.modifiers.weaknessFactorAdd)),outgoingFactor:critAnalysis.breakFactor,flatBonus:number(critAnalysis.modifiers.baseBreakAdd),criticalBonus:number(critAnalysis.modifiers.critDamagePercent)/100,critical:true});
+          normalBreakAmount=normalBreak.amount;criticalBreakAmount=criticalBreak.amount;
           hitBreak=accuracyWeight*((gamble?0:normalBreak.amount*(1-hitChance))+criticalBreak.amount*hitChance);
           breakDamage+=hitBreak;
         }
-        hits.push({damage:hitDamage,breakDamage:hitBreak});
+        hits.push({damage:hitDamage,breakDamage:hitBreak,normalDamage:normalAmount,criticalDamage:criticalAmount,normalBreakDamage:normalBreakAmount,criticalBreakDamage:criticalBreakAmount});
       }
       return {supported:true,damage:expected,damageMin:min,damageMax:max,element,resistance,criticalChance,hitProbability,gambleStageProbability,accuracyProbability,gambleOutcome:gamble?context.gambleOutcome:undefined,
-        breakDamage,hits,breakVerified:typeof D.breakDamage==='function',common};
+        breakDamage,hits,absorbed:resistance==='Absorb',breakVerified:typeof D.breakDamage==='function',common};
     }
     function gearPassives(equipment){return unique(C.equipmentIds(equipment).flatMap(id=>indexes.equipment.get(id)?.passiveIds || []));}
     function intrinsicEffects(skill,context={}){
@@ -397,7 +427,7 @@
       const baseFinal=S.characterStats(catalog,snapshot,prepared.saved.id,reference,baseAnalysis.terms);
       // Reuse reference rolls only for the same gear, leaf context and passive sources.
       function referenceRoll(ids,leafSkill,context,occurrences){
-        context={...context,passiveIdOccurrences:occurrences};
+        context={accuracyModeled:isAttack(leafSkill),...context,passiveIdOccurrences:occurrences};
         const rollKey=`${prepared.saved.id}:${leafSkill.id}:${gearKey}:${JSON.stringify(context)}:${ids.slice().sort((a,b)=>a-b).join(',')}`;
         if(referenceRollCache.has(rollKey))return referenceRollCache.get(rollKey);
         const effects=analysis(ids,leafSkill,context);
@@ -547,6 +577,7 @@
       else if(effectId===1382)s.focusSpeedUntil=round+2;
     };
     function skillStateEffects(s,skill,timing,round,outcome={}){
+      if(timing==='AfterDamageCalculation' && outcome.anyHit===false)return;
       for(const bundle of skill.effectBundles || []){
         const effect=indexes.effects.get(Number(bundle.effectId));
         if(!effect || clean(bundle.activeSkillAddTiming)!==timing || !(clean(bundle.TargetType)==='Self' || clean(bundle.TargetType)==='SkillTarget' && clean(skill.target)==='Self' && clean(skill.relation)==='Friendlies') ||
@@ -558,7 +589,7 @@
     }
     function liveContext(s,plan,context={}){
       const clock=s.overclocks.flatMap(clock=>clock.effectId===19004?[12914,15114]:[12913,15113]);
-      return {...context,currentSkillIds:[...(context.currentSkillIds ?? s.currentSkillIds)],skillHistory:s.skillHistory.map(ids=>ids.slice()),passiveIdOccurrences:plan.passiveIdOccurrences ?? context.passiveIdOccurrences,broken:s.targetBroken?.() ?? context.broken,round:s.round,completedNormalAttackCount:s.completedNormalAttackCount,receivedAttackCountThisRound:s.receivedAttackCountThisRound,targetPreviouslyAttackedSource:s.targetPreviouslyAttackedSource,recoveryDamageBonus:s.recoveryDamageBonus,recoveryBreakBonus:s.recoveryBreakBonus,sameSideProtectCount:s.sameSideProtectCount?.() ?? 0,equippedCommandActiveCount:plan.equippedCommandActiveCount,currentHp:s.hp,maxHp:plan.maxHp,normalAttackSkillId:NORMAL_ATTACK_IDS[plan.characterId],hpPercent:s.hp/Math.max(1,plan.maxHp)*100,
+      return {commandId:s.commandId,...context,currentSkillIds:[...(context.currentSkillIds ?? s.currentSkillIds)],skillHistory:s.skillHistory.map(ids=>ids.slice()),passiveIdOccurrences:plan.passiveIdOccurrences ?? context.passiveIdOccurrences,broken:s.targetBroken?.() ?? context.broken,round:s.round,completedNormalAttackCount:s.completedNormalAttackCount,receivedAttackCountThisRound:s.receivedAttackCountThisRound,targetPreviouslyAttackedSource:s.targetPreviouslyAttackedSource,recoveryDamageBonus:s.recoveryDamageBonus,recoveryBreakBonus:s.recoveryBreakBonus,sameSideProtectCount:s.sameSideProtectCount?.() ?? 0,equippedCommandActiveCount:plan.equippedCommandActiveCount,currentHp:s.hp,maxHp:plan.maxHp,normalAttackSkillId:NORMAL_ATTACK_IDS[plan.characterId],hpPercent:s.hp/Math.max(1,plan.maxHp)*100,
         mpPercent:s.mp/Math.max(1,number(plan.maxMp,s.m.availableMp))*100,goodLuck:s.goodLuck,
         activeEffectIds:unique([...(context.activeEffectIds || []),...(s.goodLuck>0?[1195]:[]),...clock,...(s.demonForm?[16603]:[]),...(s.focusLife>0?[12907]:[]),...(s.round<s.focusSpeedUntil?[1382]:[])]),
         resources:{...(context.resources || {}),GoodLuck:s.goodLuck,OverClock:s.overclocks.length?1:0},
@@ -626,6 +657,9 @@
     }
     function* liveTurnHits(s,plan,round){
       let leafIndex=0,blockedDepth=null;
+      // Native repeat admissions are rolled while the queue is built, before original hit checks.
+      const repeats=new Map((plan.turn.leaves || []).filter(leaf=>leaf.nativeRepeat).map(leaf=>[leaf,
+        (leaf.repeatChances || [100]).some(chance=>chance>=100 || D.skillHitSuccess(chance,s.combatRng(round)))]));
       for(const step of plan.turn.steps || plan.turn.leaves){
         // The preceding child finishes before this command pays its resources.
         yield {actionBoundary:true,actionIndex:leafIndex};
@@ -634,9 +668,10 @@
         if(blockedDepth!==null && depth>blockedDepth){if(!isWrapper)leafIndex++;continue;}
         blockedDepth=null;
         const leaf=isWrapper?step:plan.turn.leaves[leafIndex++] || step,actionIndex=leafIndex-1;
-        if(leaf.nativeRepeat && !(leaf.repeatChances || [100]).some(chance=>chance>=100 || D.skillHitSuccess(chance,s.combatRng(round))))continue;
+        if(leaf.nativeRepeat && !repeats.get(leaf))continue;
         const payment=payLiveSkill(s,plan,skill,leaf,round);
         if(!payment){if(isWrapper)blockedDepth=depth;continue;}
+        s.commandId=leaf.context?.commandId;
         s.currentSkillIds.push(skill.id);
         skillStateEffects(s,skill,'BeforeDamageCalculation',round);
         if(isWrapper){skillStateEffects(s,skill,'AfterDamageCalculation',round);continue;}
@@ -644,47 +679,57 @@
         if(['Decrease','RatioDecrease'].includes(clean(skill.parameterVariationType)) && clean(skill.parameterType)==='HitPoint')s.performedAttackThisRound=true;
         const temporary=intrinsicEffects(skill,liveContext(s,plan,leaf.context));
         const context=liveContext(s,plan,{...leaf.context,anyCritical:false,activeEffectIds:unique([...(leaf.context?.activeEffectIds || []),...temporary])});
+        let accuracyOptions;
         context.mpThresholdPercent=payment.mpBefore/Math.max(1,number(plan.maxMp,s.m.availableMp))*100;
         if(isGambleSkill(skill)){
           const modifiers=analysis(plan.passiveIds || [],skill,context).modifiers;
           const target=P.analyze(catalog,enemy.passiveIds || [],{skill,hpPercent:100,mpPercent:100,broken:context.broken});
-          const accuracyOptions={accuracyBonus:number(modifiers.accuracyBonus),evasion:number(target.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
+          accuracyOptions=accuracyOptionsFor(skill,modifiers,target);
           context.gambleProbability=context.broken || context.extraPhase?1:D.gambleHitProbability(s.goodLuck,number(modifiers.accuracyBonus));
           context.gambleStageOutcome=!!context.broken || !!context.extraPhase || D.gambleSuccess(s.goodLuck,s.gambleRng(round),number(modifiers.accuracyBonus));
-          context.gambleHitOutcomes=Array.from({length:Math.max(1,number(skill.hits,1))},()=>{if(context.broken || context.extraPhase)return true;const hit=D.skillHitSuccess(number(skill.accuracy,100),s.gambleRng(round),accuracyOptions);return context.gambleStageOutcome && hit;});
-          context.gambleOutcome=context.gambleHitOutcomes.some(Boolean);context.anyCritical=context.gambleOutcome;
+          context.gambleHitOutcomes=Array.from({length:Math.max(1,number(skill.hits,1))},()=>{const hit=ordinaryHitSuccess(skill,accuracyOptions,context,()=>s.gambleRng(round));return context.gambleStageOutcome && hit;});
+          context.gambleOutcome=context.gambleHitOutcomes.some(Boolean);context.anyHit=context.gambleOutcome;context.anyCritical=context.gambleOutcome;
         }
-        if((skill.effects || []).some(id=>[54100,54101].includes(Number(id)))){
+        if(leaf.kind!=='support' && !isGambleSkill(skill) && (plan.accuracyModeled || (skill.effects || []).some(id=>[54100,54101].includes(Number(id))))){
           context.accuracyModeled=true;
           const modifiers=analysis(plan.passiveIds || [],skill,context).modifiers;
           const target=P.analyze(catalog,enemy.passiveIds || [],{skill,element:clean(skill.element),hpPercent:100,mpPercent:100,broken:context.broken});
-          const accuracyOptions={accuracyBonus:number(modifiers.accuracyBonus),evasion:number(target.modifiers.physicalEvasionPercent),maxEvasion:number(catalog.battleRules.evasionLimit,75),statusResistance:number(enemy.statusResistances?.None)};
+          accuracyOptions=accuracyOptionsFor(skill,modifiers,target);
           const probability=D.criticalProbability(number(skill.criticalHitRate)+number(modifiers.critRatePercent));
           context.attackHitOutcomes=[];context.criticalOutcomes=[];context.criticalProbability=probability;
-          for(let i=0;i<Math.max(1,number(skill.hits,1));i++){
-            const hit=!!context.broken || !!context.extraPhase || D.skillHitSuccess(number(skill.accuracy,100),s.combatRng(round),accuracyOptions);
-            context.attackHitOutcomes.push(hit);context.criticalOutcomes.push(hit && (scenario.critical || s.combatRng(round)<probability*32768));
-          }
-          context.anyHit=context.attackHitOutcomes.some(Boolean);context.anyCritical=context.criticalOutcomes.some(Boolean);
+          context.anyHit=false;context.anyCritical=false;
         }
         let damageEvent={damage:0,breakDamage:0},appendedEvent;
         if(leaf.kind==='support'){
+          context.anyHit=true;
           if(round===s.traceTurn)s.stateLeafResults.push({phase:s.phase || 'normal',skillId:skill.id,kind:'support',context,...payment,damage:0,breakDamage:0,common:{}});
         }else{
-          const normal=rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,context);
+          const templateContext=context.accuracyModeled?{...context,attackHitOutcomes:undefined,criticalOutcomes:undefined}:context;
+          const normal=rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,templateContext);
           if(!normal.supported){s.resourceSkips.push({round,phase:s.phase || 'normal',skillId:skill.id,reason:'The live-state damage calculation is unsupported.'});continue;}
-          const broken=scenario.broken?normal:rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,{...context,broken:true});
+          const broken=scenario.broken?normal:rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,{...templateContext,broken:true});
           damageEvent={damage:normal.damage,breakDamage:normal.breakDamage,common:normal.common,context,hitProbability:normal.hitProbability,gambleOutcome:normal.gambleOutcome};
           if(round===s.traceTurn)s.stateLeafResults.push({phase:s.phase || 'normal',skillId:skill.id,kind:leaf.kind || 'attack',context,...payment,damage:normal.damage,breakDamage:normal.breakDamage,common:normal.common});
+          let actualDamage=0,actualBreak=0;
           for(const [hitIndex,originalHit] of combatHits(normal,broken).entries()){
             let hit=originalHit;
-            if(context.accuracyModeled && s.targetBroken?.() && !context.attackHitOutcomes[hitIndex]){
-              context.attackHitOutcomes[hitIndex]=true;context.criticalOutcomes[hitIndex]=scenario.critical || s.combatRng(round)<context.criticalProbability*32768;context.anyHit=true;context.anyCritical=context.criticalOutcomes.some(Boolean);
-              const corrected=rollState(plan.passiveIds || [],skill,plan.characterId,plan.equipment,{...context,broken:true});
-              hit={...hit,brokenDamage:corrected.hits[hitIndex].damage};
+            if(context.accuracyModeled){
+              const staggered=!!s.targetBroken?.(),template=staggered?broken:normal;
+              const landed=ordinaryHitSuccess(skill,accuracyOptions,{...context,broken:staggered},()=>s.combatRng(round));
+              const resistance=resolvedResistance(skill,template.element);
+              const critical=landed && !['Halved','Absorb'].includes(resistance) && (scenario.critical || s.combatRng(round)<template.criticalChance*32768);
+              context.attackHitOutcomes.push(landed);context.criticalOutcomes.push(critical);
+              context.anyHit ||= landed;context.anyCritical ||= critical;
+              const part=template.hits[hitIndex],amount=landed?number(critical?part.criticalDamage:part.normalDamage):0;
+              hit={...hit,damage:amount,brokenDamage:amount,breakDamage:landed?number(critical?part.criticalBreakDamage:part.normalBreakDamage):0};
+              actualDamage+=hit.damage;actualBreak+=hit.breakDamage;
             }
-            if(isGambleSkill(skill) && s.targetBroken?.()){context.gambleOutcome=true;context.anyCritical=true;context.gambleHitOutcomes[hitIndex]=true;}
+            if(isGambleSkill(skill) && s.targetBroken?.() && ordinaryHitProbability(skill,accuracyOptions,{...context,broken:true})>0){context.gambleOutcome=true;context.anyHit=true;context.anyCritical=true;context.gambleHitOutcomes[hitIndex]=true;}
             yield {...hit,actionIndex,skillId:skill.id};
+          }
+          if(context.accuracyModeled){
+            damageEvent.damage=actualDamage;damageEvent.breakDamage=actualBreak;
+            if(round===s.traceTurn)Object.assign(s.stateLeafResults.at(-1),{damage:actualDamage,breakDamage:actualBreak});
           }
         }
         if(isGambleSkill(skill))damageEvent.gambleOutcome=context.gambleOutcome;
@@ -702,6 +747,7 @@
             }
           }
         }
+        s.lastSkillAnyHit=context.anyHit;
         context.causedStagger=!!s.currentActionNewStagger;
         if(context.causedStagger)s.onSourceBreak?.(skill,context);
         if(skill.id===400790 && plan.turn.reactionSkills){s.reactionUntil=round+1;s.reactionSkills=plan.turn.reactionSkills;}
@@ -751,7 +797,8 @@
       const defenseChancePresent=scenario.incomingDamage>0 && members.some(member=>(member.actionPlan?.passiveIds || []).some(id=>(indexes.passives.get(id)?.effects || []).includes(19034)));
       const phaseProcPresent=allPlanTurns.some(turn=>(turn.leaves || []).some(leaf=>(indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(Number(id)))));
       const conditionalRepeatPresent=allPlanTurns.some(turn=>(turn.leaves || []).some(leaf=>leaf.nativeRepeat && (leaf.repeatChances || []).some(chance=>chance<100)));
-      const combatRandom=gamblePresent || phaseProcPresent || defenseChancePresent || conditionalRepeatPresent;
+      const accuracyPresent=members.some(member=>(member.actionPlan || member.fallbackActionPlan)?.accuracyModeled);
+      const combatRandom=gamblePresent || phaseProcPresent || defenseChancePresent || conditionalRepeatPresent || accuracyPresent;
       const samples=Math.max(1,Math.min(maxSamples,combatRandom?32:members.length>1?16:1)),partyOrder=new Map((snapshot.party || []).map((id,i)=>[Number(id),i]));
       const rateAmplitude=number(catalog.battleRules.actionTimeCalcValueWithAgilityRatio,20),flatAmplitude=number(catalog.battleRules.actionTimeCalcValueWithFixValue,5);
       const draw=(sample,round,id,stream)=>{
@@ -827,7 +874,7 @@
             s.onSkillEnd=(skill,context)=>{
               for(const bundle of skill.effectBundles || []){
                 const effect=indexes.effects.get(Number(bundle.effectId));
-                if(effect?.status!=='DeffenceUp' || clean(bundle.activeSkillAddTiming)!=='AfterDamageCalculation' || number(effect.prob,100)!==100 || number(effect.activationProbability,100)!==100 ||
+                if(context.anyHit===false || effect?.status!=='DeffenceUp' || clean(bundle.activeSkillAddTiming)!=='AfterDamageCalculation' || number(effect.prob,100)!==100 || number(effect.activationProbability,100)!==100 ||
                   clean(bundle.conditionData?.Condition || 'None')!=='None' || clean(effect.condition?.Condition || 'None')!=='None')continue;
                 const targets=clean(bundle.TargetType)==='Self'?[s]:clean(bundle.TargetType)==='SkillTarget' && clean(skill.relation)==='Friendlies'?
                   ['Group','All'].includes(clean(skill.target))?state.filter(target=>target.hp>0):clean(skill.target)==='Self'?[s]:state.filter(target=>target.m.id===context.friendlyTargetId):[];
@@ -1020,7 +1067,7 @@
                 s.damageElements.add(clean(hit.brokenElement ?? hit.element ?? 'Unknown'));
                 executed=true;damage+=number(hit.brokenDamage,hit.damage);
               }
-              if(executed && finish.kind!=='protection' && selected.guards?.length)applyProtection({},true);
+              if(executed && finish.kind!=='protection' && selected.guards?.length && s.lastSkillAnyHit!==false)applyProtection({},true);
               if(executed)s.finishUses.push({round,phase:'finish',skillId:skill.id,visionId:finish.visionId});
             }
           }
@@ -1044,7 +1091,7 @@
       return {...representative,damage,breakDamage,staggers:mean('staggers'),gauge:averageByMember('gauge'),remainingMp:averageByMember('remainingMp'),remainingHp:averageByMember('remainingHp'),hpSpent:averageByMember('hpSpent'),
         minimumRemainingHp:Object.fromEntries(members.map(m=>[m.id,Math.min(...outcomes.map(o=>o.remainingHp[m.id]))])),
         damageElements:Object.fromEntries(members.map(m=>[m.id,[...new Set(outcomes.flatMap(o=>o.damageElements[m.id]))]])),
-        combatSamples:combatRandom?samples:0,initiativeSamples:samples,gambleSamples:gamblePresent?samples:0,sampleKind:bonusPresent || defenseChancePresent?'native-initiative-and-combat':gamblePresent?'native-initiative-and-gamble':'native-initiative',representativeSample:representative.sample,usesAreRepresentative:samples>1,
+        combatSamples:combatRandom?samples:0,initiativeSamples:samples,gambleSamples:gamblePresent?samples:0,sampleKind:bonusPresent || defenseChancePresent || conditionalRepeatPresent || accuracyPresent?'native-initiative-and-combat':gamblePresent?'native-initiative-and-gamble':'native-initiative',representativeSample:representative.sample,usesAreRepresentative:samples>1,
         expectedExtraActions:averageByMember('extraActions'),expectedFinishUses:Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o.finishUses[m.id].length,0)/samples])),expectedLimitUses:Object.fromEntries(members.map(m=>[m.id,outcomes.reduce((sum,o)=>sum+o.uses[m.id].length,0)/samples]))};
     }
     function setupTurnsFor(prepared,skill){
@@ -1224,7 +1271,7 @@
       };
       const hasVersatility=[...freeIds,...prepared.learned,...prepared.learn.masterSkillIds].some(versatility);
       // Unused active commands have the same native count benefit; cheapest legal distinct slots dominate.
-      const extras=hasVersatility?unique([...prepared.learn.learnedActiveIds,...prepared.free]).filter(id=>id!==skill.id && !turn.reservedIds.includes(id) && !locked.includes(id) && prepared.legal.has(id) &&
+      const extras=hasVersatility?unique(prepared.learn.learnedActiveIds).filter(id=>id!==skill.id && !turn.reservedIds.includes(id) && !locked.includes(id) && prepared.legal.has(id) &&
         Number.isFinite(indexes.skills.get(id)?.equipCost) && indexes.skills.get(id).equipCost>=0)
         .sort((a,b)=>indexes.skills.get(a).equipCost-indexes.skills.get(b).equipCost || a-b).slice(0,stats0.maxSkillSlots):[];
       const source=id=>indexes.passives.get(id) || indexes.masterSkills.get(id) || (extras.includes(id)?indexes.skills.get(id):undefined);
@@ -1370,7 +1417,7 @@
       const scorePackage=(skill,turn,packageInfo)=>{
         if(!packageInfo)return;
         if(actionId && skill.id!==actionId)return;
-        turn=commandTurn(turn,characterId,equipment);
+        turn=commandTurn(turn,prepared,equipment,packageInfo,skill.id);
         const allPassives=unique([...freeIds,...packageInfo.passiveIds,...turn.reservedIds.filter(id=>indexes.passives.has(id))]);
         const commandSensitive=allPassives.some(id=>(indexes.passives.get(id)?.effects || []).some(effectId=>[15125,15127,54220].includes(effectId)));
         if(commandSensitive && turn.nativeCommandName && !turn.recipeLabel.startsWith(`${turn.nativeCommandName} command: `))turn={...turn,recipeLabel:`${turn.nativeCommandName} command: ${turn.recipeLabel}`};
@@ -1451,11 +1498,12 @@
         const survivability=number(stats.MaxHitPoint)*.02+defenseSum(stats,passiveAnalysis.modifiers);
         const limit=prepared.limitMax>0?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds]),{passiveIdOccurrences}):null;
         const setupLimit=limit && turn.setupContext?limitInfo(prepared,equipment,unique([...allPassives,...turn.reservedIds]),{...turn.setupContext,passiveIdOccurrences}):null;
-        const fallbackActionPlan={turn,openingTurn:turn.openingTurn,rotationTurns:turn.rotationTurns,luckPolicy:turn.luckPolicy,characterId,equipment,passiveIds:allPassives,passiveIdOccurrences,equippedCommandActiveCount:equippedCommandActiveCount(characterId,equipment,prepared.fixed?prepared.equippedIds:unique([...selected,...activeSelected])),maxHp:number(stats.MaxHitPoint),maxMp:number(stats.MaxMagicPoint ?? stats.MagicPoint)};
+        const accuracyModeled=leafRolls.some(leaf=>number(leaf.normal.accuracyProbability,1)<1);
+        const fallbackActionPlan={turn,accuracyModeled,openingTurn:turn.openingTurn,rotationTurns:turn.rotationTurns,luckPolicy:turn.luckPolicy,characterId,equipment,passiveIds:allPassives,passiveIdOccurrences,equippedCommandActiveCount:equippedCommandActiveCount(characterId,equipment,prepared.fixed?prepared.equippedIds:unique([...selected,...activeSelected])),maxHp:number(stats.MaxHitPoint),maxMp:number(stats.MaxMagicPoint ?? stats.MagicPoint)};
         const historyScaled=allPassives.some(id=>(indexes.passives.get(id)?.effectBundles || []).some(bundle=>clean(indexes.effects.get(Number(bundle.effectId))?.type)==='DmgMulSkillNum'));
         const changingMp=allPassives.some(id=>mpStatePassiveIds.has(id));
         const statePassives=allPassives.some(id=>(indexes.passives.get(id)?.effects || []).some(effectId=>['DmgMulNTNum','DmgMulCmdNum','DmgMulHitCnt','AllParamUp','DmgMulRetaliation','DmgMulByRecoveryVal','BreakDmgByProtect'].includes(clean(indexes.effects.get(effectId)?.type))));
-        const actionPlan=statePassives || scenario.incomingDamage>0 || historyScaled || changingMp || turn.hasNativeRepeats || allPassives.some(id=>openingPassiveIds.has(id)) || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo' || (indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(id))) || allPassives.some(id=>[1511,1499,1404].includes(id))?fallbackActionPlan:null;
+        const actionPlan=accuracyModeled || statePassives || scenario.incomingDamage>0 || historyScaled || changingMp || turn.hasNativeRepeats || allPassives.some(id=>openingPassiveIds.has(id)) || turn.focus || turn.stateful || turn.openingTurn || turn.rotationTurns || turn.leaves.some(leaf=>hpCostsFor(leaf.skillId).length || indexes.skills.get(leaf.skillId)?.hasUnit==='Jake' || clean(indexes.skills.get(leaf.skillId)?.attr)==='Mechabo' || (indexes.skills.get(leaf.skillId)?.effects || []).some(id=>[54100,54101].includes(id))) || allPassives.some(id=>[1511,1499,1404].includes(id))?fallbackActionPlan:null;
         const fight=simulateFight([{id:characterId,agility:baseAgility,setupAgility:turn.focus?stats.Agility:undefined,passiveIds:allPassives,passiveIdOccurrences,damage:damage.damage,brokenDamage:damage.brokenDamage,breakDamage:damage.breakDamage,hits:damage.hits,limit,setupLimit,setupDuration:turn.setupDuration,availableMp,turnMp:turn.mp,actionPlan,fallbackActionPlan,finish:prepared.finish}]);
         if(options.jointOptimization && !prepared.fixed){
           const key=recipeKey(skill,turn);
@@ -1569,7 +1617,7 @@
       ]).slice(0,4);
       const leafProxy=new Map();
       // These order mixed candidates; their actual command provenance is scored on the complete recipe.
-      const proxyKey=leaf=>{const {hierarchySkills,queuedCommandId,commandId,...context}=leaf.context || {};return `${leaf.skillId}:${JSON.stringify(context)}`;};
+      const proxyKey=leaf=>{const {hierarchySkills,queuedCommandId,commandId,initialCommandId,parentActionId,...context}=leaf.context || {};return `${leaf.skillId}:${JSON.stringify(context)}`;};
       for(const result of results)for(const [index,leaf] of result.turn.leaves.entries()){
         const key=proxyKey(leaf);
         const hits=result.hits.filter(hit=>number(hit.actionIndex)===index);

@@ -1,0 +1,598 @@
+{
+  "evidence": "Original ordinary hit kernel145233C68-F17 including native AccuracyVariation/Avoidance getters runs unchanged in private Unicorn. Explicit synthetic source/target/effect lists and actual Amelia accuracy85 and Deathblow400530 accuracy50 rows. Global General lookup/evasionlimit and CRT rand output supplied; statusresistance is an input from separately traced native target lookup. No process opened, target calls, injection or game/save/product writes.",
+  "exeSha256": "b8c588e46ebadbe37feca7bdf2da0ae63a8538099d14a53ec0c2241b086e5ffa",
+  "nativeCalcEnumEvidence": {
+    "Physic": {
+      "nameRecord": "0x148843C90",
+      "value": 1
+    },
+    "Magic": {
+      "nameRecord": "0x148843CA0",
+      "value": 2
+    }
+  },
+  "kernelVectors": [
+    {
+      "input": {
+        "skillId": 414200
+      },
+      "nativeSuccessSamples": 27852,
+      "totalSamples": 32768,
+      "probability": 0.8499755859375,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 85,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27851,
+          "threshold": 85,
+          "roll": 85,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27852,
+          "threshold": 85,
+          "roll": 86,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 85,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414210
+      },
+      "nativeSuccessSamples": 27852,
+      "totalSamples": 32768,
+      "probability": 0.8499755859375,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 85,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27851,
+          "threshold": 85,
+          "roll": 85,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27852,
+          "threshold": 85,
+          "roll": 86,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 85,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "sourceIds": [
+          1027
+        ]
+      },
+      "nativeSuccessSamples": 21299,
+      "totalSamples": 32768,
+      "probability": 0.649993896484375,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 65,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 21298,
+          "threshold": 65,
+          "roll": 65,
+          "miss": 0
+        },
+        {
+          "rngRaw": 21299,
+          "threshold": 65,
+          "roll": 66,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 65,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "sourceIds": [
+          1251
+        ]
+      },
+      "nativeSuccessSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 100,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 100,
+          "roll": 100,
+          "miss": 0
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "targetIds": [
+          1143
+        ]
+      },
+      "nativeSuccessSamples": 27852,
+      "totalSamples": 32768,
+      "probability": 0.8499755859375,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 85,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27851,
+          "threshold": 85,
+          "roll": 85,
+          "miss": 0
+        },
+        {
+          "rngRaw": 27852,
+          "threshold": 85,
+          "roll": 86,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 85,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "targetIds": [
+          1144
+        ]
+      },
+      "nativeSuccessSamples": 11469,
+      "totalSamples": 32768,
+      "probability": 0.350006103515625,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 35,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 11468,
+          "threshold": 35,
+          "roll": 35,
+          "miss": 0
+        },
+        {
+          "rngRaw": 11469,
+          "threshold": 35,
+          "roll": 36,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 35,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "targetIds": [
+          1144,
+          1189
+        ]
+      },
+      "nativeSuccessSamples": 3277,
+      "totalSamples": 32768,
+      "probability": 0.100006103515625,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 10,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 3276,
+          "threshold": 10,
+          "roll": 10,
+          "miss": 0
+        },
+        {
+          "rngRaw": 3277,
+          "threshold": 10,
+          "roll": 11,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 10,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "sourceIds": [
+          1027
+        ],
+        "targetIds": [
+          1144
+        ]
+      },
+      "nativeSuccessSamples": 4916,
+      "totalSamples": 32768,
+      "probability": 0.1500244140625,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 15,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 4915,
+          "threshold": 15,
+          "roll": 15,
+          "miss": 0
+        },
+        {
+          "rngRaw": 4916,
+          "threshold": 15,
+          "roll": 16,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 15,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "statusResistance": 50
+      },
+      "nativeSuccessSamples": 13763,
+      "totalSamples": 32768,
+      "probability": 0.420013427734375,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 42,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 13762,
+          "threshold": 42,
+          "roll": 42,
+          "miss": 0
+        },
+        {
+          "rngRaw": 13763,
+          "threshold": 42,
+          "roll": 43,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 42,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "statusResistance": 99
+      },
+      "nativeSuccessSamples": 0,
+      "totalSamples": 32768,
+      "probability": 0.0,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 0,
+          "roll": 1,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 0,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "accuracyOverride": 0
+      },
+      "nativeSuccessSamples": 0,
+      "totalSamples": 32768,
+      "probability": 0.0,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 0,
+          "roll": 1,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 0,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 414200,
+        "accuracyOverride": 500
+      },
+      "nativeSuccessSamples": 32768,
+      "totalSamples": 32768,
+      "probability": 1.0,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 100,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 100,
+          "roll": 100,
+          "miss": 0
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 400530
+      },
+      "nativeSuccessSamples": 16384,
+      "totalSamples": 32768,
+      "probability": 0.5,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 50,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 16383,
+          "threshold": 50,
+          "roll": 50,
+          "miss": 0
+        },
+        {
+          "rngRaw": 16384,
+          "threshold": 50,
+          "roll": 51,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 50,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 400530,
+        "targetIds": [
+          1144
+        ]
+      },
+      "nativeSuccessSamples": 16384,
+      "totalSamples": 32768,
+      "probability": 0.5,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 50,
+          "roll": 1,
+          "miss": 0
+        },
+        {
+          "rngRaw": 16383,
+          "threshold": 50,
+          "roll": 50,
+          "miss": 0
+        },
+        {
+          "rngRaw": 16384,
+          "threshold": 50,
+          "roll": 51,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 50,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    },
+    {
+      "input": {
+        "skillId": 400530,
+        "targetIds": [
+          1143
+        ]
+      },
+      "nativeSuccessSamples": 0,
+      "totalSamples": 32768,
+      "probability": 0.0,
+      "boundary": [
+        {
+          "rngRaw": 0,
+          "threshold": 0,
+          "roll": 1,
+          "miss": 1
+        },
+        {
+          "rngRaw": 32767,
+          "threshold": 0,
+          "roll": 100,
+          "miss": 1
+        }
+      ]
+    }
+  ],
+  "statusLookupVectors": [
+    {
+      "queryStatus": 0,
+      "mapKey": null,
+      "mapValue": 0,
+      "nativeResistance": 0,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 0,
+      "mapKey": 16,
+      "mapValue": 75,
+      "nativeResistance": 0,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 0,
+      "mapKey": 0,
+      "mapValue": 0,
+      "nativeResistance": 0,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 0,
+      "mapKey": 0,
+      "mapValue": 50,
+      "nativeResistance": 50,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 0,
+      "mapKey": 0,
+      "mapValue": 100,
+      "nativeResistance": 100,
+      "nativeCallerAutomaticMiss": true
+    },
+    {
+      "queryStatus": 0,
+      "mapKey": 0,
+      "mapValue": -1,
+      "nativeResistance": -1,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 16,
+      "mapKey": 16,
+      "mapValue": 33,
+      "nativeResistance": 33,
+      "nativeCallerAutomaticMiss": false
+    },
+    {
+      "queryStatus": 16,
+      "mapKey": 0,
+      "mapValue": 50,
+      "nativeResistance": 0,
+      "nativeCallerAutomaticMiss": false
+    }
+  ],
+  "scalarRngChecks": 131072,
+  "scalarSuccessCounts": {
+    "0": 0,
+    "35": 11469,
+    "85": 27852,
+    "100": 32768
+  },
+  "effectInputs": {
+    "1027": {
+      "accuracyBonus": -20
+    },
+    "1251": {
+      "accuracyBonus": 10000
+    },
+    "1143": {
+      "evasion": 50,
+      "damageType": "Physic"
+    },
+    "1144": {
+      "evasion": 50,
+      "damageType": "Magic"
+    },
+    "1189": {
+      "evasion": 60,
+      "damageType": "Magic"
+    }
+  },
+  "limits": [
+    "This ordinary scalar branch starts after target/source validity and broken/context bypasses. Parent traces those caller gates.",
+    "Statusresistance>=100 early automaticmiss lies before executed region; kernel inputvectors here cover0..99 only.",
+    "Binary search obtains exact successcount because final scalar threshold is fixed and native RNG bucket mapping monotonic; boundaries reexecuted explicitly.",
+    "Negative/huge accuracy overrides are synthetic clamp controls, not amended Amelia rows.",
+    "Uniform15bit probability is a mathematical expectation, not a live RNG distribution measurement.",
+    "Map values are supplied service inputs. No claim that a particular live unit can acquire a None-key resistance.",
+    "Missingkey returns0; None0 is looked up normally, not hard-codedzero.",
+    "The ordinary caller automatically misses when returnedinteger>=100 beforebroken/contextbypasses."
+  ],
+  "sourceArtifacts": [
+    "accuracy-native-kernel.py/json",
+    "accuracy-native-status-resistance.py/json",
+    "accuracy-native-callers.md"
+  ]
+}

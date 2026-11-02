@@ -2,13 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const core = require('../docs/core.js');
 
-test('ordinary action eligibility accepts native high-accuracy Ultima and excludes attacks below 100',()=>{
+test('ordinary action eligibility accepts modeled low accuracy and rejects unknown accuracy',()=>{
   const ultima=require('../docs/data/catalog.json').skills.find(skill=>skill.id===220340);
   assert.equal(ultima.name,'Ultima');
   assert.equal(ultima.accuracy,500);
   assert.equal(core.isOrdinaryAttack(ultima),true);
   assert.equal(core.isOrdinaryAttack({...ultima,accuracy:100}),true);
-  assert.equal(core.isOrdinaryAttack({...ultima,accuracy:99}),false);
+  assert.equal(core.isOrdinaryAttack({...ultima,accuracy:99}),true);
+  for(const accuracy of [null,undefined,NaN,-1,'unknown'])assert.equal(core.isOrdinaryAttack({...ultima,accuracy}),false);
 });
 
 test('equipped-only stock is shared without double counting inventory totals or unrecruited defaults',()=>{
