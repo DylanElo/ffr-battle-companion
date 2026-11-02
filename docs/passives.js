@@ -9,7 +9,7 @@
   const resistances=['None','Weakness','Halved','Invalid','Absorb','Reflect'];
   const resistancePriority={None:0,Weakness:25,Halved:50,Invalid:75,Absorb:100};
   const f=Math.fround,EPS=f(2**-23);
-  const instanceStackingTypes=new Set(['DamageMultiplier','DmgMulSkillNumUp','IgnoreAllMagicReduction']);
+  const instanceStackingTypes=new Set(['DamageMultiplier','DmgMulSkillNumUp','IgnoreAllMagicReduction','ResistMagVariation']);
   const utilityTypes=new Set(['ExperienceUp','ExperienceUpCap','MoneyUp','MoneyUpCap','APUp','APUpCap','ItemDropUp','EncountRatio','Preemtive','StealRate','StealRareRate']);
   const catalogCache=new WeakMap(),effectCache=new WeakMap();
   const evidence={
@@ -61,14 +61,14 @@
       if(Number(p[1])>0)requireValue('lbPercent',Number(p[1]),'min');
       if(Number(p[2])>=0)requireValue('commandId',Number(p[2]));
       if(Number(p[3])>0)requireValue('skill.attr',attributes[p[3]]);
-      if(Number(p[4])>=0)requireValue('analyzed',Number(p[4])!==0);
+      if(Number(p[4])>0){requireValue('analyzed',true,'exact');requireValue('weakness',true,'exact');}
       if(Number(p[5])>0)requireValue('skill.dmgType',damageTypes[p[5]]);
-      if(Number(p[6])>=0)requireValue('targetStatusIds',null,'nonempty');
+      if(Number(p[6])>0)requireValue('targetHasActiveBadStatus',true,'exact');
       if(Number(p[7])>=0)requireValue('extraPhase',Number(p[7])!==0);
       if(Number(p[9])>0)requireValue('hpPercent',Number(p[9]),'min');
       if(Number(p[10])>=0)requireValue('critical',Number(p[10])!==0);
       if(Number(p[12])>=0)requireValue('notTargeted',Number(p[12])!==0);
-      if(Number(p[13])>=0)requireValue('mpPercent',Number(p[13]),'min');
+      if(Number(p[13])>=0)requireValue('mpThresholdPercent',Number(p[13]),'min');
       if(Number(p[14])>=0)requireValue('skill.element','None');
       if(clean(effect.applyTiming)==='DamageCalculationOnBreak')requireValue('broken',true);
       term.kind='damagePercent';term.value=Number(p[0]);return term;
@@ -110,7 +110,7 @@
     if(type==='BreakDamageVariation'){
       if(![-1,0,1].includes(p[1]) || !attributes[p[3]] || ![0,1,2].includes(p[7]) || ![-1,0].includes(p[8]) || Number(p[10])!==-1)return reject('Unmodeled break multiplier filter.');
       if(Number(p[1])===1)requireValue('weakness',true);
-      if(Number(p[2])>=0)requireValue('targetStatusIds',null,'nonempty');
+      if(Number(p[2])>0)requireValue('targetHasActiveBadStatus',true,'exact');
       if(Number(p[3])>0)requireValue('skill.attr',attributes[p[3]]);
       if(Number(p[4])>=0)requireValue('stolenFromTarget',Number(p[4])!==0);
       if(Number(p[5])>=0)requireValue('extraPhase',Number(p[5])!==0);
@@ -120,7 +120,8 @@
       if(Number(p[11])>=0)requireValue('skill.element','None');
       if(Number(p[12])>=0)requireValue('commandId',Number(p[12]));
       if(Number(p[13])>=0)requireValue('protectedOrShelled',Number(p[13])!==0);
-      if(Number(p[14])>=0)return reject('Unmodeled trailing break multiplier filter.');
+      if(![-1,0,1].includes(Number(p[14])))return reject('Unmodeled trailing break multiplier filter.');
+      if(Number(p[14])>=0)term.actionFilter=Number(p[14]);
       term.kind='breakPercent';term.value=Number(p[0]);return term;
     }
     if(type==='AddElementWhenNoneElement' || type==='AddElement'){
@@ -187,6 +188,28 @@
       requireValue('skill.target',['Group','All'],'oneOf');requireValue('targetCount',1,'exact');
       return {...term,kind:'damagePercent',value:Number(p[0])};
     }
+    if(type==='HoningSense'){
+      if(p.length!==15 || !Number.isFinite(p[0]) || p[0]<0 || !Number.isFinite(p[1]) || !allDefault(2))return reject('Unrecognized Honing Sense layout.');
+      return {...term,kind:'honingSense',value:p[0],criticalThreshold:p[1]};
+    }
+    if(type==='RepeatAction'){
+      if(effect.id!==54212 || p.length!==15 || p[0]!==1 || p[1]!==15 || !p.slice(2,6).every(id=>id===-1) || p[6]!==100 || p[7]!==-1 || p[8]!==1 || p[9]!==-1 || p[10]!==200 || !allDefault(11))return reject('Unverified automatic-repeat layout.');
+      requireValue('skill.attr','MagicSword');return {...term,kind:'automaticRepeat',value:1,priority:p[10]};
+    }
+    if(type==='ResistMagVariation'){
+      if(p.length!==15 || p[0]!==1 || !Number.isFinite(p[1]) || p[1]<0 || !allDefault(2))return reject('Unrecognized weakness-factor variation layout.');
+      requireValue('weakness',true,'exact');
+      return {...term,kind:'weaknessFactorAdd',value:f(f(f(p[1])*f(.01))-f(1-EPS))};
+    }
+    if(type==='DmgMulHitPoint'){
+      if(p.length!==15 || !Number.isInteger(p[0]) || p[0]<0 || !Number.isInteger(p[1]) || p[1]<=0 || !attributes[p[2]] || ![-1,1].includes(p[3]) || !allDefault(4) || !['DamageCalculation','BreakDmgCalculation'].includes(clean(effect.applyTiming)))return reject('Unrecognized stepped HP damage layout.');
+      if(p[2]>0)requireValue('skill.attr',attributes[p[2]]);
+      return {...term,kind:'missingHpBonus',value:p[0],step:p[1],normalOnly:p[3]!==-1,resultKind:clean(effect.applyTiming)==='BreakDmgCalculation'?'breakPercent':'damagePercent'};
+    }
+    if(type==='DmgMulStatusConditionNum'){
+      if(p.length!==15 || !Number.isFinite(p[0]) || p[0]<0 || !Number.isFinite(p[1]) || p[1]<0 || !allDefault(2) || clean(effect.applyTiming)!=='DamageCalculation')return reject('Unrecognized bad-status instance damage layout.');
+      return {...term,kind:'badStatusBonus',value:p[0],cap:p[1]};
+    }
     if(type==='DmgMulSkillNumUp'){
       if(p.length!==15 || !Number.isFinite(Number(p[0])) || Number(p[0])<0 || !allDefault(1))return reject('Unrecognized skill-history scale layout.');
       return {...term,kind:'skillHistoryMultiplier',value:Number(p[0])};
@@ -213,11 +236,13 @@
     let indexes=catalogCache.get(catalog);
     if(!indexes){indexes={byPassive:new Map((catalog.passives||[]).map(p=>[p.id,p])),byEffect:new Map((catalog.effects||[]).map(e=>[e.id,e]))};catalogCache.set(catalog,indexes);}
     const context={...providedContext},{byPassive,byEffect}=indexes;
+    context.mpThresholdPercent ??= context.mpPercent;
+    if(Array.isArray(context.targetStatusIds) && context.targetStatusIds.length===0){context.targetBadStatusCount ??= 0;context.targetHasActiveBadStatus ??= false;}
     const modifiers={statFlat:{},statPercent:{},statScale:{},damagePercent:0,elementDamagePercent:0,elementBreakPercent:0,breakPercent:0,critRatePercent:0,critDamagePercent:0,resistances:{},statusResists:{},imbues:[],physicalReductionPercent:0,magicReductionPercent:0,physicalEvasionPercent:0,magicEvasionPercent:0,damageCapRaised:false,dominantPower:false,dominantDefence:false,coefficientPerLevel:0,coefficientAdd:0,coefficientScalePercent:0,baseBreakScalePercent:0,gambleShot:false,accuracyBonus:0};
     modifiers.incomingPhysicalNullifyChance=0;
     modifiers.bonusPhaseChancePercent=0;
     modifiers.skillHistoryMultiplier=1;modifiers.ignoreAreaReduction=false;
-    modifiers.mpRecoveryFlat=0;modifiers.mpRecoveryPercent=0;
+    modifiers.mpRecoveryFlat=0;modifiers.mpRecoveryPercent=0;modifiers.weaknessFactorAdd=0;modifiers.automaticRepeats=[];
     const result={modifiers,terms:[],applied:[],deferred:[],inactive:[],unsupported:[],coverage:{passives:0,effects:0,applied:0,deferred:0,unsupported:0},damageStackingVerified:true,identicalEffectStackingVerified:false,evidence};
     const candidates=[],seenEffects=new Set();
     // An occurrence list replaces semantic references; it never adds a second copy of the reference list.
@@ -232,6 +257,11 @@
         if(!effect){result.unsupported.push({...record,reason:'Unknown effect ID.'});continue;}
         record.type=clean(effect.type);
         if(clean(bundle.TargetType)!=='Self' || clean(bundle.targetRelation)!=='Friendlies'){result.deferred.push({...record,reason:`Non-self effect (${bundle.TargetType}, ${bundle.targetRelation}) needs recipient/event simulation.`});continue;}
+        if(record.timing==='SpawnUnit' && clean(effect.proceedTiming)==='BeginTurn' && Number(effect.duration)>0){
+          const round=Number(context.round ?? context.turn ?? 1);
+          if(!Number.isInteger(round) || round<1){result.deferred.push({...record,reason:'Requires an actual fresh-battle round for opening-effect expiry.'});continue;}
+          if(round>Number(effect.duration)){result.inactive.push({...record,reason:'The opening effect has expired.'});continue;}
+        }
         const timing=record.timing;
         const events=providedContext.eventTimings || [];
         if(!['SpawnUnit','BeginDmgCalc'].includes(timing) && !events.includes(timing)){result.deferred.push({...record,reason:`Requires passive event ${timing}.`});continue;}
@@ -300,6 +330,7 @@
       modifiers.skillHistoryMultiplier=f(modifiers.skillHistoryMultiplier*f(f(f(term.value)*f(.01))+EPS));
       result.applied.push(term);result.terms.push(term);
     }
+    let honingApplied=false;
     for(const term of candidates.filter(t=>!['imbue','skillHistoryMultiplier'].includes(t.kind))){
       if(term.eventTiming && !(Array.isArray(context.eventTimings) && context.eventTimings.some(t=>clean(t)===term.eventTiming))){
         result.deferred.push({...term,reason:`Requires passive event ${term.eventTiming}.`});continue;
@@ -311,6 +342,49 @@
       const gate=filters(term,context);
       if(gate.state==='unknown'){result.deferred.push({...term,reason:gate.reason});continue;}
       if(gate.state==='no'){result.inactive.push(term);continue;}
+      if(term.kind==='honingSense'){
+        const ids=catalog.skillRules?.general?.meikyoIds;
+        if(!Array.isArray(ids) || !context.skill){result.deferred.push({...term,reason:'Requires the native Honing Sense skill-ID list and current skill.'});continue;}
+        if(!ids.includes(Number(context.skill.id))){result.inactive.push(term);continue;}
+        if(honingApplied){result.deferred.push({...term,reason:'Overlapping Honing Sense statuses do not receive an unverified additive bonus.'});continue;}
+        honingApplied=true;const value=f(f(f(term.value)*f(.01))+EPS)*100;
+        modifiers.damagePercent+=value;modifiers.critRatePercent+=term.criticalThreshold;
+        result.applied.push(term);result.terms.push({...term,kind:'damagePercent',value},{...term,kind:'critRatePercent',value:term.criticalThreshold});continue;
+      }
+      if(term.kind==='automaticRepeat'){
+        modifiers.automaticRepeats.push(term);result.applied.push(term);result.terms.push(term);continue;
+      }
+      if(term.actionFilter!==undefined){
+        const parameter=context.skill?.parameterType,variation=context.skill?.parameterVariationType;
+        if(!known(parameter) || !known(variation)){result.deferred.push({...term,reason:'Requires native action parameter and variation metadata.'});continue;}
+        const variations=term.actionFilter===0?['Decrease','RatioDecrease']:['Increase','RatioIncrease'];
+        if(clean(parameter)!=='HitPoint' || !variations.includes(clean(variation)) || term.actionFilter===0 && catalog.skillRules?.damageCalc?.[clean(context.skill?.calcType)]?.doCalcSkillEffect===false){result.inactive.push(term);continue;}
+      }
+      if(term.kind==='missingHpBonus'){
+        if(term.normalOnly){
+          const general=catalog.skillRules?.general?.normalAttackSkills;
+          const normal=Number(context.normalAttackSkillId);
+          if(!(Number(context.skill?.id)===normal || Array.isArray(general) && general.includes(Number(context.skill?.id)))){
+            if(!Number.isInteger(normal) || normal<=0)result.deferred.push({...term,reason:'Requires the native owner normal-attack ID or configured normal-attack skill list.'});else result.inactive.push(term);
+            continue;
+          }
+        }
+        let ratio;
+        if(known(context.currentHp) || known(context.maxHp)){
+          if(Number.isFinite(context.currentHp) && context.currentHp>=0 && Number.isFinite(context.maxHp) && context.maxHp>0)ratio=f(f(context.currentHp)/f(context.maxHp));
+        }else if(Number.isFinite(context.hpPercent) && context.hpPercent>=0)ratio=f(context.hpPercent/100);
+        const lost=Math.trunc(f(f(100)-f(ratio*f(100)))),steps=Math.trunc(lost/term.step);
+        const value=f(f(f(f(term.value)*f(.01))+EPS)*f(steps))*100;
+        if(!Number.isFinite(ratio) || !Number.isFinite(value) || lost<-2147483648 || lost>2147483647){result.deferred.push({...term,reason:'Requires finite native-representable HP state and a positive maximum HP.'});continue;}
+        modifiers[term.resultKind]+=value;
+        const applied={...term,kind:term.resultKind,value,lostHpPercent:lost,steps};result.applied.push(applied);result.terms.push(applied);continue;
+      }
+      if(term.kind==='badStatusBonus'){
+        const count=context.targetBadStatusCount;
+        if(!Number.isInteger(count) || count<0){result.deferred.push({...term,reason:'Requires the verified count of eligible target bad-status effect instances.'});continue;}
+        const value=Math.max(0,Math.min(f(f(term.cap)*f(.01)),f(f(f(term.value*count)*f(.01))+EPS)))*100;
+        modifiers.damagePercent+=value;const applied={...term,kind:'damagePercent',value,badStatusInstances:count};result.applied.push(applied);result.terms.push(applied);continue;
+      }
       if(term.kind==='fullGaugeBreakPercent'){
         // Native 0x145114310 compares current raw LB points with owner+0x2A0 capacity.
         // Costs are paid by the caller before this getter; there is no skill-attribute exclusion.

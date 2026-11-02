@@ -21,12 +21,14 @@ test('First Strike changes opening priority only, not every later global turn',(
  assert.equal(later.model.evaluateParty([later.early,later.late]).damage,650,'second round loses first-strike priority: normal 100 + 100, then 200 + 200 additional');
 });
 
-test('party support deadline keeps the last complete full-sample fight instead of partial support trials',()=>{
+test('party support ignores obsolete elapsed deadlines and completes the same initiative samples',()=>{
  const {model,early,late}=fixture();
  const baseline=model.evaluateParty([early,late]);
- early.evaluation.supportActions=[{kind:'damagePercent',skillId:230110}];
- const result=model.evaluateParty([early,late],{deadline:0});
- assert.equal(result.damage,baseline.damage);assert.equal(result.initiativeSamples,baseline.initiativeSamples);
- assert.equal(result.supportSearchTruncated,true);assert.equal(result.supportUsed,null);
- assert.match(result.warnings.at(-1),/last fully sampled party/);
+ const original=Date.now;
+ let ticks=0,result;
+ try{Date.now=()=>++ticks*1000000;result=model.evaluateParty([early,late],{deadline:0});}finally{Date.now=original;}
+ assert.deepEqual(result,baseline);
+ assert.equal(result.initiativeSamples,16);
+ assert.equal(result.supportSearchTruncated,false);
+ assert.ok(!result.warnings.some(warning=>/time limit/.test(warning)));
 });

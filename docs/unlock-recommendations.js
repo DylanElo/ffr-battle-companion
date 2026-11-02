@@ -32,10 +32,9 @@
 
   function recommend(catalog, snapshot, characterId, build, enemy, options = {}, {core, stats, battle}, progress = () => {}) {
     const result = {results: [], checked: 0, total: 0, unscored: 0, timedOut: false, evaluations: 0, baseline: null, scenario: null, modelEvidence: {}, reason: ''};
-    const started = Date.now(), timeMs = finite(options.timeMs) ? Math.max(0, options.timeMs) : 8000;
     const maxEvaluations = finite(options.maxEvaluations) ? Math.max(0, Math.floor(options.maxEvaluations)) : 26;
     let next;
-    const stopped = () => Date.now() - started >= timeMs || result.evaluations >= maxEvaluations;
+    const stopped = () => result.evaluations >= maxEvaluations;
     try {
       const invalid = core.validPlan(catalog, snapshot, characterId, build, {}, false);
       if (invalid) { result.reason = invalid; return result; }

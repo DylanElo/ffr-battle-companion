@@ -1,0 +1,525 @@
+{
+  "evidence": "Installed full BreakDamageVariation15116 handler145114160/common filter14510BC70/trailing gate14513BAB0 executed unchanged in private Unicorn. Environment table/owner/HP supplied; no gameprocessaccess.",
+  "effects": [
+    {
+      "id": 15116,
+      "row": "魔法ブレイクダメージ+30%(魔法ブレイカー)",
+      "type": "BreakDamageVariation",
+      "params": [
+        30,
+        -1,
+        -1,
+        0,
+        -1,
+        -1,
+        0,
+        2,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        0
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "BreakDmgCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": -1,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 0,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 1,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 0,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 1,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 2,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 3,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": false,
+      "nativeContribution": 0
+    },
+    {
+      "p14": 1,
+      "parameterType": 2,
+      "variationType": 4,
+      "damageType": 2,
+      "doCalcSkillEffect": true,
+      "nativeContribution": 0
+    }
+  ],
+  "limits": [
+    "Damage calculation row is synthetic and present. Native missing-row offensive path still reaches HP parameter/variation validation.",
+    "p14 gate is independent of p7 damage-type restriction; actual15116 also requiresMagic2."
+  ]
+}

@@ -102,20 +102,18 @@ test('an invalid baseline never turns ability optimization into an apparent unlo
   assert.match(result.reason, /Unsupported action/);
 });
 
-test('evaluation and elapsed-time budgets stop between calls without inventing unchecked gains', () => {
+test('finite evaluation budgets stop between calls while obsolete elapsed limits are ignored', () => {
   const f = fixture();
   const result = recommend(f.catalog, f.snapshot, 1, f.build, f.enemy, {maxEvaluations: 2}, f.deps);
   assert.equal(result.checked, 1); assert.equal(result.timedOut, true); assert.equal(f.calls.length, 2);
   assert.equal(result.unscored, 1); assert.deepEqual(result.results, []); assert.equal(result.evaluations, 2);
   const noTime = recommend(f.catalog, f.snapshot, 1, f.build, f.enemy, {timeMs: 0}, f.deps);
-  assert.equal(noTime.checked, 0); assert.equal(noTime.timedOut, true);
+  assert.equal(noTime.checked, 2); assert.equal(noTime.timedOut, false); assert.equal(noTime.evaluations, 4);
   const originalNow = Date.now; let clock = 0;
   try {
-    Date.now = () => clock;
-    f.deps.battle.createModel = () => ({evaluate: () => {clock += 10; return {valid: true, score: clock};}});
+    Date.now = () => clock += 1e12;
     const timed = recommend(f.catalog, f.snapshot, 1, f.build, f.enemy, {timeMs: 15}, f.deps);
-    assert.equal(timed.checked, 1); assert.equal(timed.timedOut, true); assert.equal(timed.results.length, 0);
-    assert.equal(timed.unscored, 1); assert.equal(timed.evaluations, 2);
+    assert.deepEqual(timed, noTime);
   } finally {Date.now = originalNow;}
 });
 

@@ -17,7 +17,8 @@ test('single worker checkpoints only improving owned, unreserved completed candi
   const context={importScripts:()=>{},performance:{now:()=>0},fetch:async()=>({ok:true,json:async()=>({})}),
     self:{postMessage:message=>messages.push(message)},CompanionBattle:{createModel:(c,s,e,options)=>{modelOptions=options;return model;}},
     CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:(c,s,id,callbacks)=>{
-      assert.equal(modelOptions.deadline-callbacks.options.deadline,2000,'Reserve completion time inside the original budget');
+      assert.equal(modelOptions.deadline,undefined);
+      assert.equal(callbacks.options.deadline,undefined);
       for(const candidate of candidates){callbacks.candidate(candidate);assert.equal(evaluated,0,'A checkpoint cannot trigger another model evaluation');}
       return [];
     },finalizeBuilds:()=>[]}};
@@ -136,8 +137,8 @@ test('party mode enables joint passive search while retaining required role supp
   assert.equal(modelOptions.jointOptimization,true);
   assert.equal(modelOptions.includeSupportOptions,true);
   assert.equal(modelOptions.fillAbilitySlots,false);
-  assert.equal(modelOptions.seedEvaluationTimeMs,80);
-  assert.ok(modelOptions.deadline>Date.now());
+  assert.equal(modelOptions.seedEvaluationTimeMs,undefined);
+  assert.equal(modelOptions.deadline,undefined);
 });
 
 test('worker never compares a partially evaluable saved party against a complete recommendation',async()=>{
@@ -182,7 +183,7 @@ test('party resource outputs update both displayed and explanation state while p
  assert.equal(JSON.stringify(member.explanationEvaluation.limitUses),JSON.stringify(partyState.limitUses[1]));
 });
 
-test('single worker reserves a bounded passive refinement on leading gear and preserves ability pins',async()=>{
+test('single worker refines leading gear with a finite evaluation count regardless of elapsed time and preserves ability pins',async()=>{
   const messages=[],calls=[],evaluated=[];let now=1000;
   const equipment={weaponId:10,armorId:20,accessoryIds:[30,31]};
   const first={characterId:1,visionId:100,equipment,key:'leader',score:10,evaluation:{skillId:1,skillCost:50}};
@@ -191,17 +192,19 @@ test('single worker reserves a bounded passive refinement on leading gear and pr
     self:{postMessage:m=>messages.push(m)},CompanionBattle:{createModel:()=>({evaluate:args=>{evaluated.push(args);return {valid:true};},explainAbilities:()=>[]})},
     CompanionSearch:{compareCandidates:require('../docs/search.js').compareCandidates,buildCandidates:(c,s,id,callbacks,options)=>{
       calls.push(options);
-      if(calls.length===1){assert.equal(options.deadline,7000);now=7000;return [first];}
-      assert.equal(options.maxEvaluations,1);assert.equal(options.seedEvaluationTimeMs,1500);assert.equal(options.deadline,8500);
+      if(calls.length===1){assert.equal(options.deadline,undefined);now=1e12;return [first];}
+      assert.equal(options.maxEvaluations,1);assert.equal(options.seedEvaluationTimeMs,undefined);assert.equal(options.deadline,undefined);
+      assert.equal(options.timeMs,undefined);assert.equal(options.evaluationTimeMs,undefined);
       assert.deepEqual([...options.visionIds],[100]);assert.equal(options.locks.weaponId,10);assert.equal(options.locks.armorId,20);
       assert.deepEqual([...options.locks.accessoryIds],[30,31]);assert.deepEqual([...options.locks.skillIds],[88]);
-      callbacks.evaluate({characterId:1,visionId:100,equipment});
+      callbacks.evaluate({characterId:1,visionId:100,equipment,jointAbilityBudget:4});
       assert.equal(evaluated.at(-1).refineEvaluation,first.evaluation);
-      now=8500;callbacks.candidate(refined);return [refined];
-    },finalizeBuilds:(c,s,rows,stock,callbacks)=>{assert.equal(callbacks.options.deadline,9000);return rows;}}};
+      assert.equal(evaluated.at(-1).jointAbilityBudget,undefined,'Final refinement restores the full model allowance after a four-trial seed');
+      now+=1e12;callbacks.candidate(refined);return [refined];
+    },finalizeBuilds:(c,s,rows,stock,callbacks)=>{assert.equal(callbacks.options.deadline,undefined);return rows;}}};
   vm.runInNewContext(source,context);
   await context.self.onmessage({data:{id:1,mode:'single',catalog:{enemies:[{id:1}]},snapshot:{characters:[{id:1,equipment:{visionId:100}}],resonances:[{id:100}]},
-    characterId:1,enemyId:1,available:[],options:{timeMs:8000,locks:{skillIds:[88]}}}});
+    characterId:1,enemyId:1,available:[],options:{timeMs:0,partyTimeMs:1,deadline:0,evaluationTimeMs:1,seedEvaluationTimeMs:1,locks:{skillIds:[88]}}}});
   assert.equal(calls.length,2);
   assert.equal(messages.find(m=>m.type==='result').result.results[0].score,12);
 });

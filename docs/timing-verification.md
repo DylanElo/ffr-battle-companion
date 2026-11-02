@@ -50,7 +50,7 @@ The previously unresolved nested expiry and duplicate queue boundaries are now t
 
 `tests/fixtures/native-commands.json` records the source asset-pair hashes and normalized recipes/filter facts. `tests/fixtures/native-gauge.json` retains eight independently executed gauge arithmetic cases. Native field `+0x284` records the full truncated increment before overflow; its wider gameplay use is unverified. The optimizer deliberately scores gauge actually retained within capacity.
 
-Run `node --test tests/timing.test.cjs tests/battle-reliability.test.cjs tests/search.test.cjs`. Tests cover reward recipients, overflow, recovery, within-action hit order, wrapper eligibility, support-LB capacity, critical effects after stagger, unmultiplied opening gauge, Opener ability selection and removal of invented allied contribution. A search-budget regression also preserves completed saved-loadout seeds when the deeper timing evaluations exhaust the time budget.
+Run `node --test tests/timing.test.cjs tests/battle-reliability.test.cjs tests/search.test.cjs`. Tests cover reward recipients, overflow, recovery, within-action hit order, wrapper eligibility, support-LB capacity, critical effects after stagger, unmultiplied opening gauge, Opener ability selection and removal of invented allied contribution. Search regressions preserve completed, scored saved-loadout seeds under finite evaluation limits; elapsed-time cutoffs have been removed.
 
 Next Step: exceptional initiative effects, mixed attack skills and full enemy action scripts remain separate work.
 

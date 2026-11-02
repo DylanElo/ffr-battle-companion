@@ -1,0 +1,34 @@
+{
+  "evidence": "Copied original installed BP scalar blocks145232253\u201327D +1452322E0/2E6\u20132F7 executed in isolated Unicorn with actual RainAttack BP25, equal55levels, noothermodifiers. No processaccess.",
+  "rows": [
+    {
+      "outgoingFactor": 1.16,
+      "critical": false,
+      "nativeCriticalFactor": 1,
+      "nativeRaw": 29.0,
+      "nativeAmount": 29
+    },
+    {
+      "outgoingFactor": 1.16,
+      "critical": true,
+      "nativeCriticalFactor": 1.5000001192092896,
+      "nativeRaw": 43.500003814697266,
+      "nativeAmount": 44
+    },
+    {
+      "outgoingFactor": 1.1600003242492676,
+      "critical": false,
+      "nativeCriticalFactor": 1,
+      "nativeRaw": 29.00000762939453,
+      "nativeAmount": 29
+    },
+    {
+      "outgoingFactor": 1.1600003242492676,
+      "critical": true,
+      "nativeCriticalFactor": 1.5000001192092896,
+      "nativeRaw": 43.50001525878906,
+      "nativeAmount": 44
+    }
+  ],
+  "conclusion": "ExistinglocalReactorBP29normal/44critical is nativecorrect. Semantic-onlytype92factor is a realprecisiongap but DOES NOTexplain thisparticularCodex1criticalpointdifference: botholdandexactnativefactorreturn44critical. ObservedCodexweightedstagger isconsistentwith43critical ratherthan44, givenverifiedcriticalprobability; exactreferencearithmeticcauseisnotassertedhere."
+}

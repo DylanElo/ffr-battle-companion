@@ -1,0 +1,82 @@
+{
+  "evidence": "Original installed HoningSense getters+membership predicate and first-BeginTurn decision branch in isolated Unicorn. General row/table environment is synthetic with explicit two-ID list; this does not independently establish installed listcontents. No gameprocessaccess.",
+  "getterVectors": [
+    {
+      "kind": "damage",
+      "skill": 402040,
+      "nativeValue": 0.40000009536743164
+    },
+    {
+      "kind": "damage",
+      "skill": 402130,
+      "nativeValue": 0.40000009536743164
+    },
+    {
+      "kind": "damage",
+      "skill": 220340,
+      "nativeValue": 0
+    },
+    {
+      "kind": "damage",
+      "skill": 446000,
+      "nativeValue": 0
+    },
+    {
+      "kind": "criticalRate",
+      "skill": 402040,
+      "nativeValue": 20
+    },
+    {
+      "kind": "criticalRate",
+      "skill": 402130,
+      "nativeValue": 20
+    },
+    {
+      "kind": "criticalRate",
+      "skill": 220340,
+      "nativeValue": 0
+    },
+    {
+      "kind": "criticalRate",
+      "skill": 446000,
+      "nativeValue": 0
+    }
+  ],
+  "turnBranchVectors": [
+    {
+      "turnIndex": 0,
+      "copiedBattleFlag": false,
+      "nativeSkipBeginTurnProceed": true
+    },
+    {
+      "turnIndex": 0,
+      "copiedBattleFlag": true,
+      "nativeSkipBeginTurnProceed": false
+    },
+    {
+      "turnIndex": 1,
+      "copiedBattleFlag": false,
+      "nativeSkipBeginTurnProceed": false
+    },
+    {
+      "turnIndex": 1,
+      "copiedBattleFlag": true,
+      "nativeSkipBeginTurnProceed": false
+    },
+    {
+      "turnIndex": 5,
+      "copiedBattleFlag": false,
+      "nativeSkipBeginTurnProceed": false
+    },
+    {
+      "turnIndex": 5,
+      "copiedBattleFlag": true,
+      "nativeSkipBeginTurnProceed": false
+    }
+  ],
+  "limitations": [
+    "Installed full Honing skill list requires extracted General row metadata, separate from membershipalgorithm proof.",
+    "Copiedbattleflagsemantic not yet named: first index0 skips BeginTurn lifetimeproceed onlywhenfalse.",
+    "No universal lifetime-extension immunity or livebattlecapture asserted."
+  ]
+}

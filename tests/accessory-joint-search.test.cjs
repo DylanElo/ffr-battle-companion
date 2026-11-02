@@ -90,7 +90,7 @@ test('equivalent accessory identities remain available for disjoint party alloca
   assert.equal(new Set(allocated).size,8);
 });
 
-test('deadline, maximum evaluations and per-loadout bounds stop recursive traversal without losing seeds',()=>{
+test('maximum evaluations and per-loadout bounds stop recursive traversal without losing seeds',()=>{
   const original=Date.now;let clock=0;
   try{
     Date.now=()=>clock;
@@ -104,61 +104,52 @@ test('deadline, maximum evaluations and per-loadout bounds stop recursive traver
   }finally{Date.now=original;}
 });
 
-test('Resonance seeds receive their smaller evaluation cap while full assignments keep the ordinary cap',()=>{
+test('seeds and full assignments have no elapsed-time evaluation caps',()=>{
   const {catalog,snapshot}=fixture([accessory(1,{PhysicalAttack:1}),accessory(2,{PhysicalAttack:2})]),seen=[];
   Search.buildCandidates(catalog,snapshot,1,{evaluate:args=>{seen.push(args);return {valid:true,score:1};}},
     {...baseOptions,seedEvaluationTimeMs:80,evaluationTimeMs:500});
   assert.ok(seen.length>1);
-  assert.equal(seen[0].evaluationTimeMs,80);
-  assert.ok(seen.slice(1).every(args=>args.evaluationTimeMs===500));
+  assert.ok(seen.every(args=>args.evaluationTimeMs===undefined));
 });
 
-test('a cheap cached seed is refined once at the full cap before the joint accessory walk',()=>{
+test('completed seed evaluations are reused exactly once throughout the accessory walk',()=>{
   const {catalog,snapshot}=fixture([accessory(1,{PhysicalAttack:1})]),calls=[];
   const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:args=>{
-    calls.push({cap:args.evaluationTimeMs,key:key(args.equipment.accessoryIds)});
-    return {valid:true,score:args.evaluationTimeMs===80?1:10};
+    calls.push(key(args.equipment.accessoryIds));return {valid:true,score:10};
   }},{...baseOptions,seedEvaluationTimeMs:80,evaluationTimeMs:500});
-  const baseKey=key(snapshot.characters[0].equipment.accessoryIds),baseCalls=calls.filter(call=>call.key===baseKey);
-  assert.deepEqual(baseCalls.map(call=>call.cap),[80,500]);
+  const baseKey=key(snapshot.characters[0].equipment.accessoryIds);
+  assert.equal(calls.filter(call=>call===baseKey).length,1);
   assert.equal(results.find(result=>key(result.equipment.accessoryIds)===baseKey).score,10);
-  assert.deepEqual(calls.slice(0,2).map(call=>call.cap),[80,500]);
+  assert.equal(new Set(calls).size,calls.length);
 });
 
-test('failed or weaker full-cap refinement preserves the legal cheap incumbent and is not retried repeatedly',()=>{
-  for(const refinement of [{valid:false,score:0},{valid:true,score:0}]){
-    const {catalog,snapshot}=fixture([accessory(1,{PhysicalAttack:1})]),baseKey=key(snapshot.characters[0].equipment.accessoryIds);
-    let baseCalls=0;
-    const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:args=>{
-      if(key(args.equipment.accessoryIds)!==baseKey)return {valid:true,score:2};
-      baseCalls++;return args.evaluationTimeMs===80?{valid:true,score:1}:refinement;
-    }},{...baseOptions,seedEvaluationTimeMs:80,evaluationTimeMs:500});
-    assert.equal(baseCalls,2);
-    assert.equal(results.find(result=>key(result.equipment.accessoryIds)===baseKey).score,1);
-  }
+test('invalid completed seed evaluations are not retried throughout the accessory walk',()=>{
+  const {catalog,snapshot}=fixture([accessory(1,{PhysicalAttack:1})]),baseKey=key(snapshot.characters[0].equipment.accessoryIds);
+  let baseCalls=0;
+  const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:args=>{
+    if(key(args.equipment.accessoryIds)!==baseKey)return {valid:true,score:2};
+    baseCalls++;return {valid:false,score:0};
+  }},baseOptions);
+  assert.equal(baseCalls,1);
+  assert.ok(results.length>0);
+  assert.ok(results.every(result=>key(result.equipment.accessoryIds)!==baseKey));
 });
 
-test('joint weighted vision slices leave room for accessory assignments after many cheap seeds',()=>{
-  const original=Date.now;
-  const run=jointOptimization=>{
-    let clock=0;Date.now=()=>clock;
+test('every owned vision keeps its seed and accessory traversal regardless of elapsed clock',()=>{
+  const original=Date.now;let clock=0;
+  try{
+    Date.now=()=>clock;
     const {catalog,snapshot}=fixture([accessory(1,{PhysicalAttack:1}),accessory(2,{PhysicalAttack:2})]);
     catalog.visions=Array.from({length:12},(_,i)=>({id:100+i}));
     snapshot.resonances=catalog.visions.map(vision=>({id:vision.id}));
-    const seen=[];
+    const explored=new Set(),seen=[];
     Search.buildCandidates(catalog,snapshot,1,{evaluate:args=>{
-      assert.ok(clock<60,'No evaluation may start after the shared deadline');
-      seen.push({cap:args.evaluationTimeMs,changed:args.equipment.accessoryIds.some(id=>id>0)});
-      clock=Math.min(60,clock+args.evaluationTimeMs);
+      seen.push(args);clock+=10000;
+      if(args.equipment.accessoryIds.some(id=>id>0))explored.add(args.visionId);
       return {valid:true,score:args.equipment.accessoryIds.filter(id=>id>0).length};
-    }},{...baseOptions,visionIds:catalog.visions.map(vision=>vision.id),visionSlices:true,jointOptimization,
-      deadline:60,seedEvaluationTimeMs:1,evaluationTimeMs:10});
-    assert.equal(seen.filter(call=>call.cap===1).length,12,'All owned Resonances retain their cheap seed');
-    assert.ok(clock<=60);
-    return seen.filter(call=>call.changed).length;
-  };
-  try{
-    assert.equal(run(false),0,'Legacy equal slices can spend each tiny slice solely on base refinement');
-    assert.ok(run(true)>0,'Joint mode must visit complete accessory assignments before the deadline');
+    }},{...baseOptions,visionIds:catalog.visions.map(vision=>vision.id),visionSlices:true,jointOptimization:true,
+      deadline:1,timeMs:1,seedEvaluationTimeMs:1,evaluationTimeMs:1});
+    assert.equal(explored.size,12);
+    assert.ok(seen.length<100,'Finite full assignments terminate without a time limit');
   }finally{Date.now=original;}
 });
