@@ -1,0 +1,291 @@
+{
+  "evidence": "Original installed Aggravation getter145146020 and target effect collector145237BF0 run unchanged in private Unicorn memory. Status rows/table services and private allocation/free are synthetic. No game process access, target calls, injection, game/save or product writes.",
+  "effects": [
+    {
+      "id": 12910,
+      "row": "状態異常の数ごとにダメージ倍率+15%(追い撃ち)",
+      "type": "DmgMulStatusConditionNum",
+      "params": [
+        15,
+        60,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 1,
+      "nativeContribution": 0.15000011026859283
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 2,
+      "nativeContribution": 0.3000001013278961
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 3,
+      "nativeContribution": 0.4500001072883606
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 4,
+      "nativeContribution": 0.5999999642372131
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 5,
+      "nativeContribution": 0.5999999642372131
+    },
+    {
+      "case": "separate instances, duplicate same status ID",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 1,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 6,
+      "nativeContribution": 0.5999999642372131
+    },
+    {
+      "case": "bad but not debuff",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true,
+          "debuff": false
+        }
+      ],
+      "eligibleCount": 1,
+      "nativeContribution": 0.15000011026859283
+    },
+    {
+      "case": "debuff-only is excluded",
+      "entries": [
+        {
+          "id": 2,
+          "bad": false,
+          "debuff": true
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "good status excluded",
+      "entries": [
+        {
+          "id": 3,
+          "bad": false,
+          "debuff": false
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "dead effect excluded",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true,
+          "dead": true
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "virtual2E0 true excluded",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true,
+          "excludedVirtual": true
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "status0 excluded",
+      "entries": [
+        {
+          "id": 0,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "missing row excluded",
+      "entries": [
+        {
+          "id": 4,
+          "missingRow": true
+        }
+      ],
+      "eligibleCount": 0,
+      "nativeContribution": 1.1920928955078125e-7
+    },
+    {
+      "case": "mixed eligibility",
+      "entries": [
+        {
+          "id": 1,
+          "bad": true
+        },
+        {
+          "id": 2,
+          "bad": false,
+          "debuff": true
+        },
+        {
+          "id": 3,
+          "bad": true,
+          "excludedVirtual": true
+        },
+        {
+          "id": 4,
+          "bad": true,
+          "dead": true
+        },
+        {
+          "id": 5,
+          "bad": true
+        }
+      ],
+      "eligibleCount": 2,
+      "nativeContribution": 0.3000001013278961
+    }
+  ],
+  "limits": [
+    "Synthetic target effects/status row metadata; not a fresh live combat capture.",
+    "Virtual+2E0 exclusion is executed using installed constant false/true leaves; its semantic name and all overriding effect classes are not inferred.",
+    "isBadStatus true is the native row gate; do not assume isDebuff alone qualifies.",
+    "This proves per-effect-instance counting, not that all same-status duplicates are legal to equip or persist together."
+  ]
+}

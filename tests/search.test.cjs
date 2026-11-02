@@ -92,7 +92,7 @@ test('leading party refinement gives every member a trial before further expensi
   const f=refinementFixture(),tried=[];
   const result=S.rankParties(f.catalog,f.snapshot,{options:{...f.options,deadline:6100,timeMs:100,partyTimeMs:6000},
     evaluate:args=>{tick(1);return f.evaluate(args);},
-    refine:args=>{tried.push(args.characterId);tick(args.evaluationTimeMs);return f.evaluate(args);},
+    refine:args=>{tried.push(args.characterId);tick(10000);return f.evaluate(args);},
     evaluateParty:(members,{samples}={})=>{tick(samples===4?25:2000);return {score:20};}});
   assert.deepEqual(tried.slice().sort(),[1,2]);
   assert.equal(result.results[0].score,20);
@@ -110,12 +110,12 @@ test('party refinement trims redundant paid role support while preserving the re
   assert.equal(checkpoints.at(-1).results[0].members.reduce((sum,member)=>sum+member.evaluation.skillCost,0),10);
 });
 
-test('party startup fallback cannot overwrite a stronger completed joint candidate on the same gear',()=>{
+test('party startup reuses its completed evaluation on the same gear',()=>{
   const {catalog,snapshot}=fixture(1);catalog.equipment=[];snapshot.inventory=[];
   catalog.visions=[];snapshot.resonances=[];snapshot.characters[0].equipment.visionId=-1;
   const result=S.rankParties(catalog,snapshot,{options:{partySize:1,maxResults:1,jointOptimization:true,
     timeMs:1000,partyTimeMs:1000,seedEvaluationTimeMs:80,evaluationTimeMs:500,perLoadoutBudget:4,maxEvaluations:100},
-    evaluate:({evaluationTimeMs})=>({score:evaluationTimeMs>80?30:10,equippedSkillIds:[]})});
+    evaluate:()=>({score:30,equippedSkillIds:[]})});
   assert.equal(result.results[0].score,30);
 });
 
@@ -132,11 +132,11 @@ test('a fully fixed party checkpoints its saved gear before option generation an
   assert.equal(result.results[0].score,20);
 });
 
-test('an early fully scored party survives global expiry before the expensive option sweep',()=>withClock(tick=>{
+test('a fully scored party remains available while elapsed clocks advance',()=>withClock(tick=>{
   const f=refinementFixture(),checkpoints=[];
   const result=S.rankParties(f.catalog,f.snapshot,{options:{...f.options,deadline:50,timeMs:10,partyTimeMs:40},
     evaluate:args=>{tick(1);return f.evaluate(args);},evaluateParty:(members,{deadline})=>{
-      assert.ok(deadline<=50);tick(100);return {score:20};},checkpoint:result=>checkpoints.push(result)});
+      assert.equal(deadline,undefined);tick(100);return {score:20};},checkpoint:result=>checkpoints.push(result)});
   assert.ok(checkpoints.length>0);
   assert.equal(result.results[0].score,20);
   assert.equal(S.validateParty(f.catalog,f.snapshot,result.results[0].members,f.options),'');
@@ -159,7 +159,7 @@ test('budget exhaustion preserves every completed Resonance seed, including the 
   assert.ok(result.some(c=>c.visionId===101 && c.score===100));
 });
 
-test('large accessory spaces preserve the baseline before a tiny time budget expires',()=>{
+test('large accessory spaces preserve the baseline without materializing combinations',()=>{
   const {catalog,snapshot}=fixture(1);
   catalog.equipment=Array.from({length:96},(_,i)=>({id:1000+i,name:'Accessory',type:'Accessory',stats:{}}));
   snapshot.inventory=catalog.equipment.map(e=>({id:e.id,quantity:4}));
@@ -381,7 +381,7 @@ test('completion does not silently fill an accessory whose effects cannot be eva
   assert.ok(result.gearReasons.filter(r=>r.slot==='accessory').every(r=>r.reason==='unsupported'));
 });
 
-test('party startup preserves saved setups without an unbounded alternative-Resonance sweep',()=>{
+test('party startup evaluates saved setups before alternative Resonances',()=>{
   const {catalog,snapshot}=fixture();
   const seen=[],originalNow=Date.now;
   let tick=0;
@@ -392,41 +392,31 @@ test('party startup preserves saved setups without an unbounded alternative-Reso
     }});
   }finally{Date.now=originalNow;}
   assert.deepEqual(seen.slice(0,4).map(input=>input.characterId),[1,2,3,4]);
-  assert.ok(seen.every(input=>input.visionId===snapshot.characters.find(c=>c.id===input.characterId).equipment.visionId));
+  assert.ok(seen.slice(0,4).every(input=>input.visionId===snapshot.characters.find(c=>c.id===input.characterId).equipment.visionId));
 });
-// A fake clock: each call advances it, so time budgets are exercised deterministically.
+// Advance a fake clock to prove elapsed time cannot truncate finite work.
 function withClock(fn){
   const originalNow=Date.now;let clock=0;
   try{Date.now=()=>clock;return fn(ms=>{clock+=ms;});}finally{Date.now=originalNow;}
 }
 
-test('a shared absolute deadline prevents candidate search from restarting its time budget',()=>withClock(tick=>{
+test('obsolete elapsed limits do not truncate candidate traversal',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(2);let calls=0;
-  S.buildCandidates(catalog,snapshot,1,{evaluate:()=>{calls++;tick(10);return {score:1};}},
-    {...options,deadline:5,timeMs:1000,visionIds:[100,101]});
-  assert.equal(calls,1,'Keep the first legal incumbent, then respect the worker deadline');
+  S.buildCandidates(catalog,snapshot,1,{evaluate:()=>{calls++;tick(10000);return {score:1};}},
+    {...options,deadline:5,timeMs:1,visionIds:[100,101],maxEvaluations:20});
+  assert.ok(calls>1);
+  assert.ok(calls<=20);
 }));
 
-test('finalization keeps completed gear and skips all comparisons after the shared deadline',()=>withClock(tick=>{
+test('finalization evaluates its finite comparisons after obsolete shared deadlines',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(1),equipment={weaponId:10,armorId:20,accessoryIds:[30,-1]};
   const member={characterId:1,visionId:100,equipment,score:100,roles:[],evaluation:{equippedSkillIds:[99]}};
-  tick(10);let calls=0;
+  tick(10000);let calls=0;
   const [result]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),{
-    options:{...options,deadline:5},evaluate:()=>{calls++;return {score:0};}});
-  assert.equal(calls,0);
+    options:{...options,deadline:5},evaluate:()=>{calls++;tick(10000);return {score:0};}});
+  assert.ok(calls>1);
   assert.deepEqual(result.equipment,equipment);
-  assert.ok(result.gearReasons.every(reason=>reason.reason==='budget-exhausted'));
-}));
-
-test('finalization stops after one slow callback spends the remaining time',()=>withClock(tick=>{
-  const {catalog,snapshot}=fixture(1),equipment={weaponId:-1,armorId:-1,accessoryIds:[-1,-1]};
-  const member={characterId:1,visionId:100,equipment,score:100,roles:[],evaluation:{equippedSkillIds:[]}};
-  let calls=0;
-  const [result]=S.finalizeBuilds(catalog,snapshot,[member],S.inventory(snapshot),{
-    options:{...options,deadline:5},evaluate:()=>{calls++;tick(10);return {score:0};}});
-  assert.equal(calls,1);
-  assert.deepEqual(result.equipment,equipment);
-  assert.ok(result.gearReasons.every(reason=>reason.reason==='budget-exhausted'));
+  assert.ok(result.gearReasons.every(reason=>reason.reason!=='budget-exhausted'));
 }));
 
 test('finalization preserves a supplied evaluation budget instead of granting unlimited probes',()=>{
@@ -439,26 +429,26 @@ test('finalization preserves a supplied evaluation budget instead of granting un
   assert.deepEqual(result.equipment,equipment);
   assert.ok(state.reasons.has('evaluation budget'));
 });
-test('a slow party simulation cannot run the search past its party time budget',()=>withClock(tick=>{
+test('slow party simulations finish a finite beam regardless of elapsed time',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(6);
   let simulations=0;
   S.rankParties(catalog,snapshot,{options:{...options,timeMs:1000,partyTimeMs:1000},evaluate:({characterId})=>({score:characterId}),
     evaluateParty:members=>{simulations++;tick(100);return {score:members.reduce((sum,m)=>sum+m.score,0)};}});
-  // Ten simulations fit the budget; the rest are the re-scored finalists and their slot completion.
-  assert.ok(simulations<500,`${simulations} party simulations`);
+  assert.ok(simulations>10,`${simulations} party simulations must not stop at the old time limit`);
+  assert.ok(simulations<100000,`${simulations} simulations remain bounded by the finite beam`);
 }));
-test('teams ranked after the party time budget are still compared, so the strongest team can win',()=>withClock(tick=>{
+test('all finite team combinations are compared despite large elapsed time',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(6);
   const result=S.rankParties(catalog,snapshot,{options:{...options,timeMs:1000,partyTimeMs:1000},evaluate:({characterId})=>({score:characterId}),
     evaluateParty:members=>{tick(100);return {score:members.reduce((sum,m)=>sum+m.score,0)};}});
   assert.deepEqual(result.results[0].members.map(m=>m.characterId).sort(),[3,4,5,6]);
 }));
-test('a candidate time budget spent on the first characters does not limit the search to the first team',()=>withClock(tick=>{
+test('slow candidate evaluation does not limit the search to the first team',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(6);
   const result=S.rankParties(catalog,snapshot,{options:{...options,timeMs:40},evaluate:({characterId})=>{tick(1);return {score:characterId};}});
   assert.deepEqual(result.results[0].members.map(m=>m.characterId).sort(),[3,4,5,6]);
 }));
-test('every character gets a share of the candidate time budget',()=>withClock(tick=>{
+test('every character receives its finite candidate search regardless of elapsed time',()=>withClock(tick=>{
   const {catalog,snapshot}=fixture(6);
   const explored=new Set();
   S.rankParties(catalog,snapshot,{options:{...options,timeMs:60},evaluate:({characterId,equipment})=>{

@@ -36,46 +36,36 @@
   }
   function defaults(options) {
     return {partySize:4,maxResults:3,maxEvaluations:120000,perLoadoutBudget:2500,
-      candidatesPerVision:6,beamWidth:120,timeMs:12000,minHealers:0,minProtectors:0,
+      candidatesPerVision:6,beamWidth:120,minHealers:0,minProtectors:0,
       reserveNonParty:false,...options};
   }
-  const deadlineAfter = ms => ms>0?Date.now()+ms:Infinity;
-  const evaluationCap=(options,baseline=false)=>{
-    const cap=baseline?(options.seedEvaluationTimeMs ?? options.evaluationTimeMs):options.evaluationTimeMs;
-    return Number.isFinite(cap) && cap>0?cap:Infinity;
-  };
   // Party simulations while searching use the first few of their reproducible paths; every party shown is re-scored on all of them.
   const QUICK_SAMPLES = 4;
   function stateFor(options) {
-    return {evaluations:0,cache:new Map(),cacheBudgets:new Map(),truncated:false,reasons:new Set(),
-      started:Date.now(),deadline:Number.isFinite(options.deadline)?options.deadline:deadlineAfter(options.timeMs),options};
+    return {evaluations:0,cache:new Map(),truncated:false,reasons:new Set(),
+      started:Date.now(),options};
   }
   function stopped(state) {
     const {options} = state;
-    const reason = state.evaluations>=options.maxEvaluations?'evaluation budget':
-      Date.now()>=state.deadline?'time budget':'';
+    const reason = state.evaluations>=options.maxEvaluations?'evaluation budget':'';
     if (reason) { state.truncated=true;state.reasons.add(reason);return true; }
     return false;
   }
   function evaluateOne(state, callbacks, characterId, visionId, equipment, baseline=false) {
     const key = `${characterId}:${visionId}:${keyOf(equipment)}`;
-    const requestedCap=evaluationCap(state.options,baseline),cached=state.cache.get(key);
-    state.cacheBudgets ||= new Map();
-    if (state.cache.has(key) && (state.cacheBudgets.get(key) ?? Infinity)>=requestedCap) return cached;
+    const cached=state.cache.get(key);
+    if (state.cache.has(key)) return cached;
     if (stopped(state) && !(baseline && state.evaluations===0 && state.options.maxEvaluations>0)) return cached || null;
     state.evaluations++;
-    // A larger-cap attempt replaces the cache fidelity even if it fails; retain any earlier legal incumbent.
-    state.cacheBudgets.set(key,requestedCap);
     const evaluation = callbacks.evaluate({characterId,visionId,equipment,enemy:callbacks.enemy,options:state.options,
-      ...(Number.isFinite(requestedCap)?{evaluationTimeMs:requestedCap}:{}),
+      // Establish a legal incumbent with a finite seed allowance before the full combination passes.
+      ...(baseline?{jointAbilityBudget:4}:{}),
       ...(state.options.locks?.skillIds?.length?{lockedSkillIds:state.options.locks.skillIds}:{})});
     if (!evaluation || evaluation.valid===false || !Number.isFinite(Number(evaluation.score))) {
-      if(cached)return cached;
       state.cache.set(key,null);return null;
     }
     const candidate={characterId,visionId,equipment:{...equipment,accessoryIds:equipment.accessoryIds.slice()},
       score:Number(evaluation.score),evaluation,roles:rolesOf(evaluation),key};
-    if(cached && compareCandidates(cached,candidate)<0)return cached;
     state.cache.set(key,candidate);
     callbacks.candidate?.(candidate);
     return candidate;
@@ -124,7 +114,8 @@
       else if(C.clean(type)==='Physic'){keys.add('Attack');keys.add('PhysicalAttack');}
       else if(C.clean(type)==='Divine')keys.add('Divine');
     };
-    if(action)addAttack(action.calcType);
+    if(action && C.clean(action.calcType)==='Magic' && C.clean(action.element)==='Light'){keys.add('Mind');keys.add('Divine');}
+    else if(action)addAttack(action.calcType);
     if(!keys.size){
       addAttack((catalog.visions || []).find(vision=>vision.id===visionId)?.attackType);
       for(const key of C.kitProfile([],native).keys)if(['PhysicalAttack','MagicalAttack'].includes(key)){
@@ -179,8 +170,7 @@
     const emptyGear={weaponId:positive(locks.weaponId)?Number(locks.weaponId):-1,armorId:positive(locks.armorId)?Number(locks.armorId):-1,
       accessoryIds:[...lockedAcc,...Array(slots-lockedAcc.length).fill(-1)]};
     const owned=new Set((snapshot.resonances || []).map(v=>v.id));
-    // Seed owned Resonances with saved gear before walking loadouts. Joint mode gives the leading seeds longer walks;
-    // legacy mode keeps equal remaining shares, and the saved Resonance always retains its first comparison.
+    // Seed owned Resonances before walking loadouts; the saved Resonance retains its first comparison.
     if (positive(locks.visionId) && !owned.has(Number(locks.visionId))) return [];
     const pool=[...(positive(locks.visionId)?[Number(locks.visionId)]:options.visionIds || [-1,...catalog.visions.filter(v=>owned.has(v.id)).map(v=>v.id)])]
       .sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId));
@@ -199,27 +189,23 @@
       for(let n=0;n<slots;n++)if(!(complete.accessoryIds[n]>0)){
         const item=fill('accessory');if(item){complete.accessoryIds[n]=item.id;remaining.set(item.id,remaining.get(item.id)-1);}
       }
-      // Publish scored gear before the expensive walk; never append unscored filler after time expires.
+      // Publish scored gear before the expensive walk; never append unscored filler.
       const seed=evaluateOne(state,callbacks,saved.id,id,complete,true) || evaluateOne(state,callbacks,saved.id,id,{...base,visionId:id},true);
       return [id,seed];
     }));
     const visions=[...seeds.keys()].sort((a,b)=>(b===saved.equipment.visionId)-(a===saved.equipment.visionId) || (seeds.get(b)?.score ?? -Infinity)-(seeds.get(a)?.score ?? -Infinity));
     const all=new Map([...seeds.values()].filter(Boolean).map(c=>[c.key,c]));
-    for (const [n,visionId] of visions.entries()) {
+    for (const visionId of visions) {
       const local=new Map();
-      // Native timing checks can exhaust the budget during seeding; retain that completed comparison.
+      // Retain the completed seed when the evaluation count is exhausted.
       if(seeds.get(visionId))local.set(keyOf(seeds.get(visionId).equipment),seeds.get(visionId));
       let attempts=0;
       let best=seeds.get(visionId);
-      const fairShare=1/(visions.length-n);
-      const sliceShare=options.jointOptimization && n<3?Math.max(.5,fairShare):fairShare;
-      const sliceEnd=options.visionSlices?Date.now()+(state.deadline-Date.now())*sliceShare:Infinity;
       const consider=(weaponId,armorId,accessoryIds)=>{
         if ((positive(locks.weaponId) && weaponId!==weaponIds[0]) || (positive(locks.armorId) && armorId!==armorIds[0]) || !holdsLocks(accessoryIds)) return true;
         const equip={weaponId,armorId,accessoryIds,visionId},key=keyOf(equip);
-        const cachedCap=state.cacheBudgets?.get(`${saved.id}:${visionId}:${key}`) ?? Infinity;
-        if (local.has(key) && cachedCap>=evaluationCap(state.options)) return true;
-        if (attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd) return false;
+        if (local.has(key)) return true;
+        if (attempts>=options.perLoadoutBudget || stopped(state)) return false;
         if (!fits(equip,available)) return true;
         attempts++;
         const candidate=evaluateOne(state,callbacks,saved.id,visionId,equip);
@@ -235,13 +221,13 @@
       const order=(ids,preferred)=>ids.slice().sort((a,b)=>Number(b===preferred && b>0)-Number(a===preferred && a>0) ||
         Number(b>0)-Number(a>0) || priorityOf(b)-priorityOf(a) || b-a);
       // Whole-build weapon/armor probes seed the joint walk, without eliminating any stat tradeoff.
-      const probeLimit=Math.floor(options.perLoadoutBudget/4),probeEnd=Date.now()+(Math.min(sliceEnd,state.deadline)-Date.now())/4;
+      const probeLimit=Math.floor(options.perLoadoutBudget/4);
       for(const weapon of order(weaponIds,base.weaponId)){
-        if(attempts>=probeLimit || Date.now()>=probeEnd)break;
+        if(attempts>=probeLimit)break;
         const current=best?.equipment || base;if(!consider(weapon,current.armorId,current.accessoryIds))break;
       }
       for(const armor of order(armorIds,base.armorId)){
-        if(attempts>=probeLimit || Date.now()>=probeEnd)break;
+        if(attempts>=probeLimit)break;
         const current=best?.equipment || base;if(!consider(current.weaponId,armor,current.accessoryIds))break;
       }
       const start=best?.equipment || base,preferredAccessories=new Set(start.accessoryIds);
@@ -250,7 +236,7 @@
       jointAccessories.push(-1);
       let interrupted=false;
       const stop=()=>{
-        if(attempts>=options.perLoadoutBudget || stopped(state) || Date.now()>=sliceEnd){interrupted=true;return true;}
+        if(attempts>=options.perLoadoutBudget || stopped(state)){interrupted=true;return true;}
         return false;
       };
       traverse:for(const weapon of order(weaponIds,start.weaponId))for(const armor of order(armorIds,start.armorId)){
@@ -423,8 +409,6 @@
   }
   function rankParties(catalog,snapshot,callbacks) {
     const options=defaults(callbacks.options || {}),state=stateFor(options);
-    const globalDeadline=Number.isFinite(options.deadline)?options.deadline:Infinity;
-    state.deadline=Math.min(globalDeadline,deadlineAfter(options.timeMs));
     if (typeof callbacks.evaluate!=='function') throw new Error('A native-mechanics evaluator is required.');
     if (!Number.isInteger(options.partySize) || options.partySize<1 || options.partySize>8) throw new Error('Party size must be between 1 and 8.');
     const native=new Set(catalog.characters.map(c=>c.id));
@@ -438,19 +422,18 @@
     const fairBudget=Math.floor(options.maxEvaluations/Math.max(1,people.length*visionCount*(options.reserveNonParty?teams.length:1)));
     options.perLoadoutBudget=Math.min(options.perLoadoutBudget,Math.max(2,fairBudget));
     // Preserve one saved setup per character; alternative Resonances belong to the bounded search.
-    const seedState=stateFor({...options,timeMs:0,deadline:globalDeadline}),fallback=new Map();
+    const seedState=stateFor(options),fallback=new Map();
     for(const id of people){
       const person=snapshot.characters.find(c=>c.id===id);
       fallback.set(id,buildCandidates(catalog,snapshot,id,callbacks,{...options,jointOptimization:false,perLoadoutBudget:0,visionIds:[Number(person.equipment.visionId)]},inventory(snapshot),seedState));
     }
-    state.cache=seedState.cache;state.cacheBudgets=seedState.cacheBudgets;state.evaluations=seedState.evaluations;
+    state.cache=seedState.cache;state.evaluations=seedState.evaluations;
     let considered=0,teamCount=0,reported=0;
     const progress=(message,force)=>{if(force || Date.now()-reported>=250){reported=Date.now();callbacks.progress?.(message);}};
     const nameOf=id=>catalog.characters.find(c=>c.id===id)?.name || `#${id}`;
     const sumOf=members=>({score:members.reduce((sum,m)=>sum+m.score,0),evaluation:null});
-    const partyScore=(members,samples,deadline=globalDeadline)=>{
-      if(Date.now()>=globalDeadline){state.truncated=true;state.reasons.add('time budget');return null;}
-      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options,deadline:Math.min(globalDeadline,deadline),...(samples?{samples}:{})});
+    const partyScore=(members,samples)=>{
+      const detail=callbacks.evaluateParty?.(members,{enemy:callbacks.enemy,options,...(samples?{samples}:{})});
       return callbacks.evaluateParty?(detail && Number.isFinite(Number(detail.score))?{score:Number(detail.score),evaluation:detail}:null):sumOf(members);
     };
     const stockFor=team=>options.reserveNonParty?reserveOutside(snapshot,team,inventory(snapshot)):inventory(snapshot);
@@ -464,13 +447,13 @@
     };
     const baselineIds=(snapshot.party || []).filter(id=>people.includes(id)).slice(0,options.partySize);
     let baseline=null;
-    // Establish a fully simulated stock-safe incumbent before spending time on alternative gear and Resonances.
+    // Establish a fully simulated stock-safe incumbent before searching alternative gear and Resonances.
     for(const team of [fixed.length===options.partySize?fixed:baselineIds,...teams]){
       if(team.length!==options.partySize || new Set(team).size!==team.length)continue;
       const members=team.map(id=>(fallback.get(id)||[])[0]),stock=stockFor(team);
       if(!members.every(Boolean) || validateParty(catalog,snapshot,members,options) ||
         [...countsOf(members.flatMap(member=>C.equipmentIds(member.equipment)))].some(([id,count])=>count>(stock.get(id)||0)))continue;
-      const scored=partyScore(members,undefined,Math.min(globalDeadline,Date.now()+1000));
+      const scored=partyScore(members);
       if(!scored)break;
       const result={members,...scored,stock,estimated:false};
       results.push(result);checkpoint(result);
@@ -491,28 +474,16 @@
       return candidateCache.get(key);
     };
     if(!options.reserveNonParty) {
-      // Every character gets an equal share of the remaining time before any team is ranked. Building them
-      // team by team let the first team spend the whole budget, leaving later characters only their saved setup.
+      // Generate each character’s bounded options before ranking complete teams.
       for(const [n,id] of people.entries()) {
         progress(`Building ${nameOf(id)}’s options (${n+1} of ${people.length})…`,true);
-        const end=state.deadline;
-        state.deadline=Math.min(end,Date.now()+(end-Date.now())/(people.length-n));
         candidatesFor(id,inventory(snapshot));
-        state.deadline=end;
       }
-      // Strongest teams first, so a party time budget only ever cuts the least promising ones short.
+      // Compare the strongest member-score bounds first.
       const bound=new Map(teams.map(team=>[team,team.reduce((sum,id)=>sum+Math.max(0,...candidatesFor(id,inventory(snapshot)).map(c=>c.score)),0)]));
       teams.sort((a,b)=>bound.get(b)-bound.get(a));
     }
-    // MP-dependent state can make full party scoring expensive; reserve time for refinement and final scoring. After this deadline the beam ranks the
-    // remaining parties by their members' own scores, so every team is still compared and the search ends.
-    const partyBudget=options.partyTimeMs ?? options.timeMs,partyDeadline=Math.min(globalDeadline,deadlineAfter(partyBudget));
-    const comparisonDeadline=partyDeadline-(options.jointOptimization && partyBudget>0?Math.min(4000,partyBudget*2/3):0);
-    const rank=members=>{
-      if(Date.now()<comparisonDeadline)return {...(partyScore(members,QUICK_SAMPLES,comparisonDeadline) || sumOf(members)),estimated:true};
-      state.truncated=true;state.reasons.add('party time budget');
-      return {...sumOf(members),estimated:true};
-    };
+    const rank=members=>({...(partyScore(members,QUICK_SAMPLES) || sumOf(members)),estimated:true});
     if(!baseline && baselineIds.length===options.partySize) {
       const members=baselineIds.map(id=>{
         const person=snapshot.characters.find(c=>c.id===id);
@@ -555,11 +526,10 @@
       // Spare results: filling empty slots can make near-duplicates identical.
       if(results.length>options.maxResults*5)results.length=options.maxResults*5;
     }
-    // Compare the leading finalists on every sample: the beam ranked them on a few, or on members' own scores after
-    // its deadline. The rest are spares for duplicates, and each party kept below is re-scored in full anyway.
+    // Compare leading finalists on every sample. The rest are spares for duplicates, and every party shown is fully re-scored.
     results.sort((a,b)=>b.score-a.score);
     for(const result of results.slice(0,options.jointOptimization?1:options.maxResults*2))if(result.estimated){
-      const scored=partyScore(result.members,undefined,options.jointOptimization?comparisonDeadline:globalDeadline);
+      const scored=partyScore(result.members);
       if(scored){Object.assign(result,scored,{estimated:false});checkpoint(result);}
     }
     results.sort((a,b)=>b.score-a.score);
@@ -567,11 +537,9 @@
     if(options.jointOptimization){
       for(const result of results.filter(result=>!result.estimated).slice(0,1)){
       const proposals=[],originalMembers=result.members;
-      const refineDeadline=partyDeadline-Math.min(1000,Math.max(0,(partyDeadline-Date.now())*.35));
-      let remaining=result.members.length;
       for(let n=0;n<result.members.length;n++){
-        const member=result.members[n],left=refineDeadline-Date.now(),share=left/Math.max(1,remaining--);
-        if(left<=0 || state.evaluations>=options.maxEvaluations || !member.evaluation?.turn)continue;
+        const member=result.members[n];
+        if(state.evaluations>=options.maxEvaluations || !member.evaluation?.turn)continue;
         progress(`Refining ${nameOf(member.characterId)} in a complete party…`);
         state.evaluations++;
         const supportRoles=['healer','protector'].filter(role=>{
@@ -579,13 +547,13 @@
           return result.members.filter((other,index)=>index!==n && other.roles.includes(role)).length<minimum;
         });
         const evaluation=(callbacks.refine || callbacks.evaluate)({characterId:member.characterId,visionId:member.visionId,equipment:member.equipment,
-          refineEvaluation:member.evaluation,supportRoles,evaluationTimeMs:Math.min(500,Math.max(1,share*.85)),
+          refineEvaluation:member.evaluation,supportRoles,
           ...(options.locks?.skillIds?.length?{lockedSkillIds:options.locks.skillIds}:{})});
         if(!evaluation || evaluation.valid===false || !Number.isFinite(Number(evaluation.score)))continue;
         const candidate={...member,evaluation,score:Number(evaluation.score),roles:rolesOf(evaluation)};
         proposals.push({n,candidate});
       }
-      const quickScore=members=>partyScore(members,QUICK_SAMPLES,Math.min(globalDeadline,Date.now()+Math.max(1,Math.min(250,(partyDeadline-Date.now())*.15))));
+      const quickScore=members=>partyScore(members,QUICK_SAMPLES);
       let members=result.members,quick=proposals.length?quickScore(members):null;
       for(const {n,candidate} of proposals){
         const member=members[n],next=members.slice();next[n]=candidate;

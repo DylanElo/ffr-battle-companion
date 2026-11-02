@@ -1,0 +1,1937 @@
+{
+  "evidence": "Original installed DmgMulHitPoint getter and full formula/gates in private Unicorn. Environment/table lookup/actor virtual/maxHP supplied; normal-attack predicate supplied separately as documented boolean; no gameprocessaccess.",
+  "effects": [
+    {
+      "id": 12908,
+      "row": "HP-10%ごとに魔法ダメージ倍率+6%(闇の儀式)",
+      "type": "DmgMulHitPoint",
+      "params": [
+        6,
+        10,
+        4,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 12925,
+      "row": "HP-1%ごとに、通常攻撃のダメージ倍率+1%(逆境の底力)",
+      "type": "DmgMulHitPoint",
+      "params": [
+        1,
+        1,
+        0,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "DamageCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 15119,
+      "row": "HP-1%ごとに、通常攻撃のブレイクダメージ倍率+1%(逆境の底力)",
+      "type": "DmgMulHitPoint",
+      "params": [
+        1,
+        1,
+        0,
+        1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "BreakDmgCalculation",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "effectId": 12908,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": -0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": -0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.06000011786818504
+    },
+    {
+      "effectId": 12908,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.12000023573637009
+    },
+    {
+      "effectId": 12908,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.12000023573637009
+    },
+    {
+      "effectId": 12908,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.12000023573637009
+    },
+    {
+      "effectId": 12908,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.12000023573637009
+    },
+    {
+      "effectId": 12908,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.24000047147274017
+    },
+    {
+      "effectId": 12908,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.24000047147274017
+    },
+    {
+      "effectId": 12908,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.3000005781650543
+    },
+    {
+      "effectId": 12908,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.48000094294548035
+    },
+    {
+      "effectId": 12908,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.48000094294548035
+    },
+    {
+      "effectId": 12908,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.5400010347366333
+    },
+    {
+      "effectId": 12908,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12908,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.6000011563301086
+    },
+    {
+      "effectId": 12908,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0.6000011563301086
+    },
+    {
+      "effectId": 12925,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": -0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": -0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.09000106900930405
+    },
+    {
+      "effectId": 12925,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.09000106900930405
+    },
+    {
+      "effectId": 12925,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 12925,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.19000226259231567
+    },
+    {
+      "effectId": 12925,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.19000226259231567
+    },
+    {
+      "effectId": 12925,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 12925,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 12925,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 12925,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 12925,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.49000582098960876
+    },
+    {
+      "effectId": 12925,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.49000582098960876
+    },
+    {
+      "effectId": 12925,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 12925,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.8900105953216553
+    },
+    {
+      "effectId": 12925,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.8900105953216553
+    },
+    {
+      "effectId": 12925,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 12925,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 12925,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 12925,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 12925,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9900117516517639
+    },
+    {
+      "effectId": 12925,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9900117516517639
+    },
+    {
+      "effectId": 12925,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 1.000011920928955
+    },
+    {
+      "effectId": 12925,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 12925,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 1.000011920928955
+    },
+    {
+      "effectId": 12925,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": -0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 1500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": -0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": -0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 1100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1001,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1000,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 999,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.09000106900930405
+    },
+    {
+      "effectId": 15119,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.09000106900930405
+    },
+    {
+      "effectId": 15119,
+      "hp": 901,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 900,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.10000118613243103
+    },
+    {
+      "effectId": 15119,
+      "hp": 899,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.19000226259231567
+    },
+    {
+      "effectId": 15119,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.19000226259231567
+    },
+    {
+      "effectId": 15119,
+      "hp": 801,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 15119,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 15119,
+      "hp": 800,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 15119,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.20000237226486206
+    },
+    {
+      "effectId": 15119,
+      "hp": 799,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.49000582098960876
+    },
+    {
+      "effectId": 15119,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.49000582098960876
+    },
+    {
+      "effectId": 15119,
+      "hp": 501,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 500,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.5000059604644775
+    },
+    {
+      "effectId": 15119,
+      "hp": 499,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.8900105953216553
+    },
+    {
+      "effectId": 15119,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.8900105953216553
+    },
+    {
+      "effectId": 15119,
+      "hp": 101,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 15119,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 15119,
+      "hp": 100,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 15119,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9000107049942017
+    },
+    {
+      "effectId": 15119,
+      "hp": 99,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 0.9900117516517639
+    },
+    {
+      "effectId": 15119,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 0.9900117516517639
+    },
+    {
+      "effectId": 15119,
+      "hp": 1,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": true,
+      "nativeContribution": 1.000011920928955
+    },
+    {
+      "effectId": 15119,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 1,
+      "normalAttack": false,
+      "nativeContribution": 0
+    },
+    {
+      "effectId": 15119,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": true,
+      "nativeContribution": 1.000011920928955
+    },
+    {
+      "effectId": 15119,
+      "hp": 0,
+      "maxHp": 1000,
+      "attribute": 4,
+      "normalAttack": false,
+      "nativeContribution": 0
+    }
+  ],
+  "limits": [
+    "Normal attack predicate itself is disassembled, not executed here: native owner+508 equality or General.normalAttackSkills list.",
+    "No live HP capture. MaximumHP fixed1000 in oracle; no zero-maxHP behavior asserted."
+  ]
+}

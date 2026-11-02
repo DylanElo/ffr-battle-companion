@@ -1,5 +1,5 @@
 /* Search runs off the UI thread; cancellation terminates this worker. */
-importScripts('core.js?v=27', 'passives.js?v=27', 'damage.js?v=7', 'mp-costs.js?v=1', 'stats.js?v=24', 'battle.js?v=47', 'search.js?v=38', 'unlock-recommendations.js?v=1');
+importScripts('core.js?v=27', 'passives.js?v=28', 'damage.js?v=7', 'mp-costs.js?v=1', 'stats.js?v=24', 'battle.js?v=48', 'search.js?v=39', 'unlock-recommendations.js?v=1');
 // The setup as saved: its gear, Resonance and equipped abilities, scored by the same model for a before/after.
 const savedSetup=(snapshot,id)=>snapshot.characters.find(c=>c.id===id);
 function currentOf(model,snapshot,id){
@@ -7,7 +7,7 @@ function currentOf(model,snapshot,id){
   const evaluation=model.evaluate({characterId:id,visionId:Number(saved.equipment.visionId),equipment:saved.equipment,current:true});
   return evaluation.valid?evaluation:null;
 }
-function describeParties(result,model,deadline,explain=false){
+function describeParties(result,model,explain=false){
   return {...result,results:(result.results || []).map(party=>({...party,members:party.members.map(member=>{
     const state={};
     for(const key of ['remainingHp','hpSpent','resourceSkips','stateLeafResults','resourceEvents','remainingGoodLuck','overclockCharges','overclockStates','overheat','demonForm','remainingMp','mpExhaustedRounds','extraActions','expectedExtraActions','phaseEvents','finishUses','expectedFinishUses','remainingGuards']){
@@ -17,14 +17,16 @@ function describeParties(result,model,deadline,explain=false){
     for(const key of ['gambleSamples','combatSamples','sampleKind','initiativeSamples'])if(Object.hasOwn(party.evaluation || {},key))state[key]=party.evaluation[key];
     if(state.stateLeafResults?.length)state.leafResults=state.stateLeafResults;
     state.limitUses=party.evaluation?.limitUses?.[member.characterId] || [];
-    return {...member,abilityReasons:explain && Date.now()<deadline?model.explainAbilities(member):[],
+    return {...member,abilityReasons:explain?model.explainAbilities(member):[],
       explanationEvaluation:{...member.evaluation,...state},
       evaluation:{...member.evaluation,...party.evaluation?.actionOverrides?.[member.characterId],...state}};
   })}))};
 }
 let rulesPromise;
 self.onmessage = async event => {
-  const {id,catalog,snapshot,enemyId,options={}} = event.data;
+  const {id,catalog,snapshot,enemyId} = event.data;
+  const options={...event.data.options};
+  for(const key of ['deadline','timeMs','partyTimeMs','evaluationTimeMs','seedEvaluationTimeMs','visionSlices'])delete options[key];
   try {
     rulesPromise ||= fetch('skill-rules.json?v=1').then(response=>{if(!response.ok)throw new Error('Native skill eligibility rules are unavailable.');return response.json();});
     catalog.skillRules=await rulesPromise;
@@ -36,11 +38,7 @@ self.onmessage = async event => {
       self.postMessage({id,type:'result',result});
       return;
     }
-    const budgetMs=options.timeMs>0?options.timeMs:10000;
-    const partyBudgetMs=event.data.mode==='single'?0:Math.max(0,options.partyTimeMs ?? budgetMs);
-    options.deadline=Date.now()+budgetMs+partyBudgetMs;
-    options.evaluationTimeMs=500;
-    options.seedEvaluationTimeMs=80;options.jointOptimization=true;
+    options.jointOptimization=true;
     const model=CompanionBattle.createModel(catalog,snapshot,enemy,{...options,includeSupportOptions:true,fillAbilitySlots:event.data.mode==='single'});
     if(model.requestError)throw new Error(model.requestError);
     const start=performance.now();
@@ -59,17 +57,14 @@ self.onmessage = async event => {
       self.postMessage({id,type:'progress',message:'Trying your Resonances, gear and ability combinations…'});
       const evaluate=args=>model.evaluate(args);
       const available=new Map(event.data.available);
-      // Leave part of the same budget to complete and compare the returned gear sets.
-      const candidateOptions={...options,deadline:options.deadline-Math.min(2000,budgetMs*.25)};
-      const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options:candidateOptions,candidate:checkpoint},
-        candidateOptions,available);
+      const candidates=CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,{evaluate,enemy,options,candidate:checkpoint},
+        options,available);
       const leader=candidates.filter(c=>!taken.has(c.visionId)).sort(CompanionSearch.compareCandidates)[0];
-      const refinementMs=Math.min(1500,options.deadline-Date.now()-250);
-      if(leader && refinementMs>0){
-        const refinement={...options,deadline:Date.now()+refinementMs,maxEvaluations:1,seedEvaluationTimeMs:refinementMs,
+      if(leader){
+        const refinement={...options,maxEvaluations:1,
           visionIds:[leader.visionId],locks:{...options.locks,visionId:leader.visionId,weaponId:leader.equipment.weaponId,
             armorId:leader.equipment.armorId,accessoryIds:leader.equipment.accessoryIds?.filter(id=>id>0) || []}};
-        const refineEvaluate=args=>model.evaluate({...args,refineEvaluation:leader.evaluation});
+        const refineEvaluate=args=>model.evaluate({...args,jointAbilityBudget:undefined,refineEvaluation:leader.evaluation});
         candidates.push(...CompanionSearch.buildCandidates(catalog,snapshot,event.data.characterId,
           {evaluate:refineEvaluate,enemy,options:refinement,candidate:checkpoint},refinement,available));
       }
@@ -88,7 +83,7 @@ self.onmessage = async event => {
       results.sort(CompanionSearch.compareCandidates);
       for(const member of results){
         member.evaluation={...member.evaluation,warnings:[...new Set([...(model.globalWarnings || []),...(member.evaluation.warnings || [])])]};
-        member.abilityReasons=Date.now()<options.deadline?model.explainAbilities(member):[];
+        member.abilityReasons=model.explainAbilities(member);
       }
       const baseline=event.data.baseline;
       const before=baseline?model.evaluate({characterId:event.data.characterId,visionId:baseline.visionId,equipment:baseline,
@@ -99,14 +94,14 @@ self.onmessage = async event => {
     self.postMessage({id,type:'progress',message:'Evaluating owned skills, passive combinations and legal equipment…'});
     const result=CompanionSearch.rankParties(catalog,snapshot,{
       progress:message=>self.postMessage({id,type:'progress',message}),
-      checkpoint:completed=>self.postMessage({id,type:'checkpoint',result:{...describeParties(completed,model,options.deadline),approximate:true,scenario:model.scenario,modelEvidence:model.evidence,
+      checkpoint:completed=>self.postMessage({id,type:'checkpoint',result:{...describeParties(completed,model),approximate:true,scenario:model.scenario,modelEvidence:model.evidence,
         reasons:[...(completed.reasons || []),'This legal party was fully scored before the search finished.']}}),
       evaluate:args=>model.evaluate(args),
       refine:args=>model.evaluate(args),
       evaluateParty:(members,context)=>model.evaluateParty(members,context),
       enemy,options
     });
-    const members=Date.now()<options.deadline?snapshot.party.filter(n=>n>0).map(n=>({characterId:n,evaluation:currentOf(model,snapshot,n)})):[];
+    const members=snapshot.party.filter(n=>n>0).map(n=>({characterId:n,evaluation:currentOf(model,snapshot,n)}));
     const completeCurrent=members.length===(options?.partySize ?? 4) && members.every(m=>m.evaluation) && new Set(members.map(m=>m.characterId)).size===members.length;
     result.current=completeCurrent?{...model.evaluateParty(members),characterIds:members.map(m=>m.characterId)}:null;
     result.elapsedMs=Math.round(performance.now()-start);
@@ -114,7 +109,7 @@ self.onmessage = async event => {
     result.reasons=[...new Set([...(result.reasons || []),'Joint gear and ability assignments use bounded complete-build scoring and whole-party refinement.'])];
     result.scenario=model.scenario;
     result.modelEvidence=model.evidence;
-    self.postMessage({id,type:'result',result:describeParties(result,model,options.deadline,true)});
+    self.postMessage({id,type:'result',result:describeParties(result,model,true)});
   } catch(error) {
     self.postMessage({id,type:'error',message:error.message || String(error)});
   }

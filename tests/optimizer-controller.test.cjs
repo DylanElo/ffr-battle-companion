@@ -15,16 +15,18 @@ function fixture(){
   const checkpoint=worker=>worker.onmessage({data:{id:worker.message.id,type:'checkpoint',result:completed}});
   return {controller,workers,timers,snapshot,handlers,click,start,completed,checkpoint};
 }
-test('party watchdog keeps a completed party and ignores a late result',()=>{
+test('party search has no watchdog and Stop keeps a completed party while ignoring a late result',()=>{
   const f=fixture(),worker=f.start();
-  assert.equal(worker.message.options.timeMs,10000);assert.equal(worker.message.options.partyTimeMs,6000);
-  const timer=[...f.timers.values()][0];assert.equal(timer.ms,20000);f.checkpoint(worker);timer.fn();
+  assert.equal(worker.message.options.timeMs,undefined);assert.equal(worker.message.options.partyTimeMs,undefined);
+  assert.equal(f.timers.size,0);f.checkpoint(worker);
+  assert.equal(f.controller.render().busy,true);assert.equal(worker.terminated,undefined);
+  f.click('data-cancel-party');
   const view=f.controller.render();assert.equal(view.busy,false);assert.equal(view.result.results[0].score,10);
-  assert.match(view.result.reasons.at(-1),/time limit.*best completed party/);assert.equal(worker.terminated,true);assert.equal(f.timers.size,0);
+  assert.match(view.result.reasons.at(-1),/stopped early.*best completed party/);assert.equal(worker.terminated,true);assert.equal(f.timers.size,0);
   worker.onmessage({data:{id:worker.message.id,type:'result',result:{results:[]}}});assert.equal(f.controller.render().result.results[0].score,10);
 });
-test('party timeout without a checkpoint stops cleanly without fabricating results',()=>{
-  const f=fixture(),worker=f.start();[...f.timers.values()][0].fn();const view=f.controller.render();
+test('party Stop without a checkpoint stops cleanly without fabricating results',()=>{
+  const f=fixture(),worker=f.start();f.click('data-cancel-party');const view=f.controller.render();
   assert.equal(view.busy,false);assert.equal(view.result,null);assert.match(view.error,/No legal party completed/);assert.equal(worker.terminated,true);
 });
 test('Stop and worker failure retain completed parties',()=>{

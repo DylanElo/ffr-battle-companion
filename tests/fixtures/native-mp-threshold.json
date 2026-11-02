@@ -1,0 +1,73 @@
+{
+  "evidence": "Original installed DamageMultiplierManaOverload12940 getter145115D00/commongate14510BEF0, actual parameter-record copy andfilterexecuteinprivateUnicorn; zero-recordconstructor/destructor aresuppliedenvironment. MaximumMP400 supplied, table/owner resolution supplied. No processaccess.",
+  "effect": {
+    "id": 12940,
+    "row": "攻撃前にMP75%以上で「まほう」ダメージ倍率+35%(魔の奔流)",
+    "type": "DamageMultiplier",
+    "params": [
+      35,
+      0,
+      -1,
+      4,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      75,
+      -1
+    ],
+    "status": "None",
+    "prob": 100,
+    "activationProbability": 100,
+    "duration": -1,
+    "applyTiming": "DamageCalculation",
+    "proceedTiming": "None",
+    "condition": {
+      "Condition": "None",
+      "param1": -1,
+      "param2": -1,
+      "param3": -1
+    }
+  },
+  "rows": [
+    {
+      "maxMp": 400,
+      "cachedPrePaymentMp": 300,
+      "currentPostPaymentMp": 240,
+      "nativeContribution": 0.3500001132488251
+    },
+    {
+      "maxMp": 400,
+      "cachedPrePaymentMp": 299,
+      "currentPostPaymentMp": 400,
+      "nativeContribution": 0
+    },
+    {
+      "maxMp": 400,
+      "cachedPrePaymentMp": 400,
+      "currentPostPaymentMp": 0,
+      "nativeContribution": 0.3500001132488251
+    },
+    {
+      "maxMp": 400,
+      "cachedPrePaymentMp": 0,
+      "currentPostPaymentMp": 400,
+      "nativeContribution": 0
+    },
+    {
+      "maxMp": 400,
+      "cachedPrePaymentMp": 300,
+      "currentPostPaymentMp": 300,
+      "nativeContribution": 0.3500001132488251
+    }
+  ],
+  "limits": [
+    "Full action lifecycle not executed byoracle; ordering is native disassembly proof.",
+    "CachedMPrawfield proven; no imaginary temporaryMP adjustment applied."
+  ]
+}

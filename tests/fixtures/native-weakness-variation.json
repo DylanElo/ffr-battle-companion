@@ -1,0 +1,564 @@
+{
+  "evidence": "Installed ResistMagVariation nativegetter145149010 and complete effect-aggregation instruction block14523A14E–1A6 execute unchanged in private Unicorn. Supplies selectedresistance and base table factor only; no process/game calls.",
+  "effects": [
+    {
+      "id": 1220,
+      "row": "ウィークブラスト",
+      "type": "ResistMagVariation",
+      "params": [
+        1,
+        120,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    },
+    {
+      "id": 12979,
+      "row": "弱点時ダメージ倍率+30％",
+      "type": "ResistMagVariation",
+      "params": [
+        1,
+        130,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "status": "None",
+      "prob": 100,
+      "activationProbability": 100,
+      "duration": -1,
+      "applyTiming": "None",
+      "proceedTiming": "None",
+      "condition": {
+        "Condition": "None",
+        "param1": -1,
+        "param2": -1,
+        "param3": -1
+      }
+    }
+  ],
+  "vectors": [
+    {
+      "effectIds": [],
+      "resistance": 0,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 0,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [],
+      "resistance": 1,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 1,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [],
+      "resistance": 2,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 2,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [],
+      "resistance": 3,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 3,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [],
+      "resistance": 4,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 4,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [],
+      "resistance": 5,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [],
+      "resistance": 5,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 0,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 0,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 1,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.7000000476837158
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 1,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3.200000047683716
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 2,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 2,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 3,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 3,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 4,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 4,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 5,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220
+      ],
+      "resistance": 5,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 0,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 0,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 1,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.8000000715255737
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 1,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3.3000001907348633
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 2,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 2,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 3,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 3,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 4,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 4,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 5,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        12979
+      ],
+      "resistance": 5,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 0,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 0,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 1,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 2
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 1,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 2,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 2,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 3,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 3,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 4,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 4,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 5,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        12979
+      ],
+      "resistance": 5,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 0,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 0,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 1,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.9000000953674316
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 1,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3.4000000953674316
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 2,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 2,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 3,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 3,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 4,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 4,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 5,
+      "baseElementFactor": 1.5,
+      "nativeFinalElementFactor": 1.5
+    },
+    {
+      "effectIds": [
+        1220,
+        1220
+      ],
+      "resistance": 5,
+      "baseElementFactor": 3,
+      "nativeFinalElementFactor": 3
+    }
+  ],
+  "formula": "if resistance==p0: f32(f32(p1*f32(.01))-f32(1-EPS)), else0; sum native contributions in f32 then add base factor in f32. Subtractconstant is0.9999998807907104 (1-EPS) at14779D430. No cap or clamp.",
+  "scope": [
+    "HPandBPcall samehelper145239F60: HP145232B4D,BP145231FC8; lastbool selects differentbase table, not differentbonuseligibility.",
+    "No critical gate in getter/aggregation; resulting factor is multiplied later by actual HP/BP critical factor."
+  ],
+  "limits": [
+    "Synthetic resolvedresistance/basefactors; native resistance resolution and multipleelement priority are separate existing enginepaths.",
+    "Repeatedinstances oracle proves arithmetic, not duplicate-equipment legality."
+  ]
+}

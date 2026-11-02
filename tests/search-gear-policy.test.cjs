@@ -16,11 +16,13 @@ test('one evaluation publishes a fully scored mage seed including damage-neutral
   assert.deepEqual(results[0].equipment,{weaponId:1,armorId:2,accessoryIds:[3],visionId:100});
   assert.equal(results[0].score,10);
 });
-test('a completed seed survives the deadline without a later unscored gear fill',()=>{
+test('elapsed time does not stop finite gear work and every published build was fully scored',()=>{
   const {catalog,snapshot}=fixture(),original=Date.now;let now=0,calls=0;
+  const scored=new Set(),key=equipment=>JSON.stringify([equipment.weaponId,equipment.armorId,...equipment.accessoryIds.slice().sort((a,b)=>a-b)]);
   try{Date.now=()=>now;
-    const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:()=>{calls++;now=10;return {valid:true,score:10};}}, {...options,maxEvaluations:10,deadline:5});
-    assert.equal(calls,1);assert.equal(C.equipmentIds(results[0].equipment).length,3);
+    const results=Search.buildCandidates(catalog,snapshot,1,{evaluate:({equipment})=>{calls++;now+=1000000;scored.add(key(equipment));return {valid:true,score:10};}}, {...options,maxEvaluations:10,deadline:5});
+    assert.equal(calls,10);assert.equal(C.equipmentIds(results[0].equipment).length,3);
+    for(const result of results){assert.ok(scored.has(key(result.equipment)));assert.equal(result.evaluation.valid,true);assert.equal(C.validPlan(catalog,snapshot,1,result.equipment,{},false),'');}
   }finally{Date.now=original;}
 });
 test('a one-evaluation mage seed prefers stronger neutral defense over a low item ID',()=>{

@@ -39,28 +39,28 @@ function fixture() {
   return {context, workers, timers, start, change, click};
 }
 
-test('a stalled Build ends at its watchdog without changing the draft', () => {
+test('Build stays cancellable without scheduling an elapsed-time watchdog', () => {
   const {context, timers, start} = fixture(), before = JSON.stringify(context.draft), worker = start();
-  const timer = [...timers.values()][0]; assert.equal(timer.ms, 12000);
-  timer.fn();
-  assert.equal(worker.terminated, true);
-  assert.equal(context.ui.deep.busy, undefined);
-  assert.match(context.ui.deep.error, /timed out/);
+  assert.equal(timers.size,0);
+  assert.equal(worker.message.options.timeMs,undefined);
+  assert.equal(worker.message.options.deadline,undefined);
+  assert.equal(worker.message.options.maxEvaluations,5000);
+  assert.equal(worker.terminated,undefined);
+  assert.equal(context.ui.deep.busy,true);
   assert.equal(JSON.stringify(context.draft), before);
   worker.onmessage({data: {id: worker.message.id, type: 'result', result: {results: []}}});
-  assert.match(context.ui.deep.error, /timed out/);
+  assert.equal(context.ui.deep.status,'ready');
+  assert.equal(worker.terminated,true);
 });
 
-test('the Build watchdog applies its completed checkpoint and cancels the worker', () => {
+test('Build keeps its completed checkpoint as preview until explicitly stopped', () => {
   const {context, timers, start} = fixture();
   context.applyBuildResult = (before, result) => ({draft: {...structuredClone(before), ...result.equipment}, dropped: []});
   const worker = start();
   worker.onmessage({data: {id: worker.message.id, type: 'checkpoint', result: {results: [{equipment: {weaponId: 90}, evaluation: {warnings: []}}]}}});
   assert.equal(context.ui.deep.busy, true); assert.equal(context.draft.weaponId, 10);
-  [...timers.values()][0].fn();
-  assert.equal(context.draft.weaponId, 90);
-  assert.equal(context.ui.deep.results[0].evaluation.searchTruncated, true);
-  assert.equal(worker.terminated, true);
+  assert.equal(context.ui.deep.results[0].equipment.weaponId,90);
+  assert.equal(worker.terminated,undefined);
   assert.equal(timers.size, 0);
 });
 
