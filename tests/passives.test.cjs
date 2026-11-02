@@ -5,7 +5,7 @@ const path=require('node:path');
 const P=require('../docs/passives.js');
 const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../docs/data/catalog.json'),'utf8'));
 const skillRules=JSON.parse(fs.readFileSync(path.join(__dirname,'../docs/skill-rules.json'),'utf8'));
-const skill={id:400100,dmgType:'Physic',attr:'Ability',element:'None'};
+const skill={id:400100,dmgType:'Physic',attr:'Ability',element:'None',parameterType:'HitPoint',parameterVariationType:'Decrease',calcType:'Physic'};
 const context={skill,hpPercent:100,mpPercent:100,lbPercent:0,commandId:1,broken:false,critical:false,extraPhase:false,statusIds:[],targetStatusIds:[]};
 const passiveFor=effectId=>catalog.passives.find(p=>p.effects.includes(effectId)).id;
 const nativeScionArea=require('./fixtures/native-scion-area.json');
