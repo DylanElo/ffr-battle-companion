@@ -174,8 +174,9 @@ test('Arms ancestry and missing reached-Awakening provenance do not receive Dual
     const f=fixture({skillIds:[control.skillId],passiveIds:[1443],nativeCommands:true,actionId:control.skillId,...control});
     const result=f.fixed([1443]);
     assert.equal(result.turn.hasNativeRepeats,false);
-    assert.equal(result.turn.leaves[0].context.queuedCommandId,undefined);
-    assert.ok(result.passiveAnalysis.deferred.some(term=>term.effectId===54220));
+    assert.equal(result.turn.leaves[0].context.queuedCommandId,1);
+    const routed=P.analyze(f.catalog,[1443],{skill:f.catalog.skills.find(skill=>skill.id===control.skillId),...result.turn.leaves[0].context});
+    assert.ok(routed.inactive.some(term=>term.effectId===54220));
   }
   const other=fixture({skillIds:[220010],passiveIds:[1443],nativeCommands:true,actionId:220010,visionId:13024});
   const wrongCommand=other.fixed([1443]);

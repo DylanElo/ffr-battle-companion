@@ -78,7 +78,7 @@
     if(!skill)return false;
     const accuracy=Number(skill.accuracy),mag=Number(skill.mag);
     return skill.relation==='Enemies' && clean(skill.parameterVariationType)==='Decrease' && clean(skill.parameterType)==='HitPoint' &&
-      (Number.isFinite(accuracy)?accuracy:100)>=100 && Number.isFinite(mag) && mag>0 &&
+      skill.accuracy!==null && skill.accuracy!==undefined && Number.isFinite(accuracy) && accuracy>=0 && Number.isFinite(mag) && mag>0 &&
       ['Physic','Magic','EscapeNum','SameLevel','GoodLuck'].includes(clean(skill.calcType)) && !['FinishBlow','LimitBurst','Summon','ThrowMoney'].includes(clean(skill.attr));
   }
   function eligible(item, character, slot) {

@@ -65,9 +65,9 @@ saveTest('native joint solver returns legal owned teams and preserves a healing 
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(snapshot.source.path)).digest('hex'),sourceHash);
 });
 
-test('healing magic and finishers cannot masquerade as repeatable normal attacks',()=>{
+test('ordinary attacks include modeled Deathblow while healing and finishers stay separate',()=>{
   assert.equal(B.isAttack(catalog.skills.find(s=>s.id===215000)),false);
-  assert.equal(B.isAttack(catalog.skills.find(s=>s.id===400530)),false,'Deathblow accuracy 50 must not masquerade as always-hit expected damage');
+  assert.equal(B.isAttack(catalog.skills.find(s=>s.id===400530)),true,'Deathblow uses native expected-hit scoring');
   for(const skill of catalog.skills.filter(s=>s.attr==='FinishBlow'))assert.equal(B.isAttack(skill),false);
 });
 

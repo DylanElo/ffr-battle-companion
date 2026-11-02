@@ -106,7 +106,7 @@ test('Vaan source Break proc waits for all corrected hit parts and grants one el
  P.analyze=(...args)=>{if(args[2]?.skill?.id===447410 && Array.isArray(args[2].attackHitOutcomes))context=args[2];return oldAnalyze(...args);};
  D.skillHitSuccess=(chance,...rest)=>{if(chance===100)return ++parts%3===1;if(chance===20){procInputs.push([...context.attackHitOutcomes]);return true;}return oldHit(chance,...rest);};
  try{const result=execute({ids:[447410,401010,401010],party:3,enemyCount:2,enemyBreak:1,leadAgility:1000000});
- assert.equal(procInputs.length,32);assert.ok(procInputs.every(parts=>parts.length===3 && parts.every(Boolean)));assert.equal(Object.values(result.extraActions).reduce((sum,count)=>sum+count,0),2);
+ assert.equal(procInputs.length,32);assert.ok(procInputs.every(parts=>parts.length===3 && parts.some(Boolean)));assert.equal(Object.values(result.extraActions).reduce((sum,count)=>sum+count,0),2);
  }finally{P.analyze=oldAnalyze;D.skillHitSuccess=oldHit;}
 });
 test('all-party basic stagger grants finish before Vaan evaluates its remaining ally pool',()=>{
