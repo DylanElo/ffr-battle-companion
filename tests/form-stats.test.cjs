@@ -36,6 +36,6 @@ test('primary-stat scale follows native float32 delta calculation then per-effec
  assert.equal(percent.stats.Attack,21,'both effect handlers pass through the per-effect integer aggregator');
 });
 test('AllParamUp refuses unknown trailing parameter layouts',()=>{
- const effect={...native.effects.find(e=>e.id===16603),params:[150,1,...Array(13).fill(-1)]};
+ const effect={...native.effects.find(e=>e.id===16603),params:[150,2,...Array(13).fill(-1)]};
  assert.match(P.decode(effect).unsupported,/primary-stat scale layout/);
 });

@@ -2,6 +2,8 @@
 
 This extends the [Mundanity comparison](essence-mundanity-verification.md) against [FF Resonance Codex](https://ffresonancecodex.com/calculator). Both builders use the corrected shared passive analysis and battle scoring. Agreement with another calculator is a cross-check; installed native execution resolves disagreements.
 
+**Historical comparison snapshot, retained at the 2026-11-02 native follow-up:** the 477 probes and coverage table below describe the earlier implementation. The [14-family native follow-up](new-native-passives-verification.md) adds stateful rules and transport; it does not rerun these public-calculator probes or retroactively change their outcomes.
+
 ## Comparison scope
 
 The inventory contains **114 damage-related passives**, including Mundanity as a prior verified control, across **477 fixed-loadout probes**. It covers outgoing HP/stagger damage, criticals, damage caps, area effects, higher-stat selection and casting effects, including conditional members. Sustain, survival-only and utility families are outside this inventory.
@@ -42,7 +44,7 @@ Entered HP percentages and qualified status counts in scalar probes are controll
 
 Default normal attacks come from installed `DT_BtlUnitAIParameter.fightSkillId`: characters 1001–1005 use 401010–405010, Archwitch Fina 1006 uses 408010, Jake 1007 uses 406010, and Sakura 1008 uses **407010**. This is a default table proof; arbitrary runtime overrides remain outside it.
 
-Automatic repeats with setup rotations, luck policies or overlapping temporary command modifiers remain excluded with a warning; their state transport has not been proved. Other RepeatAction layouts, including Dual Guns, are not inferred from 54212.
+Automatic repeats with setup rotations, luck policies or overlapping temporary command modifiers remain excluded with a warning; their state transport has not been proved. This comparison verified only RepeatAction 54212. Dual Guns 54220 has separate native proof in the [follow-up](new-native-passives-verification.md), rather than being inferred from 54212.
 
 ## Intentional reference differences
 
@@ -58,17 +60,17 @@ Regression fixtures retain numeric native outcomes in `tests/fixtures/native-hp-
 
 ## Remaining limits and search behavior
 
-Versatility needs the actual current-command ActiveSkill grants, not a count of all learned skills or Spirit IDs. Improvement needs a transported prior completed-normal-attack counter. The Hand That Heals, True Stagger, Heroic Nature, Trigger, Lone Lion, Thievery, Play Rough, Odin's Blessing, Dual Guns, Bastion and Perfect Serenity still have unmodeled state/effect families. Conditional command, steal, on-defeat, protection and random-effect context also remains incomplete for affected sources. Agreement while these effects are inactive is not evidence that they work. These omissions can change the best real damage build. Generic DamageMultiplier/CritMul percentage handling also does not reproduce every native per-instance float32 epsilon and mixed aggregation boundary; the exact fixtures here do not prove universal bit-for-bit equivalence.
+The [native follow-up](new-native-passives-verification.md) addresses 13 previously identified stateful families plus Trigger-Happy within explicit boundaries: prior completed normal actions, physical active IDs plus reached equipped-Vision Sync grants, saved successful steals, completed recovery results, prior-attacker identity, live same-side protection and qualified automatic repeats. These are not the same grouping as the historical table's 13 blocked passives, which also includes unavailable source/action cases. Unknown selected-command routes, mid-fight history, unsupported status/recovery actions, on-defeat state and other random-effect layouts remain incomplete. Agreement while an effect is inactive is not evidence that it works. These boundaries can change the best real damage build. Generic DamageMultiplier/CritMul percentage handling also does not reproduce every native per-instance float32 epsilon and mixed aggregation boundary; the exact fixtures here do not prove universal bit-for-bit equivalence.
 
 Elapsed-time cutoffs and automatic UI watchdog cancellation have been removed from both builders, shared evaluation, explanations, unlock recommendations and party comparison. Legacy time/deadline options do not reinstate them. Searches retain finite evaluation counts, candidate pruning, joint-assignment limits, a party beam and explicit Stop. A small finite seed-assignment allowance establishes a legal completed incumbent before the deeper passes. Stop terminates the worker and retains its last completed legal checkpoint; unfinished evaluations are discarded.
 
 The UI currently allows up to 5,000 character candidate evaluations and 12,000 party candidate evaluations, with further finite per-loadout/assignment caps. These are work limits, not elapsed-time limits. Full searches can take substantially longer, including many minutes for expensive inventories. Removing the clock does not make the finite search exhaustive or prove a global optimum. Deferred/unsupported effects remain visible rather than receiving invented bonuses.
 
-## Validation
+## Historical comparison validation
 
 The local CI command `node --test` passed with 827 tests and 14 existing skips. Populated browser checks kept both searches running beyond their former UI cutoffs. Stop retained a fully scored Sakura build with 8/8 abilities at 505/516 AP and a legal four-member party with 8/8 abilities per member. No browser errors or warnings were recorded. This checks progress and cancellation, not completion time for a full unrestricted production inventory search.
 
-## Passive inventory and coverage
+## Historical passive inventory and coverage
 
 The final column names effect IDs without an active numeric agreement in these probes; it is not a claim that every listed effect is unsupported locally.
 
